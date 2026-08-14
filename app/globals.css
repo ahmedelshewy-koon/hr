@@ -141,6 +141,28 @@ html,body{background:var(--bg)}
 .notification-pop{border-color:var(--card-border);border-radius:var(--card-radius);box-shadow:0 18px 50px rgba(16,24,40,.14)}
 .drawer{inset-block:12px;inset-inline-end:12px;border-radius:22px;box-shadow:0 24px 70px rgba(7,20,38,.22);overflow:hidden}
 
+.department-card-button{width:100%;background:#fff;color:inherit;text-align:start;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.department-card-button:hover{transform:translateY(-2px);border-color:#b9ccef;box-shadow:0 12px 28px rgba(16,55,105,.1)}
+.department-open{position:absolute;inset-block-start:16px;inset-inline-end:15px;color:#8794a6}
+.app[dir="ltr"] .department-open svg{transform:rotate(180deg)}
+.department-manager{min-height:48px;padding:10px 11px;border-radius:10px;background:#f6f8fc;border:1px solid #e8edf4}
+.department-manager>small,.department-manager>b{display:block}
+.department-manager>b{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#27364d;font-size:10px}
+.department-card-button footer span{margin-inline-start:auto;color:#2b64bd;font-weight:650}
+.department-drawer{width:min(680px,100%)}
+.department-structure-body{background:#f8fafc}
+.manager-field{padding:15px 16px;margin-bottom:12px;border:1px solid #d8e5f8;border-radius:12px;background:#fff}
+.hierarchy-key{display:flex;align-items:center;gap:9px;margin:0 4px 12px;color:#718096;font-size:9px}
+.hierarchy-key>span{display:flex;align-items:center;gap:5px}.hierarchy-key b{min-width:22px;height:22px;padding:0 5px;display:grid;place-items:center;border-radius:7px;background:#eaf2ff;color:#245fbf}.hierarchy-key>i{height:1px;flex:1;background:#dfe6ef}
+.hierarchy-list{display:flex;flex-direction:column;gap:8px}
+.hierarchy-row{min-height:70px;margin-inline-start:calc(var(--org-level) * 14px);padding:10px 11px;display:grid;grid-template-columns:auto 32px minmax(110px,1fr) minmax(150px,.85fr);gap:9px;align-items:center;border:1px solid #e2e8f0;border-inline-start:3px solid #b9c9df;border-radius:11px;background:#fff;box-shadow:0 3px 10px rgba(20,38,65,.035)}
+.hierarchy-row:has(.level-badge.manager){border-inline-start-color:#2866ca;background:#fbfdff}
+.level-badge,.org-node-level{min-width:42px;padding:4px 6px;border-radius:999px;background:#eef2f7;color:#68778c;font-size:8px;font-weight:750;text-align:center;white-space:nowrap}
+.level-badge.manager,.org-node-level.manager{background:#e5efff;color:#2360bf}
+.hierarchy-person{min-width:0}.hierarchy-person b,.hierarchy-person small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hierarchy-person b{font-size:10px}.hierarchy-person small{margin-top:3px;color:#7c899b;font-size:8px}
+.hierarchy-row>label small{display:block;margin-bottom:5px;color:#778598;font-size:8px}.hierarchy-row>label select{width:100%;height:34px;padding:0 8px;border:1px solid #dce3ec;border-radius:8px;background:#fff;color:#3c4a5f;font-size:9px}
+.primary:disabled{cursor:not-allowed;opacity:.55}
+
 @media(max-width:1050px){
   .app{gap:18px}
   .sidebar{width:210px}
@@ -169,6 +191,8 @@ html,body{background:var(--bg)}
   .department-grid{padding:14px;gap:12px}
   .settings-grid,.settings-grid.wide{gap:12px}
   .drawer{inset:8px;width:calc(100% - 16px);border-radius:18px}
+  .hierarchy-row{margin-inline-start:0;grid-template-columns:auto 32px minmax(0,1fr)}
+  .hierarchy-row>label,.hierarchy-row>.status{grid-column:2/-1}
 }
 @media(max-width:450px){
   .app{padding:9px}

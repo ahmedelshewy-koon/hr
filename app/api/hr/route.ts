@@ -10,6 +10,7 @@ const ACTIONS = ["view","create","edit","delete","approve","export","manage_sett
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
+  await d1.prepare("CREATE TABLE IF NOT EXISTS system_settings (id SERIAL PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, value_json TEXT NOT NULL DEFAULT '{}', updated_by_user_id INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
   const roleNames = ["Super Admin","Admin","HR Manager","HR","Direct Manager","Employee"];
   for (const name of roleNames) await d1.prepare("INSERT OR IGNORE INTO roles (name, description, is_system, created_at, updated_at) VALUES (?, ?, 1, ?, ?)").bind(name, `${name} system role`, now, now).run();
   const superRole = await d1.prepare("SELECT id FROM roles WHERE name = 'Super Admin'").first<{ id: number }>();
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
     await ensureSeed(d1);
     const user = await currentUser(request,d1);
     await authorize(d1,user,"dashboard","view");
-    const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,roleRows,userRows,auditRows] = await Promise.all([
+    const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
       d1.prepare("SELECT e.*,d.name_en AS department_name,j.name_en AS job_title_name,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250").all(),
       d1.prepare("SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en").all(),
       d1.prepare("SELECT j.*,d.name_en AS department_name,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id GROUP BY j.id,d.name_en ORDER BY j.name_en").all(),
@@ -73,9 +74,10 @@ export async function GET(request: Request) {
       d1.prepare("SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id GROUP BY r.id ORDER BY r.id").all(),
       d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.last_login_at,u.role_id,r.name AS role_name,e.name_en AS employee_name,d.name_en AS department_name FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY u.id").all(),
       d1.prepare("SELECT a.*,u.email AS user_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50").all(),
+      d1.prepare("SELECT setting_key,value_json,updated_at FROM system_settings ORDER BY setting_key").all(),
     ]);
     const permissions = await d1.prepare("SELECT role_id,module,action,allowed FROM permissions ORDER BY role_id,module,action").all();
-    return Response.json({ currentUser:user, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results });
+    return Response.json({ currentUser:user, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
 }
@@ -101,6 +103,32 @@ export async function POST(request: Request) {
       if(employeeRole) await d1.prepare("INSERT INTO users (email,employee_id,role_id,status,must_change_password,created_at,updated_at) VALUES (?,?,?,'active',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(email,result!.id,employeeRole.id).run();
       await audit(d1,request,user,"create","employees","employee",String(result!.id),null,{code,nameEn,email});
       return Response.json({ok:true,id:result!.id,employeeCode:code},{status:201});
+    }
+    if(action==="update_employee") {
+      await authorize(d1,user,"employees","edit");
+      const employeeId=Number(payload.employeeId);
+      if(!employeeId) throw new Response("Employee is required",{status:400});
+      const before=await d1.prepare("SELECT * FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Record<string,unknown>>();
+      if(!before) throw new Response("Employee not found",{status:404});
+      const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name"),email=required(payload.workEmail,"Work email").toLowerCase();
+      const managerId=Number(payload.managerId)||null;
+      if(managerId===employeeId) throw new Response("An employee cannot manage themselves",{status:400});
+      await d1.prepare("UPDATE employees SET name_en=?,name_ar=?,work_email=?,fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,department_id=?,job_title_id=?,manager_id=?,start_date=?,end_date=?,employment_status=?,salary=?,salary_currency=?,country=?,work_location=?,employment_type=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+        .bind(nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,Number(payload.departmentId)||null,Number(payload.jobTitleId)||null,managerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,employeeId).run();
+      await d1.prepare("UPDATE employees SET organizational_level=CASE WHEN ? IS NULL THEN 1 ELSE COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) END WHERE id=?").bind(managerId,managerId,employeeId).run();
+      await d1.prepare("UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(email,employeeId).run();
+      await audit(d1,request,user,"update","employees","employee",String(employeeId),before,payload);
+      return Response.json({ok:true,id:employeeId});
+    }
+    if(action==="save_system_settings") {
+      await authorize(d1,user,"system_settings","manage_settings");
+      const settingKey=required(payload.settingKey,"Setting key");
+      const values=payload.values && typeof payload.values==="object" ? payload.values : {};
+      const before=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key=?").bind(settingKey).first<Record<string,unknown>>();
+      const valueJson=JSON.stringify(values);
+      await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(settingKey,valueJson,user.id).run();
+      await audit(d1,request,user,"update","system_settings","setting",settingKey,before,values);
+      return Response.json({ok:true,settingKey,values});
     }
     if(action==="save_department_hierarchy") {
       await authorize(d1,user,"departments","edit");
@@ -138,6 +166,27 @@ export async function POST(request: Request) {
       await audit(d1,request,user,"update","departments","department",String(departmentId),before,{managerEmployeeId,levels:Object.fromEntries(levels)});
       return Response.json({ok:true,levels:Object.fromEntries(levels)});
     }
+    if(action==="save_organization_levels") {
+      await authorize(d1,user,"departments","edit");
+      const assignments=Array.isArray(payload.assignments)?payload.assignments as Json[]:[];
+      if(!assignments.length) throw new Response("At least one employee level is required",{status:400});
+      const rows=(await d1.prepare("SELECT e.id,d.manager_employee_id FROM employees e LEFT JOIN departments d ON d.id=e.department_id WHERE e.employment_status!='deleted'").all()).results as {id:number;manager_employee_id:number|null}[];
+      const employeeById=new Map(rows.map(row=>[Number(row.id),row]));
+      const updates:{employeeId:number;level:number}[]=[];
+      for(const assignment of assignments) {
+        const employeeId=Number(assignment.employeeId), level=Number(assignment.level);
+        const employee=employeeById.get(employeeId);
+        if(!employee) throw new Response("Employee not found",{status:404});
+        if(!Number.isInteger(level)||level<0||level>20) throw new Response("Level must be a whole number between 0 and 20",{status:400});
+        const isDepartmentManager=employeeId===Number(employee.manager_employee_id);
+        if(isDepartmentManager&&level!==0) throw new Response("Department managers must remain at level 0",{status:400});
+        if(!isDepartmentManager&&level===0) throw new Response("Only a department manager can use level 0",{status:400});
+        updates.push({employeeId,level});
+      }
+      await d1.batch(updates.map(update=>d1.prepare("UPDATE employees SET organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(update.level,update.employeeId)));
+      await audit(d1,request,user,"update","organization_chart","employee_levels",undefined,null,{count:updates.length,updates});
+      return Response.json({ok:true,count:updates.length});
+    }
     if(action==="create_request") {
       await authorize(d1,user,"employee_requests","create");
       let employeeId=Number(payload.employeeId)||user.employee_id;
@@ -166,27 +215,6 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance","create");
       let employeeId=Number(payload.employeeId)||user.employee_id;
       if(!employeeId) employeeId=(await d1.prepare("SELECT id FROM employees ORDER BY id LIMIT 1").first<{id:number}>())?.id;
-    if(action==="save_organization_levels") {
-      await authorize(d1,user,"departments","edit");
-      const assignments=Array.isArray(payload.assignments)?payload.assignments as Json[]:[];
-      if(!assignments.length) throw new Response("At least one employee level is required",{status:400});
-      const rows=(await d1.prepare("SELECT e.id,d.manager_employee_id FROM employees e LEFT JOIN departments d ON d.id=e.department_id WHERE e.employment_status!='deleted'").all()).results as {id:number;manager_employee_id:number|null}[];
-      const employeeById=new Map(rows.map(row=>[Number(row.id),row]));
-      const updates:{employeeId:number;level:number}[]=[];
-      for(const assignment of assignments) {
-        const employeeId=Number(assignment.employeeId), level=Number(assignment.level);
-        const employee=employeeById.get(employeeId);
-        if(!employee) throw new Response("Employee not found",{status:404});
-        if(!Number.isInteger(level)||level<0||level>20) throw new Response("Level must be a whole number between 0 and 20",{status:400});
-        const isDepartmentManager=employeeId===Number(employee.manager_employee_id);
-        if(isDepartmentManager&&level!==0) throw new Response("Department managers must remain at level 0",{status:400});
-        if(!isDepartmentManager&&level===0) throw new Response("Only a department manager can use level 0",{status:400});
-        updates.push({employeeId,level});
-      }
-      await d1.batch(updates.map(update=>d1.prepare("UPDATE employees SET organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(update.level,update.employeeId)));
-      await audit(d1,request,user,"update","organization_chart","employee_levels",undefined,null,{count:updates.length,updates});
-      return Response.json({ok:true,count:updates.length});
-    }
       if(!employeeId) throw new Response("Employee profile required",{status:400});
       const eventType=required(payload.eventType,"Event type");
       const last=await d1.prepare("SELECT event_type FROM attendance_logs WHERE employee_id=? ORDER BY event_at DESC LIMIT 1").bind(employeeId).first<{event_type:string}>();

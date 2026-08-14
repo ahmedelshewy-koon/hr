@@ -94,4 +94,12 @@ export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(), userId: integer("user_id"), action: text("action").notNull(), module: text("module").notNull(), recordType: text("record_type"), recordId: text("record_id"), previousValue: text("previous_value"), newValue: text("new_value"), ipAddress: text("ip_address"), createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 }, (t) => [index("idx_audit_module_created").on(t.module, t.createdAt), index("idx_audit_user_created").on(t.userId, t.createdAt)]);
 
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: text("setting_key").notNull(),
+  valueJson: text("value_json").notNull().default("{}"),
+  updatedByUserId: integer("updated_by_user_id"),
+  ...timestamps,
+}, (t) => [uniqueIndex("idx_system_settings_key").on(t.settingKey)]);
+
 export const postgresHealthcheck = sql`select 1`;

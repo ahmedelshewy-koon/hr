@@ -29,6 +29,13 @@
       "when": 1786700303173,
       "tag": "0003_organization-department-tree",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786700711280,
+      "tag": "0004_nice_mordo",
+      "breakpoints": true
     }
   ]
 }

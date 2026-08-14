@@ -204,7 +204,7 @@ html,body{background:var(--bg)}
 
 /* Compact enterprise typography system */
 :root{
-  --font-enterprise:var(--font-plex-sans-arabic),"IBM Plex Sans Arabic",Arial,sans-serif;
+  --font-enterprise:var(--font-cairo),"Cairo",Arial,sans-serif;
   --type-page:24px;
   --type-section:18px;
   --type-kpi:24px;

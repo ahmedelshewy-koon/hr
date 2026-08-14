@@ -115,3 +115,44 @@
 
 @media(max-width:1180px){.org-insights{grid-template-columns:repeat(2,minmax(0,1fr))}.org-department-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.org-department-grid::before{left:25%;right:25%}}
 @media(max-width:760px){.org-insights{grid-template-columns:1fr;gap:10px;margin-bottom:14px}.org-insight{min-height:82px;padding:14px}.org-toolbar{align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}.org-toolbar>span{display:none}.org-toolbar .org-search{width:100%}.org-canvas{min-height:440px;padding:24px 14px 18px}.org-executive-card{grid-template-columns:46px minmax(0,1fr)}.org-executive-card>.avatar{width:46px;height:46px}.org-executive-card>em{display:none}.org-main-connector{height:42px}.org-main-connector>span{top:12px}.org-department-grid{grid-template-columns:1fr}.org-department-grid::before,.org-department-branch::before,.org-division-tree>.org-tree-node::before{display:none}.org-department-branch:hover{transform:none}.org-tree-children{margin-inline-start:3px;padding-inline-start:9px}}
+
+/* Spacious organization tree */
+.org-insights,.org-toolbar,.org-canvas{font-family:var(--font-cairo),"Cairo",Arial,sans-serif}
+.org-toolbar{padding:14px 16px;gap:14px;border-radius:18px}
+.org-toolbar>div b{font-size:15px;font-weight:700}.org-toolbar>div small{font-size:12px}
+.org-edit-levels,.org-level-actions .outline,.org-level-actions .primary{height:40px!important;padding:0 13px!important;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:10px!important;font-size:11px!important;font-weight:650}
+.org-edit-levels{border:1px solid #cdd8e6!important;background:#fff!important;color:#29466f!important}
+.org-edit-levels:hover{border-color:#9db5d5!important;background:#f6f9fd!important}
+.org-level-actions{display:flex;gap:7px}
+.org-canvas{padding:46px 38px 42px;background:#f3f6fa;overflow:visible;border:1px solid #dce3ec}
+.org-canvas::before{display:none}
+.org-executive-card{width:min(520px,100%);min-height:112px;padding:20px 22px;border:1px solid #8eb3ed;border-radius:20px;box-shadow:0 16px 34px rgba(38,82,145,.14)}
+.org-executive-card b{font-size:19px}.org-executive-card span{font-size:13px}.org-executive-card small{font-size:10px}
+.org-level-label{font-size:11px;padding:7px 12px}
+.org-main-connector{height:54px}
+.org-department-grid::before,.org-division-tree>.org-tree-node::before{display:none}
+.org-division-tree{gap:28px}
+.org-tree-node{padding:18px;border:1px solid #d3dce8;border-top:4px solid var(--org-accent);border-radius:20px;background:#fff;box-shadow:0 10px 28px rgba(28,46,72,.09)}
+.org-tree-node.depth-0{outline:5px solid rgba(255,255,255,.75)}
+.org-tree-department{min-height:70px;grid-template-columns:48px minmax(0,1fr) auto;gap:13px}
+.org-tree-department .department-icon{width:46px;height:46px;border-radius:13px}
+.org-tree-department>div>small{font-size:10px;letter-spacing:.04em}.org-tree-department h3{font-size:18px;font-weight:700}.org-tree-department p{margin-top:4px;font-size:11px}
+.org-tree-department>b{min-width:48px;padding:8px;border-radius:12px;font-size:17px}.org-tree-department>b small{font-size:9px}
+.org-tree-manager{min-height:62px;margin-top:14px;padding:10px 12px;grid-template-columns:auto 38px minmax(0,1fr);gap:10px;border:1px solid #cbd9ec;border-radius:13px;background:#f1f6fd}
+.org-tree-manager .avatar,.org-tree-employee .avatar{width:36px;height:36px;font-size:10px}
+.org-tree-manager small{font-size:9px}.org-tree-manager b{font-size:12px}
+.org-level-number{width:34px;height:34px;display:grid;place-items:center;border:1px solid #d2dbe7;border-radius:10px;background:#fff;color:#31435c;font-size:13px;font-weight:750;line-height:1}
+.org-level-number.manager{border-color:#9ebbea;background:#e6f0ff;color:#1f5dbb}
+.org-tree-employees{margin-top:12px;gap:9px}
+.org-tree-employee{min-height:58px;padding:10px 11px;grid-template-columns:36px 38px minmax(0,1fr);gap:10px;border:1px solid #dbe2eb;border-radius:12px;background:#fff;box-shadow:0 3px 9px rgba(28,46,72,.045)}
+.org-tree-employee:hover{border-color:#b8c9de;box-shadow:0 5px 14px rgba(28,46,72,.08)}
+.org-tree-employee b{font-size:12px}.org-tree-employee small{margin-top:3px;font-size:9px}
+.org-level-input{width:36px;height:36px;padding:0 2px;border:2px solid #3476d5;border-radius:10px;background:#fff;color:#163f78;font-size:13px;font-weight:750;text-align:center;outline:0}
+.org-level-input::-webkit-inner-spin-button{opacity:1}
+.org-tree-children{margin-top:18px;margin-inline-start:0;padding:16px;gap:16px;border:1px solid #e0e6ee;border-radius:16px;background:#f5f7fa}
+.org-tree-children>.org-tree-node{padding:15px;border:1px solid #cfd8e4;border-top:3px solid var(--org-accent);border-radius:15px;background:#fff;box-shadow:0 6px 16px rgba(28,46,72,.065)}
+.org-tree-children>.org-tree-node::before{display:none}
+.org-tree-node.depth-2{padding:14px}.org-tree-node.depth-2 .org-tree-department{min-height:60px}.org-tree-node.depth-2 .department-icon{width:42px;height:42px}
+
+@media(max-width:1180px){.org-division-tree{gap:20px}.org-canvas{padding-inline:24px}}
+@media(max-width:760px){.org-toolbar{padding:13px}.org-level-actions{width:100%}.org-level-actions>button,.org-edit-levels{flex:1}.org-edit-levels{width:100%}.org-canvas{padding:22px 12px}.org-tree-node{padding:14px}.org-tree-children{padding:11px}.org-tree-department h3{font-size:16px}}

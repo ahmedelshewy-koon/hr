@@ -163,6 +163,27 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance","create");
       let employeeId=Number(payload.employeeId)||user.employee_id;
       if(!employeeId) employeeId=(await d1.prepare("SELECT id FROM employees ORDER BY id LIMIT 1").first<{id:number}>())?.id;
+    if(action==="save_organization_levels") {
+      await authorize(d1,user,"departments","edit");
+      const assignments=Array.isArray(payload.assignments)?payload.assignments as Json[]:[];
+      if(!assignments.length) throw new Response("At least one employee level is required",{status:400});
+      const rows=(await d1.prepare("SELECT e.id,d.manager_employee_id FROM employees e LEFT JOIN departments d ON d.id=e.department_id WHERE e.employment_status!='deleted'").all()).results as {id:number;manager_employee_id:number|null}[];
+      const employeeById=new Map(rows.map(row=>[Number(row.id),row]));
+      const updates:{employeeId:number;level:number}[]=[];
+      for(const assignment of assignments) {
+        const employeeId=Number(assignment.employeeId), level=Number(assignment.level);
+        const employee=employeeById.get(employeeId);
+        if(!employee) throw new Response("Employee not found",{status:404});
+        if(!Number.isInteger(level)||level<0||level>20) throw new Response("Level must be a whole number between 0 and 20",{status:400});
+        const isDepartmentManager=employeeId===Number(employee.manager_employee_id);
+        if(isDepartmentManager&&level!==0) throw new Response("Department managers must remain at level 0",{status:400});
+        if(!isDepartmentManager&&level===0) throw new Response("Only a department manager can use level 0",{status:400});
+        updates.push({employeeId,level});
+      }
+      await d1.batch(updates.map(update=>d1.prepare("UPDATE employees SET organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(update.level,update.employeeId)));
+      await audit(d1,request,user,"update","organization_chart","employee_levels",undefined,null,{count:updates.length,updates});
+      return Response.json({ok:true,count:updates.length});
+    }
       if(!employeeId) throw new Response("Employee profile required",{status:400});
       const eventType=required(payload.eventType,"Event type");
       const last=await d1.prepare("SELECT event_type FROM attendance_logs WHERE employee_id=? ORDER BY event_at DESC LIMIT 1").bind(employeeId).first<{event_type:string}>();

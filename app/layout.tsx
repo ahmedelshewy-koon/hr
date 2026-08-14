@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Cairo } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const plexSansArabic = IBM_Plex_Sans_Arabic({
-  variable: "--font-plex-sans-arabic",
+const cairo = Cairo({
+  variable: "--font-cairo",
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${plexSansArabic.variable} antialiased`}
+        className={`${cairo.variable} antialiased`}
       >
         {children}
       </body>

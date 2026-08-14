@@ -62,8 +62,8 @@ export async function GET(request: Request) {
     const user = await currentUser(request,d1);
     await authorize(d1,user,"dashboard","view");
     const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,roleRows,userRows,auditRows] = await Promise.all([
-      d1.prepare("SELECT e.*,d.name_en AS department_name,j.name_en AS job_title_name,m.name_en AS manager_name FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' ORDER BY e.id DESC LIMIT 250").all(),
-      d1.prepare("SELECT d.*,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' GROUP BY d.id ORDER BY d.name_en").all(),
+      d1.prepare("SELECT e.*,d.name_en AS department_name,j.name_en AS job_title_name,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250").all(),
+      d1.prepare("SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en").all(),
       d1.prepare("SELECT j.*,d.name_en AS department_name,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id GROUP BY j.id,d.name_en ORDER BY j.name_en").all(),
       d1.prepare("SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY q.id DESC LIMIT 250").all(),
       d1.prepare("SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY a.work_date DESC,a.id DESC LIMIT 250").all(),
@@ -88,14 +88,52 @@ export async function POST(request: Request) {
     if(action==="create_employee") {
       await authorize(d1,user,"employees","create");
       const nameEn=required(payload.nameEn,"English name"), nameAr=required(payload.nameAr,"Arabic name"), email=required(payload.workEmail,"Work email").toLowerCase();
+      const managerId=Number(payload.managerId)||null;
       const max=await d1.prepare("SELECT COALESCE(MAX(id),0)+1 AS next FROM employees").first<{next:number}>();
       const code=`EMP-${String(max?.next??1).padStart(5,"0")}`;
       const result=await d1.prepare("INSERT INTO employees (employee_code,name_en,name_ar,work_email,fingerprint_code,personal_phone,work_phone,nationality,gender,birth_date,identification_number,address,department_id,job_title_id,manager_id,start_date,end_date,employment_status,salary,salary_currency,country,work_location,employment_type,schedule_type,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id")
-        .bind(code,nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,Number(payload.departmentId)||null,Number(payload.jobTitleId)||null,Number(payload.managerId)||null,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480).first<{id:number}>();
+        .bind(code,nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,Number(payload.departmentId)||null,Number(payload.jobTitleId)||null,managerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480).first<{id:number}>();
+      if(managerId) await d1.prepare("UPDATE employees e SET organizational_level=COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) WHERE e.id=?").bind(managerId,result!.id).run();
       const employeeRole=await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>();
       if(employeeRole) await d1.prepare("INSERT INTO users (email,employee_id,role_id,status,must_change_password,created_at,updated_at) VALUES (?,?,?,'active',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(email,result!.id,employeeRole.id).run();
       await audit(d1,request,user,"create","employees","employee",String(result!.id),null,{code,nameEn,email});
       return Response.json({ok:true,id:result!.id,employeeCode:code},{status:201});
+    }
+    if(action==="save_department_hierarchy") {
+      await authorize(d1,user,"departments","edit");
+      const departmentId=Number(payload.departmentId), managerEmployeeId=Number(payload.managerEmployeeId);
+      if(!departmentId||!managerEmployeeId) throw new Response("Department and manager are required",{status:400});
+      const members=(await d1.prepare("SELECT id,manager_id FROM employees WHERE department_id=? AND employment_status!='deleted'").bind(departmentId).all()).results as {id:number;manager_id:number|null}[];
+      if(!members.some(member=>Number(member.id)===managerEmployeeId)) throw new Response("The department manager must belong to this department",{status:400});
+      const supplied=Array.isArray(payload.assignments)?payload.assignments as Json[]:[];
+      const memberIds=new Set(members.map(member=>Number(member.id)));
+      const parents=new Map<number,number|null>();
+      for(const member of members) {
+        const assignment=supplied.find(item=>Number(item.employeeId)===Number(member.id));
+        const requested=Number(assignment?.managerId)||null;
+        const parent=Number(member.id)===managerEmployeeId?null:(requested||managerEmployeeId);
+        if(parent!==null&&!memberIds.has(parent)) throw new Response("Every direct manager must belong to the same department",{status:400});
+        if(parent===Number(member.id)) throw new Response("An employee cannot manage themselves",{status:400});
+        parents.set(Number(member.id),parent);
+      }
+      const levels=new Map<number,number>();
+      const resolveLevel=(employeeId:number,path=new Set<number>()):number=>{
+        if(levels.has(employeeId)) return levels.get(employeeId)!;
+        if(path.has(employeeId)) throw new Response("The reporting structure contains a cycle",{status:400});
+        path.add(employeeId);
+        const parent=parents.get(employeeId)??null;
+        const level=parent===null?0:resolveLevel(parent,path)+1;
+        if(level>20) throw new Response("The reporting structure is too deep",{status:400});
+        path.delete(employeeId); levels.set(employeeId,level); return level;
+      };
+      for(const member of members) resolveLevel(Number(member.id));
+      const before=await d1.prepare("SELECT manager_employee_id FROM departments WHERE id=?").bind(departmentId).first<Record<string,unknown>>();
+      await d1.batch([
+        d1.prepare("UPDATE departments SET manager_employee_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(managerEmployeeId,departmentId),
+        ...members.map(member=>d1.prepare("UPDATE employees SET manager_id=?,organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parents.get(Number(member.id)),levels.get(Number(member.id)),member.id)),
+      ]);
+      await audit(d1,request,user,"update","departments","department",String(departmentId),before,{managerEmployeeId,levels:Object.fromEntries(levels)});
+      return Response.json({ok:true,levels:Object.fromEntries(levels)});
     }
     if(action==="create_request") {
       await authorize(d1,user,"employee_requests","create");

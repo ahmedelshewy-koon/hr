@@ -26,6 +26,7 @@ export const employees = pgTable("employees", {
   personalPhone: text("personal_phone"), workPhone: text("work_phone"), nationality: text("nationality"),
   gender: text("gender"), birthDate: text("birth_date"), identificationNumber: text("identification_number"), address: text("address"),
   departmentId: integer("department_id"), jobTitleId: integer("job_title_id"), managerId: integer("manager_id"),
+  organizationalLevel: integer("organizational_level").notNull().default(1),
   startDate: text("start_date").notNull(), endDate: text("end_date"), employmentStatus: text("employment_status").notNull().default("active"),
   salary: doublePrecision("salary"), salaryCurrency: text("salary_currency").default("SAR"), country: text("country").notNull(),
   workLocation: text("work_location"), employmentType: text("employment_type").default("full_time"),

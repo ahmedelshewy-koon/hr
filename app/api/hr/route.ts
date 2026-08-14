@@ -178,7 +178,7 @@ export async function POST(request: Request) {
       const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name");
       const parentId=Number(payload.parentId)||null;
       const status=clean(payload.status)==="archived"?"archived":"active";
-      if(parentId===departmentId)throw new Response("A department cannot be its own parent",{status:400});
+      if(departmentId&&parentId===departmentId)throw new Response("A department cannot be its own parent",{status:400});
       if(parentId){
         const parent=await d1.prepare("SELECT id FROM departments WHERE id=? AND status!='deleted'").bind(parentId).first<{id:number}>();if(!parent)throw new Response("Parent department not found",{status:404});
         if(departmentId){let current:number|null=parentId;const visited=new Set<number>();while(current){if(current===departmentId)throw new Response("The department hierarchy cannot contain a cycle",{status:400});if(visited.has(current))break;visited.add(current);const row=await d1.prepare("SELECT parent_id FROM departments WHERE id=?").bind(current).first<{parent_id:number|null}>();current=Number(row?.parent_id)||null;}}

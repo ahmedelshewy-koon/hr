@@ -1,0 +1,225 @@
+.job-title-table .tr {
+  grid-template-columns: 1.15fr 1.15fr 1fr .55fr .65fr 36px;
+}
+
+.department-icon.amber {
+  background: #fff2df;
+  color: #bd6a00;
+}
+
+.department-summary svg {
+  color: #60708a;
+}
+
+.org-toolbar .org-search {
+  width: min(300px, 36vw);
+  height: 31px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.org-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 9px;
+  color: #344054;
+}
+
+.org-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: max-content;
+  margin: 0 auto;
+  padding: 0 22px 35px;
+  transition: transform .18s ease;
+}
+
+.org-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.org-root .org-card {
+  border-color: #9ebcf4;
+  box-shadow: 0 8px 24px #1f5fc522;
+}
+
+.org-root > small {
+  margin-top: 7px;
+  font-size: 7px;
+  color: #7a8798;
+}
+
+.org-level-label {
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #1f5fc5;
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: .08em;
+}
+
+.org-main-connector {
+  width: 1px;
+  height: 42px;
+  background: #aeb9c8;
+}
+
+.org-department-list {
+  display: flex;
+  gap: 22px;
+  width: max-content;
+  padding-top: 30px;
+  position: relative;
+}
+
+.org-department-list::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  inset-inline: 130px;
+  height: 1px;
+  background: #aeb9c8;
+}
+
+.org-department-branch {
+  width: 260px;
+  position: relative;
+}
+
+.org-department-branch::before {
+  content: "";
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  width: 1px;
+  height: 30px;
+  background: #aeb9c8;
+}
+
+.org-department-card {
+  min-height: 72px;
+  border: 1px solid #d9e0e9;
+  border-top: 3px solid #4c7ed8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 5px 16px #263a5512;
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 37px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+
+.org-department-card h3,
+.org-department-card p {
+  margin: 0;
+}
+
+.org-department-card h3 {
+  font-size: 10px;
+  color: #253147;
+}
+
+.org-department-card p {
+  margin-top: 4px;
+  font-size: 7px;
+  color: #7b8797;
+}
+
+.org-department-card > b {
+  min-width: 40px;
+  color: #315fba;
+  font-size: 14px;
+  text-align: center;
+}
+
+.org-department-card > b small {
+  display: block;
+  margin-top: 2px;
+  color: #7b8797;
+  font-size: 6px;
+  font-weight: 500;
+}
+
+.org-team-list {
+  margin-inline-start: 20px;
+  padding: 12px 0 0 14px;
+  border-inline-start: 1px solid #c8d1dd;
+}
+
+.org-employee-node {
+  width: 226px;
+  min-height: 54px;
+  margin-bottom: 8px;
+  padding: 9px;
+  border: 1px solid #e1e6ed;
+  border-radius: 9px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.org-employee-node::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-start: -15px;
+  width: 14px;
+  height: 1px;
+  background: #c8d1dd;
+}
+
+.org-employee-node > div {
+  min-width: 0;
+}
+
+.org-employee-node b,
+.org-employee-node span,
+.org-employee-node small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-employee-node b {
+  font-size: 8px;
+  color: #263246;
+}
+
+.org-employee-node span {
+  margin-top: 3px;
+  font-size: 7px;
+  color: #647286;
+}
+
+.org-employee-node small {
+  margin-top: 2px;
+  font-size: 6px;
+  color: #98a2b3;
+}
+
+@media (max-width: 760px) {
+  .org-toolbar .org-search {
+    width: 150px;
+  }
+
+  .org-toolbar > label:last-child {
+    display: none;
+  }
+
+  .org-canvas {
+    min-height: 560px;
+  }
+}

@@ -52,13 +52,10 @@ async function ensureSeed(d1: PostgresDatabase) {
   for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();
 }
 
-async function currentUser(request: Request, d1: PostgresDatabase): Promise<AppUser> {
+async function currentUser(request: Request, d1: PostgresDatabase, portalEmail: string): Promise<AppUser> {
   const auth = await getChatGPTUser();
-  const url = new URL(request.url);
-  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (!auth && !local) throw new Response("Authentication required", { status: 401 });
-  const authId = auth?.userId ?? "local-postgres-owner";
-  const email = auth?.email ?? "local.owner@koon.local";
+  const authId = auth?.userId ?? `portal:${portalEmail.toLowerCase()}`;
+  const email = auth?.email ?? portalEmail.toLowerCase();
   let user = await d1.prepare("SELECT u.id,u.email,u.role_id,u.employee_id,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.auth_user_id=? OR lower(u.email)=lower(?)").bind(authId, email).first<AppUser>();
   if (!user) {
     const role = await d1.prepare("SELECT id FROM roles WHERE name='Super Admin'").first<{ id: number }>();
@@ -92,9 +89,9 @@ function required(value: unknown, name: string) { const v=clean(value); if(!v) t
 export async function GET(request: Request) {
   const d1 = createDatabase();
   try {
-    await requirePortalSession(request);
+    const portalSession = await requirePortalSession(request);
     await ensureSeed(d1);
-    const user = await currentUser(request,d1);
+    const user = await currentUser(request,d1,portalSession.email);
     await authorize(d1,user,"dashboard","view");
     const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
       d1.prepare("SELECT e.*,d.name_en AS department_name,j.name_en AS job_title_name,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250").all(),
@@ -117,9 +114,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const d1 = createDatabase();
   try {
-    await requirePortalSession(request);
+    const portalSession = await requirePortalSession(request);
     await ensureSeed(d1);
-    const user=await currentUser(request,d1);
+    const user=await currentUser(request,d1,portalSession.email);
     const payload=await request.json() as Json;
     const action=required(payload.action,"action");
     if(action==="create_employee") {

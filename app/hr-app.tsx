@@ -6,11 +6,12 @@ import {
   CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleUserRound,
   Clock3, Download, FileText, Globe2, Grid2X2, HelpCircle, Home, KeyRound,
   Languages, LayoutDashboard, LogOut, Menu, MoreHorizontal, Network,
-  Plus, Search, Settings, ShieldCheck, SlidersHorizontal, Users, X,
+  Pencil, Plus, Search, Settings, ShieldCheck, SlidersHorizontal, Trash2, Users, X,
 } from "lucide-react";
 import { EmployeeDetailsDrawer, EmployeeDrawer, HolidayDrawer, OrganizationEntityDrawer, SettingsDrawer } from "./employee-drawer";
 import "./org-chart.css";
 import "./login.css";
+import "./leave-types.css";
 
 type Lang = "en" | "ar";
 type Page = "dashboard" | "portal" | "approvals" | "employees" | "leave" | "attendance" | "org" | "users" | "settings";
@@ -72,6 +73,7 @@ const copy = {
 type HRData = {
   employees: Record<string, any>[]; departments: Record<string, any>[]; jobTitles: Record<string, any>[];
   requests: Record<string, any>[]; attendance: Record<string, any>[]; holidays: Record<string, any>[];
+  leaveTypes: Record<string, any>[];
   roles: Record<string, any>[]; users: Record<string, any>[]; permissions: Record<string, any>[]; audit: Record<string, any>[];
   settings: Record<string, any>[];
   currentUser?: Record<string, any>;
@@ -268,9 +270,32 @@ function LeavePage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
   return <><PageHeader eyebrow={rtl?"السياسات والتقويم":"POLICIES & CALENDAR"} title={rtl?"إدارة الإجازات":"Leave management"} text={rtl?"إدارة العطلات الرسمية وسياسات الإجازات في السعودية ومصر.":"Manage official holidays and leave policies across Saudi Arabia and Egypt."} action={tab==="holidays"?<button className="primary" onClick={()=>setOpen(true)}><Plus size={17}/>{rtl?"إضافة عطلة رسمية":"Add holiday"}</button>:undefined}/>
     {error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}
     <Tabs items={[{id:"holidays",label:rtl?"العطلات الرسمية":"Official holidays"},{id:"settings",label:rtl?"إعدادات الإجازات":"Leave settings"},{id:"policies",label:rtl?"سياسات الإجازات":"Leave policies"}]} active={tab} setActive={setTab}/>
-    {tab==="holidays"?<HolidayCalendar rtl={rtl} rows={data?.holidays}/>:<LeaveConfiguration rtl={rtl} mode={tab as "settings"|"policies"} rows={data?.settings} save={async(key,values)=>{await hrApi({action:"save_system_settings",settingKey:key,values});await reload();notify(rtl?"تم حفظ إعدادات الإجازات بنجاح":"Leave settings saved successfully");}}/>}
+    {tab==="holidays"?<HolidayCalendar rtl={rtl} rows={data?.holidays}/>:tab==="policies"?<LeaveTypesPanel rtl={rtl} rows={data?.leaveTypes} reload={reload} notify={notify}/>:<LeaveConfiguration rtl={rtl} mode="settings" rows={data?.settings} save={async(key,values)=>{await hrApi({action:"save_system_settings",settingKey:key,values});await reload();notify(rtl?"تم حفظ إعدادات الإجازات بنجاح":"Leave settings saved successfully");}}/>}
     {open&&<HolidayDrawer rtl={rtl} close={()=>setOpen(false)} submit={async form=>{await hrApi({action:"create_holiday",...form});setOpen(false);await reload();notify(rtl?"تم حفظ العطلة وإضافتها إلى احتساب الحضور":"Holiday saved and included in attendance calculations");}}/>}
   </>
+}
+
+function LeaveTypesPanel({rtl,rows=[],reload,notify}:{rtl:boolean;rows?:Record<string,any>[];reload:()=>Promise<void>;notify:(message:string)=>void}){
+  const [editing,setEditing]=useState<Record<string,any>|null|undefined>(undefined);
+  const remove=async(row:Record<string,any>)=>{
+    if(!window.confirm(rtl?`هل تريد حذف نوع الإجازة «${row.name_ar}»؟`:`Delete “${row.name_en}”?`)) return;
+    try{await hrApi({action:"delete_leave_type",leaveTypeId:row.id});await reload();notify(rtl?"تم حذف نوع الإجازة":"Leave type deleted");}
+    catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر حذف نوع الإجازة":"Unable to delete leave type"));}
+  };
+  const booleanIcon=(value:unknown)=><span className={Number(value)?"leave-yes":"leave-no"}>{Number(value)?<Check size={17}/>:<X size={17}/>}</span>;
+  return <section className="panel leave-types-panel">
+    <header><div><span className="leave-types-title-icon"><CalendarDays size={21}/></span><div><span className="eyebrow">{rtl?"سياسات الإجازات":"LEAVE POLICIES"}</span><h2>{rtl?"إعداد أنواع الإجازات":"Leave type setup"}</h2><p>{rtl?"أنواع الإجازات المعتمدة وأيامها الافتراضية ومسار الموافقة.":"Approved leave types, default days and approval requirements."}</p></div></div><button className="primary" onClick={()=>setEditing(null)}><Plus size={17}/>{rtl?"إضافة نوع":"Add type"}</button></header>
+    <div className="leave-types-scroll"><table><thead><tr><th>{rtl?"الرمز":"Code"}</th><th>{rtl?"الاسم (إنجليزي)":"English name"}</th><th>{rtl?"الاسم (عربي)":"Arabic name"}</th><th>{rtl?"الأيام الافتراضية":"Default days"}</th><th>{rtl?"مدفوعة":"Paid"}</th><th>{rtl?"تتطلب موافقة":"Approval required"}</th><th>{rtl?"نشط":"Active"}</th><th>{rtl?"الإجراءات":"Actions"}</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><td><code>{row.code}</code></td><td>{row.name_en}</td><td className="leave-arabic-name">{row.name_ar}</td><td>{formatNumber(Number(row.default_days)||0,rtl)}</td><td>{booleanIcon(row.paid)}</td><td>{booleanIcon(row.manager_approval||row.hr_approval)}</td><td>{booleanIcon(row.status==="active"?1:0)}</td><td><span className="leave-row-actions"><button onClick={()=>setEditing(row)} aria-label={rtl?"تعديل":"Edit"}><Pencil size={16}/></button><button className="delete" onClick={()=>void remove(row)} aria-label={rtl?"حذف":"Delete"}><Trash2 size={16}/></button></span></td></tr>)}</tbody></table>{rows.length===0&&<Empty icon={CalendarDays} title={rtl?"لا توجد أنواع إجازات":"No leave types"} text={rtl?"أضف أول نوع إجازة لبدء إعداد السياسات.":"Add the first leave type to configure policies."}/>}</div>
+    {editing!==undefined&&<LeaveTypeDrawer rtl={rtl} record={editing||undefined} close={()=>setEditing(undefined)} submit={async values=>{await hrApi({action:"save_leave_type",...values});setEditing(undefined);await reload();notify(editing?.id?(rtl?"تم تعديل نوع الإجازة":"Leave type updated"):(rtl?"تمت إضافة نوع الإجازة":"Leave type added"));}}/>}
+  </section>;
+}
+
+function LeaveTypeDrawer({rtl,record,close,submit}:{rtl:boolean;record?:Record<string,any>;close:()=>void;submit:(values:Record<string,unknown>)=>Promise<void>}){
+  const [values,setValues]=useState({code:String(record?.code||""),nameEn:String(record?.name_en||""),nameAr:String(record?.name_ar||""),defaultDays:Number(record?.default_days)||0,paid:record?Boolean(Number(record.paid)):true,requiresApproval:record?Boolean(Number(record.manager_approval)||Number(record.hr_approval)):true,active:record?record.status==="active":true});
+  const [saving,setSaving]=useState(false),[error,setError]=useState("");
+  const update=(key:string,value:unknown)=>setValues(current=>({...current,[key]:value}));
+  const save=async(event:React.FormEvent)=>{event.preventDefault();try{setSaving(true);setError("");await submit({leaveTypeId:record?.id,...values});}catch(reason){setError(reason instanceof Error?reason.message:(rtl?"تعذر حفظ نوع الإجازة":"Unable to save leave type"));}finally{setSaving(false);}};
+  return <div className="modal-layer" onMouseDown={event=>{if(event.target===event.currentTarget)close();}}><aside className="drawer leave-type-drawer" role="dialog" aria-modal="true"><header><div><span className="eyebrow">{rtl?"سياسات الإجازات":"LEAVE POLICIES"}</span><h2>{record?(rtl?"تعديل نوع الإجازة":"Edit leave type"):(rtl?"إضافة نوع إجازة":"Add leave type")}</h2></div><button className="icon-button" onClick={close} aria-label={rtl?"إغلاق":"Close"}><X size={19}/></button></header><form onSubmit={save}><div className="drawer-fields"><label><span>{rtl?"الرمز":"Code"}</span><input required maxLength={50} value={values.code} onChange={event=>update("code",event.target.value.toUpperCase())} placeholder="ANNUAL_21"/></label><label><span>{rtl?"الاسم (إنجليزي)":"English name"}</span><input required value={values.nameEn} onChange={event=>update("nameEn",event.target.value)}/></label><label><span>{rtl?"الاسم (عربي)":"Arabic name"}</span><input required dir="rtl" value={values.nameAr} onChange={event=>update("nameAr",event.target.value)}/></label><label><span>{rtl?"الأيام الافتراضية":"Default days"}</span><input required type="number" min="0" max="9999" value={values.defaultDays} onChange={event=>update("defaultDays",Number(event.target.value))}/></label></div><div className="leave-type-options"><label><input type="checkbox" checked={values.paid} onChange={event=>update("paid",event.target.checked)}/><span><b>{rtl?"إجازة مدفوعة":"Paid leave"}</b><small>{rtl?"تُحتسب بأجر كامل":"Counted as paid time off"}</small></span></label><label><input type="checkbox" checked={values.requiresApproval} onChange={event=>update("requiresApproval",event.target.checked)}/><span><b>{rtl?"تتطلب موافقة":"Requires approval"}</b><small>{rtl?"تمر عبر مسار الاعتماد":"Uses the approval workflow"}</small></span></label><label><input type="checkbox" checked={values.active} onChange={event=>update("active",event.target.checked)}/><span><b>{rtl?"نشط":"Active"}</b><small>{rtl?"متاح في طلبات الموظفين":"Available in employee requests"}</small></span></label></div>{error&&<div className="error-banner">{error}</div>}<footer><button type="button" className="outline" onClick={close}>{rtl?"إلغاء":"Cancel"}</button><button type="submit" className="primary" disabled={saving}><Check size={16}/>{saving?(rtl?"جارٍ الحفظ...":"Saving..."):(rtl?"حفظ":"Save")}</button></footer></form></aside></div>;
 }
 
 function LeaveConfiguration({rtl,mode,rows,save}:{rtl:boolean;mode:"settings"|"policies";rows?:Record<string,any>[];save:(key:string,values:Record<string,unknown>)=>Promise<void>}){

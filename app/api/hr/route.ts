@@ -47,8 +47,6 @@ async function ensureSeed(d1: PostgresDatabase) {
   const superRole = await d1.prepare("SELECT id FROM roles WHERE name = 'Super Admin'").first<{ id: number }>();
   if (superRole) for (const module of SUPER_ADMIN_MODULES) for (const action of ACTIONS) await d1.prepare("INSERT OR IGNORE INTO permissions (role_id, module, action, allowed) VALUES (?, ?, ?, 1)").bind(superRole.id, module, action).run();
 
-  const leaveTypes = [["Annual leave","إجازة سنوية",1,0],["Sick leave","إجازة مرضية",1,1],["Unpaid leave","إجازة بدون راتب",0,0]];
-  for (const l of leaveTypes) await d1.prepare("INSERT INTO leave_types (name_en,name_ar,paid,attachment_required,manager_approval,hr_approval,status,created_at,updated_at) SELECT ?,?,?,?,1,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM leave_types WHERE name_en=?)").bind(...l, now, now, l[0]).run();
   for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();
 }
 
@@ -93,20 +91,21 @@ export async function GET(request: Request) {
     await ensureSeed(d1);
     const user = await currentUser(request,d1,portalSession.email);
     await authorize(d1,user,"dashboard","view");
-    const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
+    const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,leaveTypeRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
       d1.prepare("SELECT e.*,d.name_en AS department_name,j.name_en AS job_title_name,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250").all(),
       d1.prepare("SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en").all(),
       d1.prepare("SELECT j.*,d.name_en AS department_name,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id GROUP BY j.id,d.name_en ORDER BY j.name_en").all(),
       d1.prepare("SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY q.id DESC LIMIT 250").all(),
       d1.prepare("SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY a.work_date DESC,a.id DESC LIMIT 250").all(),
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
+      d1.prepare("SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").all(),
       d1.prepare("SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id GROUP BY r.id ORDER BY r.id").all(),
       d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.last_login_at,u.role_id,r.name AS role_name,e.name_en AS employee_name,d.name_en AS department_name FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY u.id").all(),
       d1.prepare("SELECT a.*,u.email AS user_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50").all(),
       d1.prepare("SELECT setting_key,value_json,updated_at FROM system_settings ORDER BY setting_key").all(),
     ]);
     const permissions = await d1.prepare("SELECT role_id,module,action,allowed FROM permissions ORDER BY role_id,module,action").all();
-    return Response.json({ currentUser:user, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results });
+    return Response.json({ currentUser:user, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
 }
@@ -202,6 +201,37 @@ export async function POST(request: Request) {
       await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(settingKey,valueJson,user.id).run();
       await audit(d1,request,user,"update","system_settings","setting",settingKey,before,values);
       return Response.json({ok:true,settingKey,values});
+    }
+    if(action==="save_leave_type") {
+      const leaveTypeId=Number(payload.leaveTypeId)||null;
+      await authorize(d1,user,"leave_management",leaveTypeId?"edit":"create");
+      const code=required(payload.code,"Code").toUpperCase();
+      const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name");
+      const defaultDays=Number(payload.defaultDays);
+      if(!Number.isInteger(defaultDays)||defaultDays<0||defaultDays>9999) throw new Response("Default days must be a whole number between 0 and 9999",{status:400});
+      const paid=payload.paid?1:0, approval=payload.requiresApproval?1:0, status=payload.active===false?"inactive":"active";
+      const duplicate=await d1.prepare("SELECT id FROM leave_types WHERE upper(code)=upper(?) AND status!='archived' ORDER BY id LIMIT 1").bind(code).first<{id:number}>();
+      if(duplicate&&Number(duplicate.id)!==leaveTypeId) throw new Response("A leave type with the same code already exists",{status:409});
+      if(leaveTypeId){
+        const before=await d1.prepare("SELECT * FROM leave_types WHERE id=? AND status!='archived'").bind(leaveTypeId).first<Record<string,unknown>>();
+        if(!before) throw new Response("Leave type not found",{status:404});
+        await d1.prepare("UPDATE leave_types SET code=?,name_en=?,name_ar=?,default_days=?,paid=?,manager_approval=?,hr_approval=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(code,nameEn,nameAr,defaultDays,paid,approval,approval,status,leaveTypeId).run();
+        await audit(d1,request,user,"update","leave_management","leave_type",String(leaveTypeId),before,{code,nameEn,nameAr,defaultDays,paid,requiresApproval:Boolean(approval),status});
+        return Response.json({ok:true,id:leaveTypeId});
+      }
+      const result=await d1.prepare("INSERT INTO leave_types (code,name_en,name_ar,default_days,paid,attachment_required,manager_approval,hr_approval,status,created_at,updated_at) VALUES (?,?,?,?,?,0,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(code,nameEn,nameAr,defaultDays,paid,approval,approval,status).first<{id:number}>();
+      await audit(d1,request,user,"create","leave_management","leave_type",String(result!.id),null,{code,nameEn,nameAr,defaultDays,paid,requiresApproval:Boolean(approval),status});
+      return Response.json({ok:true,id:result!.id},{status:201});
+    }
+    if(action==="delete_leave_type") {
+      await authorize(d1,user,"leave_management","delete");
+      const leaveTypeId=Number(payload.leaveTypeId);
+      if(!leaveTypeId) throw new Response("Leave type is required",{status:400});
+      const before=await d1.prepare("SELECT * FROM leave_types WHERE id=? AND status!='archived'").bind(leaveTypeId).first<Record<string,unknown>>();
+      if(!before) throw new Response("Leave type not found",{status:404});
+      await d1.prepare("UPDATE leave_types SET status='archived',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(leaveTypeId).run();
+      await audit(d1,request,user,"archive","leave_management","leave_type",String(leaveTypeId),before,{status:"archived"});
+      return Response.json({ok:true});
     }
     if(action==="save_department_hierarchy") {
       await authorize(d1,user,"departments","edit");

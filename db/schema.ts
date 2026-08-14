@@ -71,8 +71,8 @@ export const dailyAttendance = pgTable("daily_attendance", {
 }, (t) => [uniqueIndex("idx_daily_attendance_employee_date").on(t.employeeId, t.workDate), index("idx_daily_attendance_date_status").on(t.workDate, t.status)]);
 
 export const leaveTypes = pgTable("leave_types", {
-  id: serial("id").primaryKey(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(), paid: integer("paid").notNull().default(1), attachmentRequired: integer("attachment_required").notNull().default(0), managerApproval: integer("manager_approval").notNull().default(1), hrApproval: integer("hr_approval").notNull().default(1), status: text("status").notNull().default("active"), ...timestamps,
-});
+  id: serial("id").primaryKey(), code: text("code").notNull(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(), defaultDays: integer("default_days").notNull().default(0), paid: integer("paid").notNull().default(1), attachmentRequired: integer("attachment_required").notNull().default(0), managerApproval: integer("manager_approval").notNull().default(1), hrApproval: integer("hr_approval").notNull().default(1), status: text("status").notNull().default("active"), ...timestamps,
+}, (t) => [uniqueIndex("idx_leave_types_code").on(t.code)]);
 
 export const leavePolicies = pgTable("leave_policies", {
   id: serial("id").primaryKey(), leaveTypeId: integer("leave_type_id").notNull(), country: text("country").notNull(), annualEntitlement: doublePrecision("annual_entitlement").notNull(), minServiceMonths: integer("min_service_months").default(0), carryForward: integer("carry_forward").notNull().default(0), maxCarryForward: doublePrecision("max_carry_forward").default(0), expiryDays: integer("expiry_days"), status: text("status").notNull().default("active"), ...timestamps,

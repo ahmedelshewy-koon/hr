@@ -43,6 +43,13 @@
       "when": 1786705860398,
       "tag": "0005_plain_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786706365071,
+      "tag": "0006_lucky_kang",
+      "breakpoints": true
     }
   ]
 }

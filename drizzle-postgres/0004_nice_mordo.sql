@@ -1,4 +1,4 @@
-CREATE TABLE "system_settings" (
+CREATE TABLE IF NOT EXISTS "system_settings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"setting_key" text NOT NULL,
 	"value_json" text DEFAULT '{}' NOT NULL,
@@ -7,4 +7,4 @@ CREATE TABLE "system_settings" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX "idx_system_settings_key" ON "system_settings" USING btree ("setting_key");
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_system_settings_key" ON "system_settings" USING btree ("setting_key");

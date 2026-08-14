@@ -21,8 +21,8 @@ test("server-renders the HR application shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>[^<]*HR/i);
-  assert.match(html, /class="brand-logo"/);
-  assert.match(html, /Dashboard/);
+  assert.match(html, /class="auth-loading"/);
+  assert.match(html, /جارٍ التحقق من تسجيل الدخول/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
@@ -38,7 +38,10 @@ test("keeps starter preview assets out of the production app", async () => {
   assert.match(packageJson, /"postgres"/);
   assert.doesNotMatch(page, /codex-preview|SkeletonPreview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  const previewFiles = await readdir(new URL("../app/_sites-preview", import.meta.url));
+  const previewFiles = await readdir(new URL("../app/_sites-preview", import.meta.url)).catch(error => {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  });
   assert.deepEqual(previewFiles, []);
 });
 
@@ -54,4 +57,18 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /org-level-input/);
   assert.match(app, /organizational_level/);
   assert.doesNotMatch(app, /Layla Alotaibi|Youssef Nassar|Commercial Director/);
+});
+
+test("provides portal login and logout controls", async () => {
+  const [app, authRoute, portalAuth] = await Promise.all([
+    readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/portal-auth.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /function LoginPage/);
+  assert.match(app, /profile-logout/);
+  assert.match(app, /method:"DELETE"/);
+  assert.match(authRoute, /verifyPortalPassword/);
+  assert.match(portalAuth, /HttpOnly; SameSite=Lax/);
+  assert.match(portalAuth, /PBKDF2/);
 });

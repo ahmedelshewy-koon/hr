@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { EmployeeDrawer, HolidayDrawer } from "./employee-drawer";
 import "./org-chart.css";
+import "./login.css";
 
 type Lang = "en" | "ar";
 type Page = "dashboard" | "portal" | "approvals" | "employees" | "leave" | "attendance" | "org" | "users" | "settings";
@@ -90,6 +91,7 @@ type HRData = {
 async function hrApi(payload?: Record<string, unknown>) {
   const response = await fetch("/api/hr", payload ? { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload) } : { cache:"no-store" });
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("portal-session-expired"));
   if (!response.ok) throw new Error(body.error || body.message || `Request failed (${response.status})`);
   return body;
 }
@@ -118,6 +120,7 @@ function Empty({ icon: Icon = FileText, title, text }: { icon?: typeof FileText;
 }
 
 export function HRApp() {
+  const [authState,setAuthState]=useState<"checking"|"signed_in"|"signed_out">("checking");
   const [lang, setLang] = useState<Lang>("en");
   const [page, setPage] = useState<Page>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -132,6 +135,17 @@ export function HRApp() {
     document.documentElement.lang = lang;
     document.documentElement.dir = rtl ? "rtl" : "ltr";
   }, [lang, rtl]);
+  useEffect(()=>{
+    let active=true;
+    void fetch("/api/auth",{cache:"no-store"}).then(response=>response.json()).then(body=>{if(active)setAuthState(body.authenticated?"signed_in":"signed_out");}).catch(()=>{if(active)setAuthState("signed_out");});
+    const expire=()=>setAuthState("signed_out");
+    window.addEventListener("portal-session-expired",expire);
+    return()=>{active=false;window.removeEventListener("portal-session-expired",expire);};
+  },[]);
+
+  const logout=async()=>{try{await fetch("/api/auth",{method:"DELETE"});}finally{setAuthState("signed_out");setMobileOpen(false);}};
+  if(authState==="checking") return <div className="auth-loading"><div><Activity size={20}/><span>جارٍ التحقق من تسجيل الدخول...</span></div></div>;
+  if(authState==="signed_out") return <LoginPage onSuccess={()=>setAuthState("signed_in")}/>;
 
   const nav = [
     { id: "dashboard" as Page, label: t.dashboard, icon: LayoutDashboard },
@@ -162,7 +176,7 @@ export function HRApp() {
         </nav>
         <div className="sidebar-bottom">
           <button onClick={() => notify(rtl ? "مركز المساعدة قريباً" : "Help center is coming soon")}><HelpCircle size={19} /><span>{rtl ? "المساعدة والدعم" : "Help & support"}</span></button>
-          <div className="profile-mini"><Avatar initials="AE" small /><div><b>{rtl ? "أحمد الشيوي" : "Ahmed Elshewy"}</b><span>{localizedRole(role,rtl)}</span></div><MoreHorizontal size={18} /></div>
+          <div className="profile-mini"><Avatar initials="AE" small /><div><b>{rtl ? "أحمد الشيوي" : "Ahmed Elshewy"}</b><span>{localizedRole(role,rtl)}</span></div><button className="profile-logout" onClick={()=>void logout()} aria-label={rtl?"تسجيل الخروج":"Sign out"}><LogOut size={14}/><span>{rtl?"خروج":"Logout"}</span></button></div>
         </div>
       </aside>
       {mobileOpen && <button className="scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
@@ -197,6 +211,12 @@ export function HRApp() {
       {toast && <div className="toast"><CheckCircle2 size={19} />{toast}</div>}
     </div>
   );
+}
+
+function LoginPage({onSuccess}:{onSuccess:()=>void}){
+  const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [error,setError]=useState("");const [loading,setLoading]=useState(false);
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();setError("");setLoading(true);try{const response=await fetch("/api/auth",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||"تعذر تسجيل الدخول");onSuccess();}catch(reason){setError(reason instanceof Error?reason.message:"تعذر تسجيل الدخول");}finally{setLoading(false);}};
+  return <main className="login-page" dir="rtl"><section className="login-panel"><img className="login-logo" src="/sanad-logo.png" alt="Sanad HR"/><div className="login-copy"><small>نظام إدارة الموارد البشرية</small><h1>مرحبًا بعودتك</h1><p>سجّل الدخول للوصول إلى لوحة التحكم وبيانات فريق العمل.</p></div><form className="login-form" onSubmit={event=>void submit(event)}><label className="login-field"><span>البريد الإلكتروني</span><div className="login-input"><CircleUserRound size={18}/><input type="email" autoComplete="username" value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@company.com" required dir="ltr"/></div></label><label className="login-field"><span>كلمة المرور</span><div className="login-input"><KeyRound size={18}/><input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="••••••••" required dir="ltr"/></div></label>{error&&<p className="login-error" role="alert">{error}</p>}<button className="login-submit" type="submit" disabled={loading}>{loading?<><Activity size={18}/>جارٍ تسجيل الدخول...</>:<><LogOut size={17}/>تسجيل الدخول</>}</button></form><p className="login-note">الدخول مخصص للمستخدمين المصرح لهم فقط</p></section><section className="login-visual"><div className="login-visual-content"><span className="login-visual-icon"><ShieldCheck size={29}/></span><h2>كل ما يخص فريقك<br/>في مكان واحد</h2><p>إدارة الموظفين والحضور والإجازات والهيكل التنظيمي من بوابة واحدة آمنة وسهلة.</p><div className="login-features"><span>إدارة الموظفين</span><span>الحضور والانصراف</span><span>الإجازات والطلبات</span><span>الهيكل التنظيمي</span></div></div></section></main>
 }
 
 function Dashboard({ rtl, t, setPage, openRequest }: { rtl: boolean; t: typeof copy.en; setPage: (p: Page) => void; openRequest: () => void }) {

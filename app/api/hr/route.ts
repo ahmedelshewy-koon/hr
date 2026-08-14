@@ -1,4 +1,5 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
+import { requirePortalSession } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 
 type Json = Record<string, unknown>;
@@ -58,6 +59,7 @@ function required(value: unknown, name: string) { const v=clean(value); if(!v) t
 export async function GET(request: Request) {
   const d1 = createDatabase();
   try {
+    await requirePortalSession(request);
     await ensureSeed(d1);
     const user = await currentUser(request,d1);
     await authorize(d1,user,"dashboard","view");
@@ -81,6 +83,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const d1 = createDatabase();
   try {
+    await requirePortalSession(request);
     await ensureSeed(d1);
     const user=await currentUser(request,d1);
     const payload=await request.json() as Json;

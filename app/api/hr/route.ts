@@ -7,10 +7,41 @@ type AppUser = { id: number; email: string; role_id: number; role_name: string; 
 
 const SUPER_ADMIN_MODULES = ["dashboard","employee_portal","employee_requests","request_approvals","employees","employee_salaries","job_titles","departments","leave_management","attendance","attendance_adjustments","organization_chart","users","permissions","system_settings","reports"];
 const ACTIONS = ["view","create","edit","delete","approve","export","manage_settings"];
+const OFFICIAL_HOLIDAYS_2026 = [
+  ["2026-01-07","Coptic Christmas","عيد الميلاد المجيد","Egypt","وقت ثابت مصر","annual"],
+  ["2026-01-08","Company holiday for 7 January","كل الشركة 7 يناير","Egypt","وقت ثابت مصر","once"],
+  ["2026-01-29","25 January Revolution","ثورة 25 يناير","Egypt","وقت ثابت مصر","annual"],
+  ["2026-02-19","First day of Ramadan","أول يوم رمضان","Egypt","وقت ثابت مصر|مواعيد رمضان مصر","once"],
+  ["2026-02-22","Saudi Founding Day","يوم التأسيس","Saudi Arabia","وقت ثابت للمملكة","annual"],
+  ["2026-03-20","Eid al-Fitr","عيد الفطر","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-03-21","Eid al-Fitr — Day 2","عيد الفطر - اليوم الثاني","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-03-22","Eid al-Fitr — Day 3","عيد الفطر - اليوم الثالث","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-03-23","Eid al-Fitr holiday","اجازة عيد الفطر المبارك","Egypt","وقت ثابت مصر|مواعيد رمضان مصر","once"],
+  ["2026-04-09","Maundy Thursday","خميس العهد","Egypt","وقت ثابت مصر|وقت من الساعة 9 صباحا الى 5 مساء","once"],
+  ["2026-04-12","Easter Sunday","حد القيامة","Egypt","وقت ثابت مصر","once"],
+  ["2026-04-13","Sham El-Nessim","شم النسيم","Egypt","وقت ثابت مصر","once"],
+  ["2026-04-25","Sinai Liberation Day","عيد تحرير سيناء","Egypt","وقت ثابت مصر","annual"],
+  ["2026-05-01","Labour Day","عيد العمال","Egypt","وقت ثابت مصر","annual"],
+  ["2026-05-07","Labour Day replacement holiday","اجازة عيد العمال","Egypt","وقت من الساعة 9 صباحا الى 5 مساء|حضور من 8 - 4|وقت ثابت مصر","once"],
+  ["2026-05-26","Eid al-Adha holiday","إجازة عيد الاضحى المبارك","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-05-27","Eid al-Adha","عيد الأضحى","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-05-28","Eid al-Adha — Day 2","عيد الأضحى - اليوم الثاني","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-05-29","Eid al-Adha — Day 3","عيد الأضحى - اليوم الثالث","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-05-30","Eid al-Adha — Day 4","عيد الأضحى - اليوم الرابع","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-05-31","Eid al-Adha Day 5","Eid al-Adha Day 5","Both","وقت ثابت مصر|وقت ثابت للمملكة|حضور من 8 - 4","once"],
+  ["2026-06-18","Islamic New Year","رأس السنة الهجرية","Egypt","وقت ثابت مصر|حضور من 8 - 4","once"],
+  ["2026-07-02","30 June replacement holiday","اجازة بديلة عن يوم 30 يونيو 2026","Egypt","وقت ثابت مصر|حضور من 8 - 4","once"],
+  ["2026-07-23","23 July Revolution","ثورة 23 يوليو","Egypt","وقت ثابت مصر|حضور من 8 - 4","annual"],
+  ["2026-08-26","Prophet’s Birthday","المولد النبوي الشريف","Egypt","وقت ثابت مصر","once"],
+  ["2026-09-23","Saudi National Day","اليوم الوطني السعودي","Saudi Arabia","وقت ثابت للمملكة","annual"],
+  ["2026-10-06","Armed Forces Day","عيد القوات المسلحة","Egypt","وقت ثابت مصر","annual"],
+] as const;
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
   await d1.prepare("CREATE TABLE IF NOT EXISTS system_settings (id SERIAL PRIMARY KEY, setting_key TEXT NOT NULL UNIQUE, value_json TEXT NOT NULL DEFAULT '{}', updated_by_user_id INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  await d1.prepare("ALTER TABLE holidays ADD COLUMN IF NOT EXISTS attendance_types TEXT NOT NULL DEFAULT ''").run();
+  await d1.prepare("ALTER TABLE holidays ADD COLUMN IF NOT EXISTS recurrence_type TEXT NOT NULL DEFAULT 'once'").run();
   const roleNames = ["Super Admin","Admin","HR Manager","HR","Direct Manager","Employee"];
   for (const name of roleNames) await d1.prepare("INSERT OR IGNORE INTO roles (name, description, is_system, created_at, updated_at) VALUES (?, ?, 1, ?, ?)").bind(name, `${name} system role`, now, now).run();
   const superRole = await d1.prepare("SELECT id FROM roles WHERE name = 'Super Admin'").first<{ id: number }>();
@@ -18,6 +49,7 @@ async function ensureSeed(d1: PostgresDatabase) {
 
   const leaveTypes = [["Annual leave","إجازة سنوية",1,0],["Sick leave","إجازة مرضية",1,1],["Unpaid leave","إجازة بدون راتب",0,0]];
   for (const l of leaveTypes) await d1.prepare("INSERT INTO leave_types (name_en,name_ar,paid,attachment_required,manager_approval,hr_approval,status,created_at,updated_at) SELECT ?,?,?,?,1,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM leave_types WHERE name_en=?)").bind(...l, now, now, l[0]).run();
+  for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();
 }
 
 async function currentUser(request: Request, d1: PostgresDatabase): Promise<AppUser> {
@@ -119,6 +151,50 @@ export async function POST(request: Request) {
       await d1.prepare("UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(email,employeeId).run();
       await audit(d1,request,user,"update","employees","employee",String(employeeId),before,payload);
       return Response.json({ok:true,id:employeeId});
+    }
+    if(action==="save_job_title") {
+      const jobTitleId=Number(payload.jobTitleId)||null;
+      await authorize(d1,user,"job_titles",jobTitleId?"edit":"create");
+      const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name");
+      const departmentId=Number(payload.departmentId)||null;
+      const status=clean(payload.status)==="archived"?"archived":"active";
+      if(departmentId){const department=await d1.prepare("SELECT id FROM departments WHERE id=? AND status!='deleted'").bind(departmentId).first<{id:number}>();if(!department)throw new Response("Department not found",{status:404});}
+      const duplicate=await d1.prepare("SELECT id FROM job_titles WHERE (lower(name_en)=lower(?) OR name_ar=?) AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr).first<{id:number}>();
+      if(duplicate&&Number(duplicate.id)!==jobTitleId)throw new Response("A job title with the same name already exists",{status:409});
+      if(jobTitleId){
+        const before=await d1.prepare("SELECT * FROM job_titles WHERE id=? AND status!='deleted'").bind(jobTitleId).first<Record<string,unknown>>();
+        if(!before)throw new Response("Job title not found",{status:404});
+        await d1.prepare("UPDATE job_titles SET name_en=?,name_ar=?,department_id=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(nameEn,nameAr,departmentId,status,jobTitleId).run();
+        await audit(d1,request,user,"update","job_titles","job_title",String(jobTitleId),before,{nameEn,nameAr,departmentId,status});
+        return Response.json({ok:true,id:jobTitleId});
+      }
+      const result=await d1.prepare("INSERT INTO job_titles (name_en,name_ar,department_id,status,created_at,updated_at) VALUES (?,?,?,? ,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,departmentId,status).first<{id:number}>();
+      await audit(d1,request,user,"create","job_titles","job_title",String(result!.id),null,{nameEn,nameAr,departmentId,status});
+      return Response.json({ok:true,id:result!.id},{status:201});
+    }
+    if(action==="save_department") {
+      const departmentId=Number(payload.departmentId)||null;
+      await authorize(d1,user,"departments",departmentId?"edit":"create");
+      const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name");
+      const parentId=Number(payload.parentId)||null;
+      const status=clean(payload.status)==="archived"?"archived":"active";
+      if(parentId===departmentId)throw new Response("A department cannot be its own parent",{status:400});
+      if(parentId){
+        const parent=await d1.prepare("SELECT id FROM departments WHERE id=? AND status!='deleted'").bind(parentId).first<{id:number}>();if(!parent)throw new Response("Parent department not found",{status:404});
+        if(departmentId){let current:number|null=parentId;const visited=new Set<number>();while(current){if(current===departmentId)throw new Response("The department hierarchy cannot contain a cycle",{status:400});if(visited.has(current))break;visited.add(current);const row=await d1.prepare("SELECT parent_id FROM departments WHERE id=?").bind(current).first<{parent_id:number|null}>();current=Number(row?.parent_id)||null;}}
+      }
+      const duplicate=await d1.prepare("SELECT id FROM departments WHERE (lower(name_en)=lower(?) OR name_ar=?) AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr).first<{id:number}>();
+      if(duplicate&&Number(duplicate.id)!==departmentId)throw new Response("A department with the same name already exists",{status:409});
+      if(departmentId){
+        const before=await d1.prepare("SELECT * FROM departments WHERE id=? AND status!='deleted'").bind(departmentId).first<Record<string,unknown>>();
+        if(!before)throw new Response("Department not found",{status:404});
+        await d1.prepare("UPDATE departments SET name_en=?,name_ar=?,parent_id=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(nameEn,nameAr,parentId,status,departmentId).run();
+        await audit(d1,request,user,"update","departments","department",String(departmentId),before,{nameEn,nameAr,parentId,status});
+        return Response.json({ok:true,id:departmentId});
+      }
+      const result=await d1.prepare("INSERT INTO departments (name_en,name_ar,parent_id,status,created_at,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,status).first<{id:number}>();
+      await audit(d1,request,user,"create","departments","department",String(result!.id),null,{nameEn,nameAr,parentId,status});
+      return Response.json({ok:true,id:result!.id},{status:201});
     }
     if(action==="save_system_settings") {
       await authorize(d1,user,"system_settings","manage_settings");
@@ -228,7 +304,7 @@ export async function POST(request: Request) {
     }
     if(action==="create_holiday") {
       await authorize(d1,user,"leave_management","create");
-      const result=await d1.prepare("INSERT INTO holidays (name_en,name_ar,holiday_date,country,days,original_date,original_date_behavior,notes,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?, 'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(required(payload.nameEn,"English name"),required(payload.nameAr,"Arabic name"),required(payload.holidayDate,"Holiday date"),required(payload.country,"Country"),Number(payload.days)||1,clean(payload.originalDate)||null,clean(payload.originalDateBehavior)||"holiday",clean(payload.notes,1000)||null).first<{id:number}>();
+      const result=await d1.prepare("INSERT INTO holidays (name_en,name_ar,holiday_date,country,attendance_types,recurrence_type,days,original_date,original_date_behavior,notes,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(required(payload.nameEn,"English name"),required(payload.nameAr,"Arabic name"),required(payload.holidayDate,"Holiday date"),required(payload.country,"Country"),clean(payload.attendanceTypes,1000),clean(payload.recurrenceType)==="annual"?"annual":"once",Number(payload.days)||1,clean(payload.originalDate)||null,clean(payload.originalDateBehavior)||"holiday",clean(payload.notes,1000)||null).first<{id:number}>();
       await audit(d1,request,user,"create","leave_management","holiday",String(result!.id),null,payload);
       return Response.json({ok:true,id:result!.id},{status:201});
     }

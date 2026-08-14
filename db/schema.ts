@@ -83,7 +83,7 @@ export const leaveBalances = pgTable("leave_balances", {
 }, (t) => [uniqueIndex("idx_leave_balances_employee_type_year").on(t.employeeId, t.leaveTypeId, t.year)]);
 
 export const holidays = pgTable("holidays", {
-  id: serial("id").primaryKey(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(), holidayDate: text("holiday_date").notNull(), country: text("country").notNull(), days: doublePrecision("days").notNull().default(1), originalDate: text("original_date"), originalDateBehavior: text("original_date_behavior").default("holiday"), notes: text("notes"), status: text("status").notNull().default("active"), ...timestamps,
+  id: serial("id").primaryKey(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(), holidayDate: text("holiday_date").notNull(), country: text("country").notNull(), attendanceTypes: text("attendance_types").notNull().default(""), recurrenceType: text("recurrence_type").notNull().default("once"), days: doublePrecision("days").notNull().default(1), originalDate: text("original_date"), originalDateBehavior: text("original_date_behavior").default("holiday"), notes: text("notes"), status: text("status").notNull().default("active"), ...timestamps,
 }, (t) => [index("idx_holidays_country_date").on(t.country, t.holidayDate)]);
 
 export const documents = pgTable("documents", {

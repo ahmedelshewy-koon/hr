@@ -42,12 +42,20 @@
 .filterbar .employee-view-switch button.active{background:white;color:#2563eb;box-shadow:0 1px 4px #0b1f4d14}
 .employee-row-scroll{overflow:auto}
 .employee-row-list{min-width:620px}
-.employee-list-row{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(150px,1fr) 58px;align-items:center;gap:16px;min-height:64px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:13px;color:#475569}
+.employee-list-row{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(150px,1fr) minmax(150px,1fr) 76px;align-items:center;gap:16px;min-height:64px;padding:8px 18px;border-bottom:1px solid var(--line);font-size:13px;color:#475569}
 .employee-list-row:last-child{border-bottom:0}
 .employee-list-head{min-height:42px;background:#f8fafc;color:#64748b;font-size:11px;font-weight:700}
 .employee-list-row .person b{font-size:13px;color:#0b1f4d}
 .employee-row-edit{width:34px;height:34px;border:1px solid var(--line);border-radius:12px;background:white;color:#64748b;display:grid;place-items:center;transition:.16s}
 .employee-row-edit:hover{background:#eaf2ff;border-color:#c7dbfb;color:#2563eb}
+.employee-list-row-editing{background:#f8fbff;box-shadow:inset 3px 0 0 #2563eb}
+.app[dir="rtl"] .employee-list-row-editing{box-shadow:inset -3px 0 0 #2563eb}
+.employee-inline-field{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:10px;background:white;padding:0 10px;color:#0b1f4d;font:inherit;outline:0}
+.employee-inline-field:focus{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb17}
+.employee-inline-actions{display:flex;align-items:center;gap:5px}
+.employee-inline-actions button{width:32px;height:32px;border:1px solid var(--line);border-radius:10px;background:white;display:grid;place-items:center}
+.employee-row-save{color:#16a34a}.employee-row-cancel{color:#ef4444}.employee-inline-actions button:disabled{opacity:.55}
+.employee-inline-error{display:block;color:#ef4444;font-size:10px;margin-top:4px}
 .modal-center{display:flex;align-items:center;justify-content:center;padding:24px}
 .modal-dialog{position:relative;background:white;border-radius:16px;display:flex;flex-direction:column;max-height:calc(100vh - 48px);overflow:hidden;box-shadow:var(--shadow-lg);animation:popIn .18s ease-out}
 @keyframes popIn{from{transform:scale(.97);opacity:0}}

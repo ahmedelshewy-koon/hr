@@ -14,7 +14,7 @@ const ROLE_DEFAULTS:Record<string,Record<string,readonly string[]>> = {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
     employees:["view","create","edit","export"], employee_salaries:["view","edit"], job_titles:["view","create","edit"], departments:["view","create","edit"],
     leave_management:["view","create","edit","delete","approve","export"], attendance:["view","create","edit","export"], attendance_adjustments:["view","edit","approve"],
-    organization_chart:["view","edit"], users:["view","edit"], reports:["view","export"], payroll:["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"],
+    organization_chart:["view","edit"], users:["view","edit"], system_settings:["view","manage_settings"], reports:["view","export"], payroll:["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"],
   },
   "Department Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
@@ -60,7 +60,7 @@ const OFFICIAL_HOLIDAYS_2026 = [
 ] as const;
 
 /** Bump whenever the seeded reference data below changes, to force a re-seed. */
-const SEED_VERSION = "2026-08-20-localized-job-titles-3";
+const SEED_VERSION = "2026-08-20-hr-settings-access-4";
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
@@ -86,6 +86,8 @@ async function ensureSeed(d1: PostgresDatabase) {
     if(!role)continue;
     for(const [moduleName,allowedActions] of Object.entries(moduleDefaults)) for(const action of ACTIONS) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,?,?,?) ON CONFLICT(role_id,module,action) DO NOTHING").bind(role.id,moduleName,action,allowedActions.includes(action)?1:0).run();
   }
+  const hrRole = await d1.prepare("SELECT id FROM roles WHERE name='HR Manager'").first<{ id: number }>();
+  if (hrRole) for (const action of ["view","manage_settings"]) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,'system_settings',?,1) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=1").bind(hrRole.id,action).run();
   for (const [roleName, allowedActions] of Object.entries(PAYROLL_ROLE_DEFAULTS)) {
     const payrollRole = await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{ id: number }>();
     if (!payrollRole) continue;

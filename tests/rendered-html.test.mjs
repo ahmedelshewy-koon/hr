@@ -47,19 +47,22 @@ test("keeps starter preview assets out of the production app", async () => {
 
 test("renders workforce departments, job titles, and organization chart from API data", async () => {
   const app = await readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8");
-  assert.match(app, /<JobTitleTable[^>]*rows=\{data\?\.jobTitles\}/);
-  assert.match(app, /<DepartmentGrid[^>]*rows=\{data\?\.departments\}/);
+  // Tables render the search-filtered projections, which are themselves derived from the API payload.
+  assert.match(app, /<JobTitleTable[^>]*rows=\{shownJobTitles\}/);
+  assert.match(app, /const shownJobTitles=\(data\?\.jobTitles\s*\?\?\s*\[\]\)/);
+  assert.match(app, /<DepartmentGrid[^>]*rows=\{shownDepartments\}/);
+  assert.match(app, /const shownDepartments=\(data\?\.departments\s*\?\?\s*\[\]\)/);
   assert.match(app, /Managing Director\|العضو المنتدب/);
   assert.match(app, /org-department-grid/);
   assert.match(app, /DepartmentHierarchyDrawer/);
   assert.match(app, /save_department_hierarchy/);
   assert.match(app, /save_organization_levels/);
-  assert.match(app, /org-level-input/);
+  assert.match(app, /org-team-level-input/);
   assert.match(app, /organizational_level/);
   assert.doesNotMatch(app, /Layla Alotaibi|Youssef Nassar|Commercial Director/);
 });
 
-test("provides portal login and logout controls", async () => {
+test("provides personal account login, password change, and logout controls", async () => {
   const [app, authRoute, portalAuth] = await Promise.all([
     readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8"),
@@ -68,7 +71,22 @@ test("provides portal login and logout controls", async () => {
   assert.match(app, /function LoginPage/);
   assert.match(app, /profile-logout/);
   assert.match(app, /method:"DELETE"/);
-  assert.match(authRoute, /verifyPortalPassword/);
+  assert.match(authRoute, /verifyPassword/);
+  assert.match(authRoute, /failed_login_attempts/);
+  assert.match(authRoute, /export async function PATCH/);
+  assert.match(app, /PasswordChange/);
+  assert.match(app, /Department Manager/);
   assert.match(portalAuth, /HttpOnly; SameSite=Lax/);
   assert.match(portalAuth, /PBKDF2/);
+  assert.match(portalAuth, /sessionVersion/);
+});
+
+test("enforces four-role server-side data scope", async () => {
+  const api = await readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8");
+  assert.match(api, /SYSTEM_ROLES = \["Super Admin","HR Manager","Department Manager","Employee"\]/);
+  assert.match(api, /WITH RECURSIVE managed/);
+  assert.match(api, /canAccessEmployee/);
+  assert.match(api, /You cannot approve your own request/);
+  assert.match(api, /Only the employee's department manager/);
+  assert.doesNotMatch(api, /const roleNames = \["Super Admin","Admin","HR Manager","HR","Direct Manager","Employee"\]/);
 });

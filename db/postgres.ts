@@ -43,7 +43,7 @@ export class PreparedPostgresQuery {
     return bound;
   }
 
-  async execute(executor: Sql = this.executor) {
+  async execute(executor: Pick<Sql, "unsafe"> = this.executor) {
     return executor.unsafe(postgresSql(this.source), this.values as never[]) as Promise<Row[]>;
   }
 

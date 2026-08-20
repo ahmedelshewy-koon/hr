@@ -1,0 +1,68 @@
+.payroll-runs-table .tr{grid-template-columns:1.4fr 1fr .8fr 1fr 1fr 48px}
+.salary-structures-table .tr{grid-template-columns:1.6fr 1fr 1.4fr 1fr 1fr 1fr}
+.loans-table .tr{grid-template-columns:1.6fr 1fr 1.6fr 1fr 1fr}
+.payroll-items-scroll{overflow-x:auto}
+.payroll-items-table{min-width:1100px}
+.payroll-items-table .tr{grid-template-columns:1.5fr repeat(8,1fr) 40px}
+.payroll-items-table .negative{color:#ef4444}
+
+.tax-panel{margin-top:16px;overflow:hidden}
+.tax-panel>header{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;padding:16px 24px}
+.tax-panel h2{font-size:18px;margin:3px 0 4px}
+.tax-panel p{color:var(--muted);font-size:12px;margin:0}
+.tax-panel table{border-collapse:collapse;width:100%}
+.tax-panel th,.tax-panel td{border-bottom:1px solid var(--line);padding:12px 16px;text-align:center;white-space:nowrap}
+.tax-panel th{background:#f8fafc;color:var(--muted);font-size:12px;font-weight:600}
+.tax-panel tbody tr:last-child td{border-bottom:0}
+.tax-panel.export-config{align-items:center;display:flex;justify-content:space-between;gap:16px;padding:16px 24px}
+.tax-panel.export-config h2{font-size:18px;margin:3px 0 4px}
+
+.loan-progress{display:grid;gap:4px}
+.loan-progress-bar{background:var(--line);border-radius:999px;height:6px;overflow:hidden;width:100%}
+.loan-progress-bar span{background:#2563eb;display:block;height:100%}
+.loan-progress small{color:var(--muted);font-size:11px}
+
+.allowance-editor{border-top:1px solid var(--line);display:grid;gap:12px;padding:16px 24px}
+.allowance-editor>header{align-items:center;display:flex;justify-content:space-between}
+.allowance-editor>header b{font-size:12px}
+.allowance-row{align-items:center;display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr 32px}
+.allowance-row select,.allowance-row input{width:100%}
+.allowance-editor p.muted{color:var(--muted);font-size:12px;margin:0}
+.icon-button{align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--muted);cursor:pointer;display:flex;height:32px;justify-content:center;width:32px}
+.icon-button:hover{background:#eaf2ff;color:#2563eb}
+.outline.small{font-size:12px;height:32px;padding:0 12px}
+
+.payroll-run-detail-drawer{max-width:960px;width:96vw}
+.payroll-run-actions{align-items:center;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;padding:16px 24px}
+
+.payslip-drawer{max-width:460px}
+.payslip-close{margin:16px 16px 0 auto}
+.payslip-card{padding:8px 24px 24px}
+.payslip-head{align-items:flex-start;display:flex;gap:16px;justify-content:space-between;padding-bottom:16px}
+.payslip-head h2{font-size:18px;margin:4px 0}
+.payslip-head p{color:var(--muted);font-size:12px;margin:0}
+.payslip-rows{border-top:1px solid var(--line);display:grid}
+.payslip-row{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;padding:12px 0}
+.payslip-row .negative{color:#ef4444}
+.payslip-net{align-items:center;display:flex;justify-content:space-between;padding-top:16px}
+.payslip-net span{color:var(--muted);font-size:12px}
+.payslip-net b{font-size:24px}
+
+.payslip-table .tr{grid-template-columns:1.4fr 1fr 1fr 40px}
+/* the payslip drawer is only ~460px wide, so it must never inherit the
+   850px table min-width that globals applies below 1050px */
+.payslip-table .tr{min-width:0}
+
+@media print{
+  body *{visibility:hidden}
+  .payslip-card,.payslip-card *{visibility:visible}
+  .payslip-card{left:0;position:fixed;top:0;width:100%}
+  .print-hide{display:none!important}
+}
+
+@media(max-width:900px){
+  /* min-width:0 is required alongside the stack: globals sets .data-table .tr
+     to min-width:850px below 1050px, which would force a stacked row to scroll */
+  .payroll-runs-table .tr,.payroll-runs-table .th,.salary-structures-table .tr,.salary-structures-table .th,.loans-table .tr,.loans-table .th{grid-template-columns:1fr;min-width:0}
+  .allowance-row{grid-template-columns:1fr}
+}

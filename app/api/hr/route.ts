@@ -105,25 +105,10 @@ async function ensureSeed(d1: PostgresDatabase) {
 }
 
 async function ensureDemoData(d1:PostgresDatabase){
-  const placements=(await d1.prepare("SELECT j.id AS job_title_id,j.department_id FROM job_titles j WHERE j.status='active' AND j.department_id IS NOT NULL ORDER BY j.id LIMIT 4").all<{job_title_id:number;department_id:number}>()).results;
-  if(!placements.length)throw new Response("Create at least one department and job title before enabling test data",{status:400});
-  const people=[
-    ["TEST-0001","Omar Hassan","عمر حسن","demo.omar@example.test","male","Saudi Arabia","Riyadh, KSA"],
-    ["TEST-0002","Sara Ahmed","سارة أحمد","demo.sara@example.test","female","Egypt","Cairo, Egypt"],
-    ["TEST-0003","Youssef Ali","يوسف علي","demo.youssef@example.test","male","Egypt","Cairo, Egypt"],
-    ["TEST-0004","Nour Khaled","نور خالد","demo.nour@example.test","female","Saudi Arabia","Jeddah, KSA"],
-    ["TEST-0005","Mariam Adel","مريم عادل","demo.mariam@example.test","female","Egypt","Alexandria, Egypt"],
-    ["TEST-0006","Fahad Salem","فهد سالم","demo.fahad@example.test","male","Saudi Arabia","Riyadh, KSA"],
-    ["TEST-0007","Laila Mostafa","ليلى مصطفى","demo.laila@example.test","female","Egypt","Cairo, Egypt"],
-    ["TEST-0008","Khaled Nasser","خالد ناصر","demo.khaled@example.test","male","Saudi Arabia","Dammam, KSA"],
-  ] as const;
+  await deleteDemoData(d1);
   const today=new Date().toISOString().slice(0,10),statuses=["present","present","late","present","leave","present","late","present"];
-  for(let index=0;index<people.length;index++){
-    const [code,nameEn,nameAr,email,gender,country,location]=people[index];const placement=placements[index%placements.length];
-    await d1.prepare("INSERT INTO employees (employee_code,name_en,name_ar,work_email,gender,department_id,job_title_id,start_date,employment_status,salary,salary_currency,country,work_location,employment_type,schedule_type,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'active',?,?,?,?,'full_time','fixed','0,1,2,3,4','09:00','17:00',15,480,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_code) DO UPDATE SET name_en=excluded.name_en,name_ar=excluded.name_ar,department_id=excluded.department_id,job_title_id=excluded.job_title_id,salary=excluded.salary,country=excluded.country,work_location=excluded.work_location,updated_at=CURRENT_TIMESTAMP")
-      .bind(code,nameEn,nameAr,email,gender,placement.department_id,placement.job_title_id,"2026-01-05",country==="Egypt"?12000:6500,country==="Egypt"?"EGP":"SAR",country,location).run();
-  }
-  const employees=(await d1.prepare("SELECT id,employee_code FROM employees WHERE employment_status!='deleted' ORDER BY employee_code LIMIT 250").all<{id:number;employee_code:string}>()).results;
+  const employees=(await d1.prepare("SELECT id,employee_code FROM employees WHERE employment_status!='deleted' AND employee_code NOT LIKE 'TEST-%' ORDER BY employee_code LIMIT 250").all<{id:number;employee_code:string}>()).results;
+  if(!employees.length)throw new Response("Create at least one real employee before enabling test data",{status:400});
   const requestTypes=["Annual leave","Work from home","Sick leave","Expense reimbursement"] as const;
   const requestStatuses=[["pending_manager","manager"],["pending_hr","hr"],["hr_approved","completed"],["rejected","completed"]] as const;
   for(let index=0;index<employees.length;index++){

@@ -1,5 +1,6 @@
 import { ensureAuthSchema, hashPassword, requirePortalSession } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
+import { JOB_TITLE_TRANSLATIONS } from "../../localization";
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -59,7 +60,7 @@ const OFFICIAL_HOLIDAYS_2026 = [
 ] as const;
 
 /** Bump whenever the seeded reference data below changes, to force a re-seed. */
-const SEED_VERSION = "2026-08-20-four-role-auth-2";
+const SEED_VERSION = "2026-08-20-localized-job-titles-3";
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
@@ -89,6 +90,11 @@ async function ensureSeed(d1: PostgresDatabase) {
     const payrollRole = await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{ id: number }>();
     if (!payrollRole) continue;
     for (const action of PAYROLL_ACTIONS) await d1.prepare("INSERT OR IGNORE INTO permissions (role_id, module, action, allowed) VALUES (?,?,?,?)").bind(payrollRole.id,"payroll",action,allowedActions.includes(action)?1:0).run();
+  }
+
+  for (const title of JOB_TITLE_TRANSLATIONS) {
+    const sourceNames=[title.en,...("aliases" in title?title.aliases:[])];
+    for (const sourceName of sourceNames) await d1.prepare("UPDATE job_titles SET name_en=?,name_ar=?,updated_at=CURRENT_TIMESTAMP WHERE lower(trim(name_en))=lower(trim(?))").bind(title.en,title.ar,sourceName).run();
   }
 
   for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();

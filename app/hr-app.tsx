@@ -223,7 +223,7 @@ export function HRApp() {
         </nav>
         <div className="sidebar-bottom">
           <button onClick={() => notify(rtl ? "مركز المساعدة قريباً" : "Help center is coming soon")}><HelpCircle size={20} /><span>{rtl ? "المساعدة والدعم" : "Help & support"}</span></button>
-          <div className="profile-mini"><Avatar initials={personInitials(authUser?.employee_name||authUser?.email)} small /><div><b>{rtl?(authUser?.employee_name_ar||authUser?.employee_name||authUser?.email):(authUser?.employee_name||authUser?.email)}</b><span>{localizedRole(role,rtl)}</span></div><button className="profile-logout" onClick={()=>void logout()} aria-label={rtl?"تسجيل الخروج":"Sign out"}><LogOut size={16}/><span>{rtl?"خروج":"Logout"}</span></button></div>
+          <div className="profile-mini"><Avatar initials={personInitials(authUser?.employee_name||authUser?.email)} small /><div className="profile-copy"><b dir={authUser?.employee_name?undefined:"ltr"} title={rtl?(authUser?.employee_name_ar||authUser?.employee_name||authUser?.email):(authUser?.employee_name||authUser?.email)}>{rtl?(authUser?.employee_name_ar||authUser?.employee_name||authUser?.email):(authUser?.employee_name||authUser?.email)}</b><span>{localizedRole(role,rtl)}</span></div><button className="profile-logout" onClick={()=>void logout()} aria-label={rtl?"تسجيل الخروج":"Sign out"} title={rtl?"تسجيل الخروج":"Sign out"}><LogOut size={16}/></button></div>
         </div>
       </aside>
       {mobileOpen && <button className="scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}

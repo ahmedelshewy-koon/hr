@@ -117,24 +117,45 @@ async function ensureDemoData(d1:PostgresDatabase){
     ["TEST-0007","Laila Mostafa","ليلى مصطفى","demo.laila@example.test","female","Egypt","Cairo, Egypt"],
     ["TEST-0008","Khaled Nasser","خالد ناصر","demo.khaled@example.test","male","Saudi Arabia","Dammam, KSA"],
   ] as const;
-  const today=new Date().toISOString().slice(0,10),statuses=["present","present","late","present","leave","present","late","present"],employeeIds:number[]=[];
+  const today=new Date().toISOString().slice(0,10),statuses=["present","present","late","present","leave","present","late","present"];
   for(let index=0;index<people.length;index++){
     const [code,nameEn,nameAr,email,gender,country,location]=people[index];const placement=placements[index%placements.length];
     await d1.prepare("INSERT INTO employees (employee_code,name_en,name_ar,work_email,gender,department_id,job_title_id,start_date,employment_status,salary,salary_currency,country,work_location,employment_type,schedule_type,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'active',?,?,?,?,'full_time','fixed','0,1,2,3,4','09:00','17:00',15,480,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_code) DO UPDATE SET name_en=excluded.name_en,name_ar=excluded.name_ar,department_id=excluded.department_id,job_title_id=excluded.job_title_id,salary=excluded.salary,country=excluded.country,work_location=excluded.work_location,updated_at=CURRENT_TIMESTAMP")
       .bind(code,nameEn,nameAr,email,gender,placement.department_id,placement.job_title_id,"2026-01-05",country==="Egypt"?12000:6500,country==="Egypt"?"EGP":"SAR",country,location).run();
-    const employee=await d1.prepare("SELECT id FROM employees WHERE employee_code=?").bind(code).first<{id:number}>();if(!employee)continue;employeeIds.push(employee.id);
-    const status=statuses[index],late=status==="late"?25:0,actualIn=status==="leave"?null:(status==="late"?"09:25":"08:55"),actualOut=status==="leave"?null:"17:05",worked=status==="leave"?0:(status==="late"?460:490);
-    await d1.prepare("INSERT INTO daily_attendance (employee_id,work_date,scheduled_in,scheduled_out,actual_in,actual_out,worked_minutes,required_minutes,late_minutes,early_minutes,overtime_minutes,attendance_type,status,note,created_at,updated_at) VALUES (?,?,'09:00','17:00',?,?,?,?,?,0,0,'office',?,'Test data',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_id,work_date) DO UPDATE SET actual_in=excluded.actual_in,actual_out=excluded.actual_out,worked_minutes=excluded.worked_minutes,late_minutes=excluded.late_minutes,status=excluded.status,note=excluded.note,updated_at=CURRENT_TIMESTAMP")
-      .bind(employee.id,today,actualIn,actualOut,worked,480,late,status).run();
   }
-  const requestSamples=[
-    ["TEST-REQ-0001",0,"Annual leave","2026-09-01","2026-09-05","Family holiday","pending_manager","manager"],
-    ["TEST-REQ-0002",1,"Work from home",today,today,"Remote work day","pending_hr","hr"],
-    ["TEST-REQ-0003",2,"Sick leave",today,today,"Medical rest","hr_approved","completed"],
-    ["TEST-REQ-0004",3,"Expense reimbursement",null,null,"Client meeting transport","pending_manager","manager"],
-    ["TEST-REQ-0005",4,"Annual leave","2026-10-12","2026-10-14","Personal leave","rejected","completed"],
-  ] as const;
-  for(const [code,employeeIndex,type,fromDate,toDate,reason,status,stage] of requestSamples){const employeeId=employeeIds[employeeIndex];if(!employeeId)continue;await d1.prepare("INSERT INTO requests (request_code,employee_id,type,from_date,to_date,reason,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,'{}',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(request_code) DO UPDATE SET employee_id=excluded.employee_id,type=excluded.type,from_date=excluded.from_date,to_date=excluded.to_date,reason=excluded.reason,status=excluded.status,current_stage=excluded.current_stage,updated_at=CURRENT_TIMESTAMP").bind(code,employeeId,type,fromDate,toDate,reason,status,stage).run();}
+  const employees=(await d1.prepare("SELECT id,employee_code FROM employees WHERE employment_status!='deleted' ORDER BY employee_code LIMIT 250").all<{id:number;employee_code:string}>()).results;
+  const requestTypes=["Annual leave","Work from home","Sick leave","Expense reimbursement"] as const;
+  const requestStatuses=[["pending_manager","manager"],["pending_hr","hr"],["hr_approved","completed"],["rejected","completed"]] as const;
+  for(let index=0;index<employees.length;index++){
+    const employee=employees[index],status=statuses[index%statuses.length],late=status==="late"?25:0;
+    const actualIn=status==="leave"?null:(status==="late"?"09:25":"08:55"),actualOut=status==="leave"?null:"17:05",worked=status==="leave"?0:(status==="late"?460:490);
+    const attendanceType=index%5===0&&status!=="leave"?"remote":"office";
+    await d1.prepare("INSERT INTO daily_attendance (employee_id,work_date,scheduled_in,scheduled_out,actual_in,actual_out,worked_minutes,required_minutes,late_minutes,early_minutes,overtime_minutes,attendance_type,status,note,created_at,updated_at) VALUES (?,?,'09:00','17:00',?,?,?,?,?,0,0,?,?,'Test data',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_id,work_date) DO NOTHING")
+      .bind(employee.id,today,actualIn,actualOut,worked,480,late,attendanceType,status).run();
+    const requestType=requestTypes[index%requestTypes.length],[requestStatus,requestStage]=requestStatuses[index%requestStatuses.length];
+    const requestCode=`TEST-REQ-EMP-${employee.id}`;
+    await d1.prepare("INSERT INTO requests (request_code,employee_id,type,from_date,to_date,reason,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,'Test data for dashboard','{\"demo\":true}',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(request_code) DO NOTHING")
+      .bind(requestCode,employee.id,requestType,today,today,requestStatus,requestStage).run();
+  }
+}
+
+async function deleteDemoData(d1:PostgresDatabase){
+  const testEmployees="SELECT id FROM employees WHERE employee_code LIKE 'TEST-%'";
+  const testRequests=`SELECT id FROM requests WHERE request_code LIKE 'TEST-REQ-%' OR employee_id IN (${testEmployees})`;
+  await d1.prepare(`DELETE FROM approvals WHERE request_id IN (${testRequests})`).run();
+  await d1.prepare(`DELETE FROM requests WHERE request_code LIKE 'TEST-REQ-%' OR employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM daily_attendance WHERE note='Test data' OR employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM attendance_logs WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM leave_balances WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM salary_allowances WHERE salary_structure_id IN (SELECT id FROM salary_structures WHERE employee_id IN (${testEmployees}))`).run();
+  await d1.prepare(`DELETE FROM salary_structures WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM payroll_items WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM loans_advances WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`DELETE FROM documents WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`UPDATE users SET employee_id=NULL WHERE employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`UPDATE departments SET manager_employee_id=NULL WHERE manager_employee_id IN (${testEmployees})`).run();
+  await d1.prepare(`UPDATE employees SET manager_id=NULL WHERE manager_id IN (${testEmployees})`).run();
+  await d1.prepare("DELETE FROM employees WHERE employee_code LIKE 'TEST-%'").run();
 }
 
 function enabledSetting(row:{value_json?:string}|null){try{return Boolean(JSON.parse(row?.value_json||"{}").enabled);}catch{return false;}}
@@ -439,9 +460,10 @@ export async function POST(request: Request) {
       await authorize(d1,user,"system_settings","manage_settings");
       const enabled=Boolean(payload.enabled);
       if(enabled)await ensureDemoData(d1);
+      else await deleteDemoData(d1);
       const before=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='demo_data'").first<Record<string,unknown>>();
-      await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES ('demo_data',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(JSON.stringify({enabled}),user.id).run();
-      await audit(d1,request,user,"update","system_settings","setting","demo_data",before,{enabled});
+      await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES ('demo_data',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(JSON.stringify({enabled,includesExistingEmployees:enabled}),user.id).run();
+      await audit(d1,request,user,enabled?"create_demo_data":"delete_demo_data","system_settings","setting","demo_data",before,{enabled,includesExistingEmployees:enabled});
       return Response.json({ok:true,enabled});
     }
     if(action==="save_leave_type") {

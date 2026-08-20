@@ -416,6 +416,8 @@ button,input,select,textarea{
 .demo-data-setting h3{font-size:16px;margin:0 0 5px}
 .demo-data-setting p{font-size:12px;color:#64748b;margin:0;line-height:1.6}
 .demo-data-setting>button{white-space:nowrap}
+.demo-data-setting .remove-demo{border-color:#fecaca;background:#fff7f7;color:#dc2626}
+.demo-data-setting .remove-demo:hover{border-color:#fca5a5;background:#feecec;color:#b91c1c}
 @media(max-width:760px){.demo-data-setting{grid-template-columns:42px 1fr}.demo-data-setting>.status{justify-self:start}.demo-data-setting>button{grid-column:1/-1;width:100%}}
 
 /* Dashboard attendance summary */

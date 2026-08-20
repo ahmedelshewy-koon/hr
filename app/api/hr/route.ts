@@ -102,6 +102,41 @@ async function ensureSeed(d1: PostgresDatabase) {
   await d1.prepare("INSERT INTO system_settings (setting_key,value_json,created_at,updated_at) VALUES ('seed_version',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_at=CURRENT_TIMESTAMP").bind(SEED_VERSION).run();
 }
 
+async function ensureDemoData(d1:PostgresDatabase){
+  const placements=(await d1.prepare("SELECT j.id AS job_title_id,j.department_id FROM job_titles j WHERE j.status='active' AND j.department_id IS NOT NULL ORDER BY j.id LIMIT 4").all<{job_title_id:number;department_id:number}>()).results;
+  if(!placements.length)throw new Response("Create at least one department and job title before enabling test data",{status:400});
+  const people=[
+    ["TEST-0001","Omar Hassan","عمر حسن","demo.omar@example.test","male","Saudi Arabia","Riyadh, KSA"],
+    ["TEST-0002","Sara Ahmed","سارة أحمد","demo.sara@example.test","female","Egypt","Cairo, Egypt"],
+    ["TEST-0003","Youssef Ali","يوسف علي","demo.youssef@example.test","male","Egypt","Cairo, Egypt"],
+    ["TEST-0004","Nour Khaled","نور خالد","demo.nour@example.test","female","Saudi Arabia","Jeddah, KSA"],
+    ["TEST-0005","Mariam Adel","مريم عادل","demo.mariam@example.test","female","Egypt","Alexandria, Egypt"],
+    ["TEST-0006","Fahad Salem","فهد سالم","demo.fahad@example.test","male","Saudi Arabia","Riyadh, KSA"],
+    ["TEST-0007","Laila Mostafa","ليلى مصطفى","demo.laila@example.test","female","Egypt","Cairo, Egypt"],
+    ["TEST-0008","Khaled Nasser","خالد ناصر","demo.khaled@example.test","male","Saudi Arabia","Dammam, KSA"],
+  ] as const;
+  const today=new Date().toISOString().slice(0,10),statuses=["present","present","late","present","leave","present","late","present"],employeeIds:number[]=[];
+  for(let index=0;index<people.length;index++){
+    const [code,nameEn,nameAr,email,gender,country,location]=people[index];const placement=placements[index%placements.length];
+    await d1.prepare("INSERT INTO employees (employee_code,name_en,name_ar,work_email,gender,department_id,job_title_id,start_date,employment_status,salary,salary_currency,country,work_location,employment_type,schedule_type,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'active',?,?,?,?,'full_time','fixed','0,1,2,3,4','09:00','17:00',15,480,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_code) DO UPDATE SET name_en=excluded.name_en,name_ar=excluded.name_ar,department_id=excluded.department_id,job_title_id=excluded.job_title_id,salary=excluded.salary,country=excluded.country,work_location=excluded.work_location,updated_at=CURRENT_TIMESTAMP")
+      .bind(code,nameEn,nameAr,email,gender,placement.department_id,placement.job_title_id,"2026-01-05",country==="Egypt"?12000:6500,country==="Egypt"?"EGP":"SAR",country,location).run();
+    const employee=await d1.prepare("SELECT id FROM employees WHERE employee_code=?").bind(code).first<{id:number}>();if(!employee)continue;employeeIds.push(employee.id);
+    const status=statuses[index],late=status==="late"?25:0,actualIn=status==="leave"?null:(status==="late"?"09:25":"08:55"),actualOut=status==="leave"?null:"17:05",worked=status==="leave"?0:(status==="late"?460:490);
+    await d1.prepare("INSERT INTO daily_attendance (employee_id,work_date,scheduled_in,scheduled_out,actual_in,actual_out,worked_minutes,required_minutes,late_minutes,early_minutes,overtime_minutes,attendance_type,status,note,created_at,updated_at) VALUES (?,?,'09:00','17:00',?,?,?,?,?,0,0,'office',?,'Test data',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_id,work_date) DO UPDATE SET actual_in=excluded.actual_in,actual_out=excluded.actual_out,worked_minutes=excluded.worked_minutes,late_minutes=excluded.late_minutes,status=excluded.status,note=excluded.note,updated_at=CURRENT_TIMESTAMP")
+      .bind(employee.id,today,actualIn,actualOut,worked,480,late,status).run();
+  }
+  const requestSamples=[
+    ["TEST-REQ-0001",0,"Annual leave","2026-09-01","2026-09-05","Family holiday","pending_manager","manager"],
+    ["TEST-REQ-0002",1,"Work from home",today,today,"Remote work day","pending_hr","hr"],
+    ["TEST-REQ-0003",2,"Sick leave",today,today,"Medical rest","hr_approved","completed"],
+    ["TEST-REQ-0004",3,"Expense reimbursement",null,null,"Client meeting transport","pending_manager","manager"],
+    ["TEST-REQ-0005",4,"Annual leave","2026-10-12","2026-10-14","Personal leave","rejected","completed"],
+  ] as const;
+  for(const [code,employeeIndex,type,fromDate,toDate,reason,status,stage] of requestSamples){const employeeId=employeeIds[employeeIndex];if(!employeeId)continue;await d1.prepare("INSERT INTO requests (request_code,employee_id,type,from_date,to_date,reason,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,'{}',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(request_code) DO UPDATE SET employee_id=excluded.employee_id,type=excluded.type,from_date=excluded.from_date,to_date=excluded.to_date,reason=excluded.reason,status=excluded.status,current_stage=excluded.current_stage,updated_at=CURRENT_TIMESTAMP").bind(code,employeeId,type,fromDate,toDate,reason,status,stage).run();}
+}
+
+function enabledSetting(row:{value_json?:string}|null){try{return Boolean(JSON.parse(row?.value_json||"{}").enabled);}catch{return false;}}
+
 async function currentUser(d1: PostgresDatabase, userId:number): Promise<AppUser> {
   const user = await d1.prepare("SELECT u.id,u.email,u.role_id,u.employee_id,u.must_change_password,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=? AND u.status='active'").bind(userId).first<AppUser>();
   if(!user)throw new Response("Account disabled",{status:403});
@@ -237,12 +272,14 @@ export async function GET(request: Request) {
     const safeEmployeeColumns="e.id,e.employee_code,e.name_en,e.name_ar,e.work_email,e.work_phone,e.department_id,e.job_title_id,e.manager_id,e.organizational_level,e.start_date,e.end_date,e.employment_status,e.country,e.work_location,e.employment_type,e.schedule_type,e.work_days,e.check_in_time,e.check_out_time,e.grace_minutes,e.required_daily_minutes,e.avatar_url,e.created_at,e.updated_at";
     const employeeColumns=fullCompany||user.role_name==="Employee"?"e.*":safeEmployeeColumns;
     const employeeIdParam = user.employee_id ?? 0;
+    const demoSetting=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='demo_data'").first<{value_json:string}>();
+    const demoEnabled=enabledSetting(demoSetting),demoEmployeeFilter=demoEnabled?"TRUE":"e.employee_code NOT LIKE 'TEST-%'";
     const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,leaveTypeRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
-      d1.prepare(`SELECT ${employeeColumns},d.name_en AS department_name,d.name_ar AS department_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' AND ${employeeScope} ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250`).all(),
-      d1.prepare(`SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' WHERE ${departmentScope} GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en`).all(),
-      d1.prepare(`SELECT j.*,d.name_en AS department_name,d.name_ar AS department_name_ar,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id WHERE ${fullCompany?"TRUE":`j.department_id IN (${departmentList})`} GROUP BY j.id,d.name_en,d.name_ar ORDER BY j.name_en`).all(),
-      d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} ORDER BY q.id DESC LIMIT 250`).all(),
-      d1.prepare(`SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} ORDER BY a.work_date DESC,a.id DESC LIMIT 250`).all(),
+      d1.prepare(`SELECT ${employeeColumns},d.name_en AS department_name,d.name_ar AS department_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' AND ${employeeScope} AND ${demoEmployeeFilter} ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250`).all(),
+      d1.prepare(`SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' AND ${demoEmployeeFilter} WHERE ${departmentScope} GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en`).all(),
+      d1.prepare(`SELECT j.*,d.name_en AS department_name,d.name_ar AS department_name_ar,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id AND ${demoEmployeeFilter} WHERE ${fullCompany?"TRUE":`j.department_id IN (${departmentList})`} GROUP BY j.id,d.name_en,d.name_ar ORDER BY j.name_en`).all(),
+      d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY q.id DESC LIMIT 250`).all(),
+      d1.prepare(`SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY a.work_date DESC,a.id DESC LIMIT 250`).all(),
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
       d1.prepare("SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").all(),
       canViewPermissions?d1.prepare("SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id WHERE r.name IN ('Super Admin','HR Manager','Department Manager','Employee') GROUP BY r.id ORDER BY r.id").all():Promise.resolve({results:[]}),
@@ -280,7 +317,7 @@ export async function GET(request: Request) {
     ]);
     const pageModules:Record<string,string>={dashboard:"dashboard",portal:"employee_portal",approvals:"request_approvals",employees:"employees",leave:"leave_management",attendance:"attendance",org:"organization_chart",users:"users",payroll:"payroll",settings:"system_settings"};
     const allowedPages=(await Promise.all(Object.entries(pageModules).map(async([page,module])=>await can(d1,user,module,"view")?page:null))).filter(Boolean);
-    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
+    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
 }
@@ -395,6 +432,15 @@ export async function POST(request: Request) {
       await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(settingKey,valueJson,user.id).run();
       await audit(d1,request,user,"update","system_settings","setting",settingKey,before,values);
       return Response.json({ok:true,settingKey,values});
+    }
+    if(action==="toggle_demo_data") {
+      await authorize(d1,user,"system_settings","manage_settings");
+      const enabled=Boolean(payload.enabled);
+      if(enabled)await ensureDemoData(d1);
+      const before=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='demo_data'").first<Record<string,unknown>>();
+      await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES ('demo_data',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(JSON.stringify({enabled}),user.id).run();
+      await audit(d1,request,user,"update","system_settings","setting","demo_data",before,{enabled});
+      return Response.json({ok:true,enabled});
     }
     if(action==="save_leave_type") {
       const leaveTypeId=Number(payload.leaveTypeId)||null;

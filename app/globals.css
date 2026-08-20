@@ -411,6 +411,13 @@ button,input,select,textarea{
 .leave-config>footer>span{font-size:11px;color:#64748b}
 @media(max-width:760px){.leave-config-head{padding:16px}.leave-config-head>.status{display:none}.leave-config-grid{grid-template-columns:1fr;padding:16px}.leave-config>footer{padding:12px 16px;align-items:stretch;flex-direction:column}.leave-config>footer .primary{width:100%}}
 
+/* Test-data visibility control */
+.demo-data-setting{display:grid;grid-template-columns:42px minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:16px;margin-bottom:12px}
+.demo-data-setting h3{font-size:16px;margin:0 0 5px}
+.demo-data-setting p{font-size:12px;color:#64748b;margin:0;line-height:1.6}
+.demo-data-setting>button{white-space:nowrap}
+@media(max-width:760px){.demo-data-setting{grid-template-columns:42px 1fr}.demo-data-setting>.status{justify-self:start}.demo-data-setting>button{grid-column:1/-1;width:100%}}
+
 /* Design-system resets (must come after Tailwind preflight) */
 b,strong{font-weight:700}
 svg{flex-shrink:0}

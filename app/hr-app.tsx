@@ -243,7 +243,7 @@ export function HRApp() {
         </header>
 
         <div className="content">
-          {page === "dashboard" && <Dashboard rtl={rtl} t={t} setPage={setPage} openRequest={() => setRequestOpen(true)} notify={notify} />}
+          {page === "dashboard" && <Dashboard rtl={rtl} t={t} setPage={setPage} notify={notify} />}
           {page === "portal" && <Portal rtl={rtl} openRequest={() => setRequestOpen(true)} notify={notify} />}
           {page === "approvals" && <Approvals rtl={rtl} notify={notify} />}
           {page === "employees" && <EmployeesPage rtl={rtl} notify={notify} />}
@@ -274,7 +274,7 @@ function PasswordChange({rtl,forced=false,onChanged,close}:{rtl:boolean;forced?:
   return <div className="modal-layer password-layer"><button className="modal-scrim" disabled={forced} onClick={close} aria-label={rtl?"إغلاق":"Close"}/><section className="password-card" role="dialog" aria-modal="true"><span className="password-card-icon"><KeyRound size={24}/></span><h2>{forced?(rtl?"غيّر كلمة المرور أولاً":"Change your password first"):(rtl?"تغيير كلمة المرور":"Change password")}</h2><p>{rtl?"استخدم 10 أحرف على الأقل، تشمل حرفاً ورقماً.":"Use at least 10 characters, including a letter and a number."}</p><label className="login-field"><span>{rtl?"كلمة المرور الحالية":"Current password"}</span><div className="login-input"><Lock size={18}/><input type="password" autoComplete="current-password" value={currentPassword} onChange={event=>setCurrentPassword(event.target.value)}/></div></label><label className="login-field"><span>{rtl?"كلمة المرور الجديدة":"New password"}</span><div className="login-input"><KeyRound size={18}/><input type="password" autoComplete="new-password" value={newPassword} onChange={event=>setNewPassword(event.target.value)}/></div></label><label className="login-field"><span>{rtl?"تأكيد كلمة المرور":"Confirm password"}</span><div className="login-input"><KeyRound size={18}/><input type="password" autoComplete="new-password" value={confirm} onChange={event=>setConfirm(event.target.value)}/></div></label>{error&&<p className="login-error">{error}</p>}<button className="login-submit" disabled={saving||!currentPassword||!newPassword||!confirm} onClick={()=>void save()}>{saving?<Activity size={18}/>:<Check size={18}/>} {saving?(rtl?"جارٍ الحفظ...":"Saving..."):(rtl?"حفظ كلمة المرور":"Save password")}</button></section></div>;
 }
 
-function Dashboard({ rtl, t, setPage, openRequest, notify }: { rtl: boolean; t: typeof copy.en; setPage: (p: Page) => void; openRequest: () => void; notify:(message:string)=>void }) {
+function Dashboard({ rtl, t, setPage, notify }: { rtl: boolean; t: typeof copy.en; setPage: (p: Page) => void; notify:(message:string)=>void }) {
   const {data,error}=useHRData(rtl);
   const today=new Date().toISOString().slice(0,10);
   const attendanceToday=(data?.attendance??[]).filter(row=>String(row.work_date).slice(0,10)===today);
@@ -287,7 +287,6 @@ function Dashboard({ rtl, t, setPage, openRequest, notify }: { rtl: boolean; t: 
     { label: rtl ? "المتأخرون اليوم" : "Late today", value: formatNumber(attendanceToday.filter(row=>String(row.status)==="late"||Number(row.late_minutes)>0).length,rtl), note: rtl ? "حسب سجلات اليوم" : "From today's records", icon: Clock3, tone: "orange" },
   ];
   return <>
-    <section className="page-heading"><div><span className="eyebrow">{formatDate(today,rtl,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</span><h1>{t.greeting} <span>👋</span></h1><p>{t.subtitle}</p></div><button className="primary" onClick={openRequest}><Plus size={16} />{t.newRequest}</button></section>
     {error&&<div className="error-banner">{error}</div>}
     <section className="stat-grid">{stats.map(({ label, value, note, icon: Icon, tone }) => <div className="stat-card" key={label}><div className={`stat-icon ${tone}`}><Icon size={20} /></div><div className="stat-value">{value}</div><div className="stat-label">{label}</div><div className={`stat-note ${tone}`}>{note}</div></div>)}</section>
     <section className="dashboard-grid">

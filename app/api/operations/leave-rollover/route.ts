@@ -1,0 +1,4 @@
+import { createDatabase } from "../../../../db/postgres";
+import { apiFailure, enforceRateLimit, enforceWriteOrigin, requireActor } from "../../api-security";
+import { runLeaveRollover } from "../../../leave/leave-rollover";
+export async function POST(request:Request){const db=createDatabase();try{enforceWriteOrigin(request);const actor=await requireActor(request,db);if(!["Super Admin","HR Manager"].includes(actor.roleName))throw new Response("Only HR can run leave rollover",{status:403});await enforceRateLimit(db,request,"leave-rollover",3,3600,actor.id);const body=await request.json() as {fromYear?:unknown};return Response.json(await runLeaveRollover({db,fromYear:Number(body.fromYear),actorUserId:actor.id}));}catch(error){return apiFailure(error,"Unable to run leave rollover");}finally{await db.close();}}

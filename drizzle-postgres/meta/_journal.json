@@ -78,6 +78,34 @@
       "when": 1787203260000,
       "tag": "0010_assign_department_managers",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787312348012,
+      "tag": "0011_third_vivisector",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787314358290,
+      "tag": "0012_natural_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787319000000,
+      "tag": "0013_hr_core_completion",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787405400000,
+      "tag": "0014_complete_hrms",
+      "breakpoints": true
     }
   ]
 }

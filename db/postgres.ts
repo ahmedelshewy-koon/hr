@@ -2,6 +2,12 @@ import { env } from "cloudflare:workers";
 import postgres, { type Sql } from "postgres";
 
 type Row = Record<string, unknown>;
+type QueryExecutor = Pick<Sql, "unsafe">;
+
+export type TransactionDatabase = {
+  prepare(source: string): PreparedPostgresQuery;
+  batch(queries: PreparedPostgresQuery[]): Promise<unknown[][]>;
+};
 
 function connectionString() {
   const workerUrl = (env as unknown as { DATABASE_URL?: string }).DATABASE_URL;
@@ -43,7 +49,7 @@ export class PreparedPostgresQuery {
     return bound;
   }
 
-  async execute(executor: Pick<Sql, "unsafe"> = this.executor) {
+  async execute(executor: QueryExecutor = this.executor) {
     return executor.unsafe(postgresSql(this.source), this.values as never[]) as Promise<Row[]>;
   }
 
@@ -83,6 +89,21 @@ export function createDatabase() {
         const results = [];
         for (const query of queries) results.push(await query.execute(transaction));
         return results;
+      });
+    },
+    async transaction<T>(callback: (database: TransactionDatabase) => Promise<T>) {
+      return client.begin(async transaction => {
+        const database: TransactionDatabase = {
+          prepare(source: string) {
+            return new PreparedPostgresQuery(transaction as unknown as Sql, source);
+          },
+          async batch(queries: PreparedPostgresQuery[]) {
+            const results = [];
+            for (const query of queries) results.push(await query.execute(transaction));
+            return results;
+          },
+        };
+        return callback(database);
       });
     },
     async close() {

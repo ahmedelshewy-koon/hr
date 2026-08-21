@@ -1,6 +1,11 @@
 import { ensureAuthSchema, hashPassword, requirePortalSession } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { JOB_TITLE_TRANSLATIONS } from "../../localization";
+import { cancelLeaveRequest, createLeaveRequest, initializeCurrentLeaveBalances, processLeaveRequest } from "../../leave/leave-service";
+import { manualAttendanceCorrection, processAttendanceCorrection, recalculateAttendance, submitAttendanceCorrection } from "../../attendance/attendance-service";
+import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
+import { createEmployeeRecord } from "../../employees/employee-service";
+// The shared employee engine preserves sequence allocation via pg_get_serial_sequence('employees','id').
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -18,9 +23,9 @@ const ROLE_DEFAULTS:Record<string,Record<string,readonly string[]>> = {
   },
   "Department Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
-    employees:["view"], leave_management:["view"], attendance:["view","create"], organization_chart:["view"], payroll:["view_own_payslip"],
+    employees:["view"], leave_management:["view"], attendance:["view","create"], attendance_adjustments:["view","approve"], organization_chart:["view"], payroll:["view_own_payslip"],
   },
-  Employee: { dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], attendance:["create"], payroll:["view_own_payslip"] },
+  Employee: { dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], attendance:["create"], attendance_adjustments:["view","create"], payroll:["view_own_payslip"] },
 };
 const PAYROLL_ACTIONS = ["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"] as const;
 const PAYROLL_ROLE_DEFAULTS: Record<string, readonly string[]> = {
@@ -60,7 +65,7 @@ const OFFICIAL_HOLIDAYS_2026 = [
 ] as const;
 
 /** Bump whenever the seeded reference data below changes, to force a re-seed. */
-const SEED_VERSION = "2026-08-20-hr-settings-access-4";
+const SEED_VERSION = "2026-08-21-attendance-corrections-1";
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
@@ -100,6 +105,7 @@ async function ensureSeed(d1: PostgresDatabase) {
   }
 
   for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();
+  await d1.prepare("INSERT INTO system_settings (setting_key,value_json,created_at,updated_at) VALUES ('attendance','{\"correctionWindowDays\":30,\"timeZone\":\"Africa/Cairo\"}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO NOTHING").run();
 
   await d1.prepare("INSERT INTO system_settings (setting_key,value_json,created_at,updated_at) VALUES ('seed_version',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_at=CURRENT_TIMESTAMP").bind(SEED_VERSION).run();
 }
@@ -177,6 +183,11 @@ async function audit(d1: PostgresDatabase, request: Request, user: AppUser, acti
 function clean(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0,max) : ""; }
 function required(value: unknown, name: string) { const v=clean(value); if(!v) throw new Response(`${name} is required`,{status:400}); return v; }
 function round2(value: number) { return Math.round((value + Number.EPSILON) * 100) / 100; }
+function businessDateTime(timeZone="Africa/Cairo"){
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+  const get=(type:Intl.DateTimeFormatPartTypes)=>parts.find(part=>part.type===type)?.value||"";
+  return {date:`${get("year")}-${get("month")}-${get("day")}`,time:`${get("hour")}:${get("minute")}`};
+}
 
 async function calculatePayrollRun(d1: PostgresDatabase, run: { id: number; month: number; year: number; country: string }) {
   const monthStart = `${run.year}-${String(run.month).padStart(2,"0")}-01`;
@@ -286,7 +297,7 @@ export async function GET(request: Request) {
       d1.prepare(`SELECT ${employeeColumns},d.name_en AS department_name,d.name_ar AS department_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=e.manager_id WHERE e.employment_status!='deleted' AND ${employeeScope} AND ${demoEmployeeFilter} ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250`).all(),
       d1.prepare(`SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' AND ${demoEmployeeFilter} WHERE ${departmentScope} GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en`).all(),
       d1.prepare(`SELECT j.*,d.name_en AS department_name,d.name_ar AS department_name_ar,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id AND ${demoEmployeeFilter} WHERE ${fullCompany?"TRUE":`j.department_id IN (${departmentList})`} GROUP BY j.id,d.name_en,d.name_ar ORDER BY j.name_en`).all(),
-      d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY q.id DESC LIMIT 250`).all(),
+      d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.country AS country,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY q.id DESC LIMIT 250`).all(),
       d1.prepare(`SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY a.work_date DESC,a.id DESC LIMIT 250`).all(),
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
       d1.prepare("SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").all(),
@@ -296,6 +307,19 @@ export async function GET(request: Request) {
       canViewSettings?d1.prepare("SELECT setting_key,value_json,updated_at FROM system_settings ORDER BY setting_key").all():Promise.resolve({results:[]}),
     ]);
     const permissions = await d1.prepare(`SELECT role_id,module,action,allowed FROM permissions WHERE ${canViewPermissions?"TRUE":"role_id=?"} ORDER BY role_id,module,action`).bind(...(canViewPermissions?[]:[user.role_id])).all();
+    const scopedEmployeeIds=(employeeRows.results as {id:number}[]).map(row=>Number(row.id)).filter(Boolean);
+    await initializeCurrentLeaveBalances(d1,scopedEmployeeIds,new Date().getUTCFullYear());
+    const [leaveBalanceRows,leavePolicyRows,requestApprovalRows]=await Promise.all([
+      d1.prepare(`SELECT lb.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar,lt.paid,lt.attachment_required,(lb.entitlement-lb.used-lb.pending) AS available,e.name_en AS employee_name,e.name_ar AS employee_name_ar FROM leave_balances lb JOIN employees e ON e.id=lb.employee_id JOIN leave_types lt ON lt.id=lb.leave_type_id WHERE ${employeeScope} ORDER BY lb.year DESC,lt.id`).all(),
+      d1.prepare(`SELECT lp.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar FROM leave_policies lp JOIN leave_types lt ON lt.id=lp.leave_type_id WHERE (lp.status='active' AND lp.country IN (SELECT DISTINCT e.country FROM employees e WHERE ${employeeScope})) OR (lp.status='active' AND lp.country IN ('Both','KSA & Egypt')) ORDER BY lp.country,lt.id`).all(),
+      d1.prepare(`SELECT a.*,u.email AS actor_email,ae.name_en AS actor_name,ae.name_ar AS actor_name_ar FROM approvals a JOIN requests q ON q.id=a.request_id JOIN employees e ON e.id=q.employee_id LEFT JOIN users u ON u.id=a.actor_user_id LEFT JOIN employees ae ON ae.id=u.employee_id WHERE ${employeeScope} ORDER BY a.created_at,a.id`).all(),
+    ]);
+    const [attendanceCorrectionRows,attendanceCorrectionActionRows,attendanceExceptionRows,attendanceLogRows]=await Promise.all([
+      d1.prepare(`SELECT c.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar,da.scheduled_in,da.scheduled_out,da.actual_in,da.actual_out,da.worked_minutes,da.late_minutes,da.early_minutes FROM attendance_corrections c JOIN employees e ON e.id=c.employee_id LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN daily_attendance da ON da.id=c.daily_attendance_id WHERE ${employeeScope} ORDER BY c.created_at DESC,c.id DESC LIMIT 500`).all(),
+      d1.prepare(`SELECT ca.*,u.email AS actor_email,ae.name_en AS actor_name,ae.name_ar AS actor_name_ar FROM attendance_correction_actions ca JOIN attendance_corrections c ON c.id=ca.correction_id JOIN employees e ON e.id=c.employee_id LEFT JOIN users u ON u.id=ca.actor_user_id LEFT JOIN employees ae ON ae.id=u.employee_id WHERE ${employeeScope} ORDER BY ca.created_at,ca.id LIMIT 2000`).all(),
+      d1.prepare(`SELECT x.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar,da.scheduled_in,da.scheduled_out,da.actual_in,da.actual_out,da.worked_minutes,da.late_minutes,da.early_minutes,da.attendance_type FROM attendance_exceptions x JOIN employees e ON e.id=x.employee_id LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN daily_attendance da ON da.id=x.daily_attendance_id WHERE ${employeeScope} ORDER BY CASE WHEN x.status IN ('open','correction_requested','pending_manager','pending_hr') THEN 0 ELSE 1 END,x.attendance_date DESC,x.id DESC LIMIT 1000`).all(),
+      d1.prepare(`SELECT l.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar FROM attendance_logs l JOIN employees e ON e.id=l.employee_id WHERE ${employeeScope} ORDER BY l.event_at DESC,l.id DESC LIMIT 2000`).all(),
+    ]);
     const emptyResults = Promise.resolve({ results: [] as Record<string, unknown>[] });
     const [salaryStructureRows,salaryAllowanceRows,payrollRunRows,payrollItemRows,payrollAllowanceLineRows,loanRows,taxBracketRows,insuranceRateRows] = await Promise.all([
       canPayroll
@@ -325,7 +349,7 @@ export async function GET(request: Request) {
     ]);
     const pageModules:Record<string,string>={dashboard:"dashboard",portal:"employee_portal",approvals:"request_approvals",employees:"employees",leave:"leave_management",attendance:"attendance",org:"organization_chart",users:"users",payroll:"payroll",settings:"system_settings"};
     const allowedPages=(await Promise.all(Object.entries(pageModules).map(async([page,module])=>await can(d1,user,module,"view")?page:null))).filter(Boolean);
-    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, attendance:attendanceRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
+    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, leavePolicies:leavePolicyRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
 }
@@ -333,9 +357,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const d1 = createDatabase();
   try {
+    enforceWriteOrigin(request);
     await ensureSeed(d1);
     const portalSession = await requirePortalSession(request,d1);
     const user=await currentUser(d1,portalSession.userId);
+    await enforceRateLimit(d1,request,"hr-write",240,60,user.id);
     const payload=await request.json() as Json;
     const action=required(payload.action,"action");
     if(action==="save_user"){
@@ -353,7 +379,7 @@ export async function POST(request: Request) {
       const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
       const temporaryPassword=clean(payload.temporaryPassword,200);let passwordHash:string|null=null;
       if(temporaryPassword){if(temporaryPassword.length<10||!/[A-Za-z]/.test(temporaryPassword)||!/[0-9]/.test(temporaryPassword))throw new Response("Temporary password must be at least 10 characters and contain a letter and number",{status:400});passwordHash=await hashPassword(temporaryPassword);}
-      await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ? IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(role!.id,status,passwordHash,passwordHash,targetUserId).run();
+      await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(role!.id,status,passwordHash,passwordHash,targetUserId).run();
       await audit(d1,request,user,"update","users","user",String(targetUserId),before,{roleName,status,passwordReset:Boolean(passwordHash)});
       return Response.json({ok:true});
     }
@@ -361,15 +387,14 @@ export async function POST(request: Request) {
       await authorize(d1,user,"employees","create");
       const nameEn=required(payload.nameEn,"English name"), nameAr=required(payload.nameAr,"Arabic name"), email=required(payload.workEmail,"Work email").toLowerCase();
       const managerId=Number(payload.managerId)||null;
-      const max=await d1.prepare("SELECT COALESCE(MAX(id),0)+1 AS next FROM employees").first<{next:number}>();
-      const code=`EMP-${String(max?.next??1).padStart(5,"0")}`;
-      const result=await d1.prepare("INSERT INTO employees (employee_code,name_en,name_ar,work_email,fingerprint_code,personal_phone,work_phone,nationality,gender,birth_date,identification_number,address,department_id,job_title_id,manager_id,start_date,end_date,employment_status,salary,salary_currency,country,work_location,employment_type,schedule_type,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,bank_name,bank_account_number,bank_iban,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id")
-        .bind(code,nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,Number(payload.departmentId)||null,Number(payload.jobTitleId)||null,managerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null).first<{id:number}>();
-      if(managerId) await d1.prepare("UPDATE employees e SET organizational_level=COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) WHERE e.id=?").bind(managerId,result!.id).run();
-      const employeeRole=await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>();
-      if(employeeRole) await d1.prepare("INSERT INTO users (email,employee_id,role_id,status,must_change_password,created_at,updated_at) VALUES (?,?,?,'active',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(email,result!.id,employeeRole.id).run();
-      await audit(d1,request,user,"create","employees","employee",String(result!.id),null,{code,nameEn,email});
-      return Response.json({ok:true,id:result!.id,employeeCode:code},{status:201});
+      const created=await d1.transaction(async tx=>{
+        const result=await createEmployeeRecord(tx,{nameEn,nameAr,workEmail:email,startDate:required(payload.startDate,"Start date"),country:required(payload.country,"Country"),departmentId:Number(payload.departmentId)||null,jobTitleId:Number(payload.jobTitleId)||null,managerId,workLocation:clean(payload.workLocation)||null,employmentType:clean(payload.employmentType)||"full_time"});
+        await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+          .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
+        return result;
+      });
+      await audit(d1,request,user,"create","employees","employee",String(created.id),null,{code:created.code,nameEn,email});
+      return Response.json({ok:true,id:created.id,employeeCode:created.code},{status:201});
     }
     if(action==="update_employee") {
       await authorize(d1,user,"employees","edit");
@@ -382,7 +407,7 @@ export async function POST(request: Request) {
       if(managerId===employeeId) throw new Response("An employee cannot manage themselves",{status:400});
       await d1.prepare("UPDATE employees SET name_en=?,name_ar=?,work_email=?,fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,department_id=?,job_title_id=?,manager_id=?,start_date=?,end_date=?,employment_status=?,salary=?,salary_currency=?,country=?,work_location=?,employment_type=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
         .bind(nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,Number(payload.departmentId)||null,Number(payload.jobTitleId)||null,managerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,employeeId).run();
-      await d1.prepare("UPDATE employees SET organizational_level=CASE WHEN ? IS NULL THEN 1 ELSE COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) END WHERE id=?").bind(managerId,managerId,employeeId).run();
+      await d1.prepare("UPDATE employees SET organizational_level=CASE WHEN ?::integer IS NULL THEN 1 ELSE COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) END WHERE id=?").bind(managerId,managerId,employeeId).run();
       await d1.prepare("UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(email,employeeId).run();
       await audit(d1,request,user,"update","employees","employee",String(employeeId),before,payload);
       return Response.json({ok:true,id:employeeId});
@@ -434,7 +459,8 @@ export async function POST(request: Request) {
     if(action==="save_system_settings") {
       await authorize(d1,user,"system_settings","manage_settings");
       const settingKey=required(payload.settingKey,"Setting key");
-      const values=payload.values && typeof payload.values==="object" ? payload.values : {};
+      const values:Json=payload.values && typeof payload.values==="object" ? {...payload.values as Json} : {};
+      if(settingKey==="security"){values.mfaRequired=false;values.mfaSupported=false;values.sessionMinutes=Math.min(1440,Math.max(15,Number(values.sessionMinutes)||480));values.passwordExpiryDays=Math.max(0,Number(values.passwordExpiryDays)||0);values.auditRetentionDays=Math.max(90,Number(values.auditRetentionDays)||365);}
       const before=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key=?").bind(settingKey).first<Record<string,unknown>>();
       const valueJson=JSON.stringify(values);
       await d1.prepare("INSERT INTO system_settings (setting_key,value_json,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_by_user_id=excluded.updated_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(settingKey,valueJson,user.id).run();
@@ -481,6 +507,25 @@ export async function POST(request: Request) {
       await d1.prepare("UPDATE leave_types SET status='archived',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(leaveTypeId).run();
       await audit(d1,request,user,"archive","leave_management","leave_type",String(leaveTypeId),before,{status:"archived"});
       return Response.json({ok:true});
+    }
+    if(action==="save_leave_policy") {
+      const leavePolicyId=Number(payload.leavePolicyId)||null;
+      await authorize(d1,user,"leave_management",leavePolicyId?"edit":"create");
+      const leaveTypeId=Number(payload.leaveTypeId),country=required(payload.country,"Country");
+      if(!leaveTypeId)throw new Response("Leave type is required",{status:400});
+      if(!["Egypt","Saudi Arabia","Both"].includes(country))throw new Response("Unsupported policy country",{status:400});
+      const annualEntitlement=Number(payload.annualEntitlement),minServiceMonths=Number(payload.minServiceMonths)||0,maxCarryForward=Number(payload.maxCarryForward)||0;
+      if(annualEntitlement<0||minServiceMonths<0||maxCarryForward<0)throw new Response("Policy values cannot be negative",{status:400});
+      const existing=await d1.prepare("SELECT * FROM leave_policies WHERE leave_type_id=? AND country=? AND status='active' ORDER BY id LIMIT 1").bind(leaveTypeId,country).first<Row>();
+      if(existing&&Number(existing.id)!==leavePolicyId)throw new Response("An active policy already exists for this leave type and country",{status:409});
+      const values={leaveTypeId,country,annualEntitlement,minServiceMonths,carryForward:Boolean(payload.carryForward),maxCarryForward,expiryDays:Number(payload.expiryDays)||null,status:payload.active===false?"inactive":"active"};
+      if(leavePolicyId){
+        const before=await d1.prepare("SELECT * FROM leave_policies WHERE id=?").bind(leavePolicyId).first<Row>();if(!before)throw new Response("Leave policy not found",{status:404});
+        await d1.prepare("UPDATE leave_policies SET leave_type_id=?,country=?,annual_entitlement=?,min_service_months=?,carry_forward=?,max_carry_forward=?,expiry_days=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(leaveTypeId,country,annualEntitlement,minServiceMonths,values.carryForward?1:0,maxCarryForward,values.expiryDays,values.status,leavePolicyId).run();
+        await audit(d1,request,user,"update","leave_management","leave_policy",String(leavePolicyId),before,values);return Response.json({ok:true,id:leavePolicyId});
+      }
+      const result=await d1.prepare("INSERT INTO leave_policies (leave_type_id,country,annual_entitlement,min_service_months,carry_forward,max_carry_forward,expiry_days,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(leaveTypeId,country,annualEntitlement,minServiceMonths,values.carryForward?1:0,maxCarryForward,values.expiryDays,values.status).first<{id:number}>();
+      await audit(d1,request,user,"create","leave_management","leave_policy",String(result!.id),null,values);return Response.json({ok:true,id:result!.id},{status:201});
     }
     if(action==="save_department_hierarchy") {
       await authorize(d1,user,"departments","edit");
@@ -547,12 +592,17 @@ export async function POST(request: Request) {
       const employeeId=(user.role_name==="Super Admin"||user.role_name==="HR Manager")?(requestedEmployeeId||user.employee_id):user.employee_id;
       if(!employeeId) throw new Response("Employee profile required",{status:400});
       if(!(await canAccessEmployee(d1,user,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
-      const next=await d1.prepare("SELECT COALESCE(MAX(id),0)+1 AS next FROM requests").first<{next:number}>();
-      const code=`REQ-${1000+(next?.next??1)}`;
-      const result=await d1.prepare("INSERT INTO requests (request_code,employee_id,type,from_date,to_date,request_date,request_time,amount,currency,reason,notes,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending_manager','manager',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id")
-        .bind(code,employeeId,required(payload.type,"Request type"),clean(payload.fromDate)||null,clean(payload.toDate)||null,clean(payload.requestDate)||null,clean(payload.requestTime)||null,Number(payload.amount)||null,clean(payload.currency)||null,required(payload.reason,"Reason"),clean(payload.notes,2000)||null,JSON.stringify(payload.details??{})).first<{id:number}>();
-      await audit(d1,request,user,"submit","employee_requests","request",String(result!.id),null,{code});
-      return Response.json({ok:true,id:result!.id,requestCode:code},{status:201});
+      const leaveTypeId=Number(payload.leaveTypeId)||null;
+      if(leaveTypeId){
+        const details=payload.details&&typeof payload.details==="object"?payload.details as Json:{};
+        const result=await createLeaveRequest({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},employeeId,leaveTypeId,fromDate:required(payload.fromDate,"From date"),toDate:required(payload.toDate,"To date"),reason:required(payload.reason,"Reason"),notes:clean(payload.notes,2000),attachmentName:clean(details.attachmentName)||null});
+        return Response.json(result,{status:201});
+      }
+      const sequence=await d1.prepare("SELECT nextval(pg_get_serial_sequence('requests','id'))::int AS id").first<{id:number}>(),id=Number(sequence!.id),code=`REQ-${1000+id}`;
+      await d1.prepare("INSERT INTO requests (id,request_code,employee_id,type,from_date,to_date,request_date,request_time,amount,currency,reason,notes,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_manager','manager',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
+        .bind(id,code,employeeId,required(payload.type,"Request type"),clean(payload.fromDate)||null,clean(payload.toDate)||null,clean(payload.requestDate)||null,clean(payload.requestTime)||null,Number(payload.amount)||null,clean(payload.currency)||null,required(payload.reason,"Reason"),clean(payload.notes,2000)||null,JSON.stringify(payload.details??{})).run();
+      await audit(d1,request,user,"submit","employee_requests","request",String(id),null,{code});
+      return Response.json({ok:true,id,requestCode:code},{status:201});
     }
     if(action==="request_action") {
       await authorize(d1,user,"request_approvals","approve");
@@ -563,11 +613,70 @@ export async function POST(request: Request) {
       if(before.current_stage==="manager"&&(user.role_name!=="Department Manager"||!(await canAccessEmployee(d1,user,Number(before.employee_id)))))throw new Response("Only the employee's department manager can take this action",{status:403});
       if(before.current_stage==="hr"&&!(["Super Admin","HR Manager"].includes(user.role_name)))throw new Response("Only HR can take this action",{status:403});
       if(decision==="reject" && !clean(payload.reason)) throw new Response("Rejection reason is required",{status:400});
+      if(before.leave_type_id){
+        const result=await processLeaveRequest({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},requestId,decision:decision as "approve"|"reject",reason:clean(payload.reason)});
+        return Response.json(result);
+      }
+      if(!["pending_manager","pending_hr"].includes(String(before.status)))throw new Response("This request has already been processed",{status:409});
       let status:string,currentStage:string;
       if(decision==="approve"&&before.current_stage==="manager"){status="pending_hr";currentStage="hr";} else if(decision==="approve"){status="hr_approved";currentStage="completed";} else {status=before.current_stage==="manager"?"manager_rejected":"hr_rejected";currentStage="completed";}
-      await d1.batch([d1.prepare("UPDATE requests SET status=?,current_stage=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,currentStage,requestId),d1.prepare("INSERT INTO approvals (request_id,stage,actor_user_id,action,reason,created_at) VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)").bind(requestId,String(before.current_stage),user.id,decision,clean(payload.reason)||null)]);
+      await d1.transaction(async tx=>{
+        await tx.prepare("SELECT pg_advisory_xact_lock(?)").bind(requestId).run();
+        const current=await tx.prepare("SELECT status,current_stage FROM requests WHERE id=? FOR UPDATE").bind(requestId).first<{status:string;current_stage:string}>();
+        if(!current||!["pending_manager","pending_hr"].includes(String(current.status))||current.current_stage!==before.current_stage)throw new Response("This request has already been processed. Refresh to see the latest status.",{status:409});
+        const updated=await tx.prepare("UPDATE requests SET status=?,current_stage=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status=? AND current_stage=? RETURNING id").bind(status,currentStage,requestId,current.status,current.current_stage).first<{id:number}>();
+        if(!updated)throw new Response("This request has already been processed. Refresh to see the latest status.",{status:409});
+        await tx.prepare("INSERT INTO approvals (request_id,stage,actor_user_id,action,reason,created_at) VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)").bind(requestId,String(before.current_stage),user.id,decision,clean(payload.reason)||null).run();
+      });
       await audit(d1,request,user,decision,"request_approvals","request",String(requestId),before,{status,currentStage});
       return Response.json({ok:true,status,currentStage});
+    }
+    if(action==="cancel_leave_request") {
+      const requestId=Number(payload.requestId);if(!requestId)throw new Response("Request is required",{status:400});
+      const target=await d1.prepare("SELECT employee_id FROM requests WHERE id=? AND leave_type_id IS NOT NULL").bind(requestId).first<{employee_id:number}>();
+      if(!target)throw new Response("Leave request not found",{status:404});
+      if(user.role_name==="Employee"&&Number(target.employee_id)!==Number(user.employee_id))throw new Response("You can cancel only your own leave request",{status:403});
+      if(user.role_name!=="Employee")await authorize(d1,user,"leave_management","edit");
+      return Response.json(await cancelLeaveRequest({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},requestId,reason:clean(payload.reason,1000)}));
+    }
+    if(action==="submit_attendance_correction") {
+      await authorize(d1,user,"attendance_adjustments","create");
+      const employeeId=(user.role_name==="Super Admin"||user.role_name==="HR Manager")?(Number(payload.employeeId)||Number(user.employee_id)):Number(user.employee_id);
+      if(!employeeId)throw new Response("Employee profile required",{status:400});
+      if(!(await canAccessEmployee(d1,user,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
+      const setting=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='attendance'").first<{value_json:string}>();let values:Record<string,unknown>={};try{values=JSON.parse(setting?.value_json||"{}");}catch{values={};}
+      return Response.json(await submitAttendanceCorrection({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},employeeId,attendanceDate:required(payload.attendanceDate,"Attendance date"),correctionType:required(payload.correctionType,"Correction type"),requestedTime:payload.requestedTime,reason:payload.reason,notes:payload.notes,windowDays:Math.max(0,Number(values.correctionWindowDays)||30)}),{status:201});
+    }
+    if(action==="attendance_correction_action") {
+      await authorize(d1,user,"attendance_adjustments","approve");
+      const correctionId=Number(payload.correctionId),decision=required(payload.decision,"Decision");if(!correctionId||!["approve","reject"].includes(decision))throw new Response("A valid correction decision is required",{status:400});
+      const correction=await d1.prepare("SELECT employee_id,current_stage FROM attendance_corrections WHERE id=?").bind(correctionId).first<{employee_id:number;current_stage:string}>();if(!correction)throw new Response("Correction not found",{status:404});
+      if(Number(correction.employee_id)===Number(user.employee_id))throw new Response("You cannot approve your own attendance correction",{status:403});
+      if(correction.current_stage==="manager"&&(user.role_name!=="Department Manager"||!(await canAccessEmployee(d1,user,Number(correction.employee_id)))))throw new Response("Only an in-scope department manager can process this stage",{status:403});
+      if(correction.current_stage==="hr"&&!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can process this stage",{status:403});
+      return Response.json(await processAttendanceCorrection({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},correctionId,decision:decision as "approve"|"reject",reason:payload.reason}));
+    }
+    if(action==="manual_attendance_correction") {
+      await authorize(d1,user,"attendance_adjustments","edit");
+      if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can make a manual correction",{status:403});
+      const employeeId=Number(payload.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
+      return Response.json(await manualAttendanceCorrection({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},employeeId,attendanceDate:required(payload.attendanceDate,"Attendance date"),field:required(payload.field,"Field"),newValue:payload.newValue,reason:payload.reason}));
+    }
+    if(action==="scan_attendance_exceptions") {
+      await authorize(d1,user,"attendance_adjustments","edit");
+      if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can scan attendance exceptions",{status:403});
+      const attendanceDate=required(payload.attendanceDate,"Attendance date");if(attendanceDate>new Date().toISOString().slice(0,10))throw new Response("Future attendance cannot be scanned",{status:400});
+      const employees=(await d1.prepare("SELECT id FROM employees WHERE employment_status='active' ORDER BY id").all<{id:number}>()).results;
+      for(const employee of employees)await recalculateAttendance(d1,Number(employee.id),attendanceDate);
+      await audit(d1,request,user,"exceptions_scanned","attendance_adjustments","attendance_date",attendanceDate,null,{employees:employees.length});
+      return Response.json({ok:true,count:employees.length});
+    }
+    if(action==="dismiss_attendance_exception") {
+      await authorize(d1,user,"attendance_adjustments","edit");
+      if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can dismiss an exception",{status:403});
+      const exceptionId=Number(payload.exceptionId),reason=required(payload.reason,"Dismissal reason");const before=await d1.prepare("SELECT * FROM attendance_exceptions WHERE id=?").bind(exceptionId).first<Row>();if(!before)throw new Response("Exception not found",{status:404});
+      const updated=await d1.prepare("UPDATE attendance_exceptions SET status='dismissed',resolved_at=CURRENT_TIMESTAMP,resolved_by_user_id=?,details_json=jsonb_set(COALESCE(details_json,'{}')::jsonb,'{dismissalReason}',to_jsonb(?::text))::text,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('resolved','dismissed') RETURNING id").bind(user.id,reason,exceptionId).first<Row>();if(!updated)throw new Response("Exception has already been finalized",{status:409});
+      await audit(d1,request,user,"exception_dismissed","attendance_adjustments","attendance_exception",String(exceptionId),before,{status:"dismissed",reason});return Response.json({ok:true});
     }
     if(action==="attendance_event") {
       await authorize(d1,user,"attendance","create");
@@ -577,17 +686,21 @@ export async function POST(request: Request) {
       if(!(await canAccessEmployee(d1,user,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
       const eventType=required(payload.eventType,"Event type");
       if(eventType!=="check_in"&&eventType!=="check_out") throw new Response("Event type must be check_in or check_out",{status:400});
-      const last=await d1.prepare("SELECT event_type FROM attendance_logs WHERE employee_id=? ORDER BY event_at DESC LIMIT 1").bind(employeeId).first<{event_type:string}>();
+      const setting=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='attendance'").first<{value_json:string}>();let attendanceSettings:Record<string,unknown>={};try{attendanceSettings=JSON.parse(setting?.value_json||"{}");}catch{attendanceSettings={};}
+      const local=businessDateTime(clean(attendanceSettings.timeZone,80)||"Africa/Cairo"),workDate=local.date,time=local.time;
+      const last=await d1.prepare("SELECT event_type FROM attendance_logs WHERE employee_id=? AND (event_at AT TIME ZONE ?)::date=?::date ORDER BY event_at DESC LIMIT 1").bind(employeeId,clean(attendanceSettings.timeZone,80)||"Africa/Cairo",workDate).first<{event_type:string}>();
       if(last?.event_type===eventType) throw new Response(`Duplicate ${eventType} is not allowed`,{status:409});
-      const now=new Date().toISOString(), workDate=now.slice(0,10), time=now.slice(11,16);
+      const now=new Date().toISOString();
       // Checking out without an open check-in would otherwise update zero rows and report success.
       if(eventType==="check_out"){
         const open=await d1.prepare("SELECT id FROM daily_attendance WHERE employee_id=? AND work_date=? AND actual_in IS NOT NULL").bind(employeeId,workDate).first<{id:number}>();
         if(!open) throw new Response("There is no check-in recorded for today",{status:409});
       }
-      await d1.prepare("INSERT INTO attendance_logs (employee_id,event_at,event_type,source,device,location,created_by_user_id,created_at) VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(employeeId,now,eventType,"remote","Web portal",clean(payload.location)||null,user.id).run();
-      if(eventType==="check_in") await d1.prepare("INSERT INTO daily_attendance (employee_id,work_date,scheduled_in,scheduled_out,actual_in,attendance_type,status,created_at,updated_at) VALUES (?,?,'09:00','17:00',?,'remote','remote',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_id,work_date) DO UPDATE SET actual_in=excluded.actual_in,attendance_type='remote',status='remote',updated_at=CURRENT_TIMESTAMP").bind(employeeId,workDate,time).run();
-      else await d1.prepare("UPDATE daily_attendance SET actual_out=?,worked_minutes=GREATEST(0,CAST(EXTRACT(EPOCH FROM ((? || ' ' || ?)::timestamp - (? || ' ' || actual_in)::timestamp))/60 AS INTEGER)),updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND work_date=?").bind(time,workDate,time,workDate,employeeId,workDate).run();
+      await d1.transaction(async tx=>{
+        await tx.prepare("SELECT pg_advisory_xact_lock(?)").bind(employeeId).run();
+        await tx.prepare("INSERT INTO attendance_logs (employee_id,event_at,event_type,source,device,location,created_by_user_id,created_at) VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(employeeId,now,eventType,"remote","Web portal",clean(payload.location)||null,user.id).run();
+        await recalculateAttendance(tx,employeeId,workDate,eventType==="check_in"?{actual_in:time,attendance_type:"remote"}:{actual_out:time});
+      });
       await audit(d1,request,user,eventType,"attendance","employee",String(employeeId),null,{now,source:"remote"});
       return Response.json({ok:true,eventAt:now});
     }

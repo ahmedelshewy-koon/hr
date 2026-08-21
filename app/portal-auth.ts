@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import type { PostgresDatabase } from "../db/postgres";
 
 const COOKIE_NAME = "koon_portal_session";
-const SESSION_SECONDS = 60 * 60 * 8;
+const DEFAULT_SESSION_SECONDS = 60 * 60 * 8;
 const PASSWORD_ITERATIONS = 210_000;
 
 export type PortalSession = { userId: number; email: string; sessionVersion: number; exp: number };
@@ -61,8 +61,9 @@ export async function verifyPassword(password: string, encodedHash: string) {
 
 export async function verifyBootstrapPassword(password: string) { return verifyPassword(password, runtimeValue("KOON_LOGIN_PASSWORD_HASH")); }
 
-export async function createPortalSession(user: { id:number; email:string; session_version?:number }) {
-  const session:PortalSession = { userId:user.id, email:user.email.toLowerCase(), sessionVersion:Number(user.session_version)||1, exp:Math.floor(Date.now() / 1000) + SESSION_SECONDS };
+export async function createPortalSession(user: { id:number; email:string; session_version?:number },sessionSeconds=DEFAULT_SESSION_SECONDS) {
+  const safeSeconds=Math.min(86400,Math.max(900,Math.floor(sessionSeconds)));
+  const session:PortalSession = { userId:user.id, email:user.email.toLowerCase(), sessionVersion:Number(user.session_version)||1, exp:Math.floor(Date.now() / 1000) + safeSeconds };
   const payload = toBase64Url(new TextEncoder().encode(JSON.stringify(session)));
   const signature = toBase64Url(await hmac(payload));
   return `${payload}.${signature}`;
@@ -99,5 +100,5 @@ export async function ensureAuthSchema(d1: PostgresDatabase) {
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ").run();
 }
 
-export function portalSessionCookie(token: string, secure = true) { return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_SECONDS}${secure ? "; Secure" : ""}`; }
+export function portalSessionCookie(token: string, secure = true,sessionSeconds=DEFAULT_SESSION_SECONDS) { const safeSeconds=Math.min(86400,Math.max(900,Math.floor(sessionSeconds)));return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${safeSeconds}${secure ? "; Secure" : ""}`; }
 export function clearPortalSessionCookie(secure = true) { return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`; }

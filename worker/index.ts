@@ -9,6 +9,7 @@ interface Fetcher {
 interface Env {
   ASSETS: Fetcher;
   DATABASE_URL: string;
+  FILES: unknown;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -22,6 +23,8 @@ interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
 }
+
+interface ScheduledController { scheduledTime:number; cron:string; }
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
@@ -45,6 +48,9 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+  },
+  async scheduled(_controller:ScheduledController,_env:Env,ctx:ExecutionContext){
+    ctx.waitUntil((async()=>{const [{createDatabase},{runScheduledAttendanceScan}]=await Promise.all([import("../db/postgres"),import("../app/attendance/scheduled-scan")]);const database=createDatabase();try{await runScheduledAttendanceScan(database,{timeZone:"Africa/Cairo"});}finally{await database.close();}})());
   },
 };
 

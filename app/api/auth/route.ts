@@ -1,8 +1,9 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPassword, portalLoginEmail, portalSessionCookie, readPortalSession, verifyBootstrapPassword, verifyPassword } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
+import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
 
-type LoginUser = { id:number; email:string; password_hash:string|null; status:string; session_version:number; failed_login_attempts:number; locked_until:string|null; must_change_password:number; role_name:string; employee_id:number|null; employee_status:string|null };
+type LoginUser = { id:number; email:string; password_hash:string|null; password_changed_at?:string|null; status:string; session_version:number; failed_login_attempts:number; locked_until:string|null; must_change_password:number; role_name:string; employee_id:number|null; employee_status:string|null };
 
 async function requirePlatformAccess(request: Request) {
   const user = await getChatGPTUser();
@@ -44,12 +45,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const d1=createDatabase();
   try {
+    enforceWriteOrigin(request);
     await requirePlatformAccess(request);await ensureAuthSchema(d1);
     const body = await request.json() as { email?:unknown; password?:unknown };
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    await enforceRateLimit(d1,request,"login",10,900,email||null);
     if (!email || password.length < 8 || password.length > 200) return Response.json({ error:"البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status:401,headers:noStore });
-    let user = await d1.prepare("SELECT u.id,u.email,u.password_hash,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE lower(u.email)=lower(?)").bind(email).first<LoginUser>();
+    let user = await d1.prepare("SELECT u.id,u.email,u.password_hash,u.password_changed_at,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE lower(u.email)=lower(?)").bind(email).first<LoginUser>();
     if (!user?.password_hash) user=await bootstrapAdmin(d1,email,password);
     if (user?.locked_until && new Date(user.locked_until).getTime()>Date.now()) return Response.json({ error:"تم إيقاف المحاولات مؤقتاً. حاول مرة أخرى بعد 15 دقيقة" }, { status:429,headers:noStore });
     const valid=Boolean(user&&user.status==="active"&&(!user.employee_id||["active","probation","notice_period"].includes(String(user.employee_status)))&&user.password_hash&&await verifyPassword(password,user.password_hash));
@@ -62,8 +65,11 @@ export async function POST(request: Request) {
     }
     await d1.prepare("UPDATE users SET failed_login_attempts=0,locked_until=NULL,last_login_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(user!.id).run();
     await d1.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'login','authentication','user',?,?,CURRENT_TIMESTAMP)").bind(user!.id,String(user!.id),request.headers.get("cf-connecting-ip")).run();
-    const token = await createPortalSession(user!);
-    return Response.json({ authenticated:true, user:{id:user!.id,email:user!.email,role_name:user!.role_name,employee_id:user!.employee_id,must_change_password:user!.must_change_password} }, { headers:{ "set-cookie":portalSessionCookie(token,isSecure(request)), ...noStore } });
+    const security=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='security'").first<{value_json:string}>();let securityValues:Record<string,unknown>={};try{securityValues=JSON.parse(security?.value_json||"{}");}catch{securityValues={};}
+    const expiryDays=Math.max(0,Number(securityValues.passwordExpiryDays)||0);if(expiryDays&&(!user!.password_hash||!user!.password_changed_at||new Date(user!.password_changed_at).getTime()<Date.now()-expiryDays*86400000)){user!.must_change_password=1;await d1.prepare("UPDATE users SET must_change_password=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(user!.id).run();}
+    const sessionSeconds=Math.min(86400,Math.max(900,(Number(securityValues.sessionMinutes)||480)*60));
+    const token = await createPortalSession(user!,sessionSeconds);
+    return Response.json({ authenticated:true, user:{id:user!.id,email:user!.email,role_name:user!.role_name,employee_id:user!.employee_id,must_change_password:user!.must_change_password} }, { headers:{ "set-cookie":portalSessionCookie(token,isSecure(request),sessionSeconds), ...noStore } });
   } catch(error) { return error instanceof Response ? error : Response.json({ error:"تعذر تسجيل الدخول" }, { status:500,headers:noStore }); }
   finally { await d1.close(); }
 }
@@ -71,8 +77,10 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const d1=createDatabase();
   try {
+    enforceWriteOrigin(request);
     await requirePlatformAccess(request);await ensureAuthSchema(d1);
     const session=await readPortalSession(request);if(!session)throw new Response("Portal login required",{status:401});
+    await enforceRateLimit(d1,request,"password-change",5,3600,session.userId);
     const body=await request.json() as {currentPassword?:unknown;newPassword?:unknown};
     const currentPassword=typeof body.currentPassword==="string"?body.currentPassword:"";const newPassword=typeof body.newPassword==="string"?body.newPassword:"";
     if(newPassword.length<10||newPassword.length>200||!/[A-Za-z]/.test(newPassword)||!/[0-9]/.test(newPassword))return Response.json({error:"كلمة المرور الجديدة يجب أن تكون 10 أحرف على الأقل وتحتوي على حرف ورقم"},{status:400,headers:noStore});
@@ -87,4 +95,4 @@ export async function PATCH(request: Request) {
   finally{await d1.close();}
 }
 
-export async function DELETE(request: Request) { return Response.json({ authenticated:false }, { headers:{ "set-cookie":clearPortalSessionCookie(isSecure(request)), ...noStore } }); }
+export async function DELETE(request: Request) { try{enforceWriteOrigin(request);return Response.json({ authenticated:false }, { headers:{ "set-cookie":clearPortalSessionCookie(isSecure(request)), ...noStore } });}catch(error){return error instanceof Response?error:Response.json({error:"Unable to sign out"},{status:500});} }

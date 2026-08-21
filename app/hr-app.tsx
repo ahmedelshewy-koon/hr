@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleUserRound,
-  Clock3, Download, Eye, FileText, Globe2, HelpCircle, KeyRound,
+  Clock3, Download, Eye, EyeOff, FileText, Globe2, HelpCircle, KeyRound,
   Languages, LayoutDashboard, LayoutGrid, List, Lock, LogOut, Menu, MoreHorizontal, Network,
   Pencil, Plus, Printer, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
   Trash2, Unlock, Users, Wallet, X, Trophy, UserRoundSearch, Workflow, Laptop, GraduationCap,
@@ -292,9 +292,39 @@ export function HRApp() {
 }
 
 function LoginPage({onSuccess}:{onSuccess:(user:AuthUser)=>void}){
-  const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [error,setError]=useState("");const [loading,setLoading]=useState(false);
+  const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [error,setError]=useState("");const [loading,setLoading]=useState(false);const [showPassword,setShowPassword]=useState(false);
   const submit=async(event:React.FormEvent)=>{event.preventDefault();setError("");setLoading(true);try{const response=await fetch("/api/auth",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||"تعذر تسجيل الدخول");onSuccess(body.user as AuthUser);}catch(reason){setError(reason instanceof Error?reason.message:"تعذر تسجيل الدخول");}finally{setLoading(false);}};
-  return <main className="login-page" dir="rtl" lang="ar"><section className="login-panel"><img className="login-logo" src="/sanad-logo.png" alt="Sanad HR"/><div className="login-copy"><small>نظام إدارة الموارد البشرية</small><h1>مرحبًا بعودتك</h1><p>سجّل الدخول للوصول إلى لوحة التحكم وبيانات فريق العمل.</p></div><form className="login-form" onSubmit={event=>void submit(event)}><label className="login-field"><span>البريد الإلكتروني</span><div className="login-input"><CircleUserRound size={20}/><input type="email" autoComplete="username" value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@company.com" required dir="ltr"/></div></label><label className="login-field"><span>كلمة المرور</span><div className="login-input"><KeyRound size={20}/><input type="password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="••••••••" required dir="ltr"/></div></label>{error&&<p className="login-error" role="alert">{error}</p>}<button className="login-submit" type="submit" disabled={loading}>{loading?<><Activity size={20}/>جارٍ تسجيل الدخول...</>:<><LogOut size={16}/>تسجيل الدخول</>}</button></form><p className="login-note">الدخول مخصص للمستخدمين المصرح لهم فقط</p></section><section className="login-visual"><div className="login-visual-content"><span className="login-visual-icon"><ShieldCheck size={24}/></span><h2>كل ما يخص فريقك<br/>في مكان واحد</h2><p>إدارة الموظفين والحضور والإجازات والهيكل التنظيمي من بوابة واحدة آمنة وسهلة.</p><div className="login-features"><span>إدارة الموظفين</span><span>الحضور والانصراف</span><span>الإجازات والطلبات</span><span>الهيكل التنظيمي</span></div></div></section></main>
+  return <main className="login-page" dir="rtl" lang="ar">
+    <section className="login-panel">
+      <div className="login-panel-inner">
+        <div className="login-brand"><img className="login-logo" src="/sanad-logo.png" alt="سند"/><span>منصة الموارد البشرية</span></div>
+        <div className="login-copy"><small>تسجيل الدخول إلى حسابك</small><h1>مرحبًا بعودتك</h1><p>أدخل بياناتك للوصول إلى مساحة عملك وإدارة فريقك بسهولة.</p></div>
+        <form className="login-form" onSubmit={event=>void submit(event)}>
+          <label className="login-field"><span>البريد الإلكتروني</span><div className="login-input"><CircleUserRound size={19}/><input type="email" autoComplete="username" value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@company.com" required dir="ltr"/></div></label>
+          <label className="login-field"><span>كلمة المرور</span><div className="login-input"><KeyRound size={19}/><input type={showPassword?"text":"password"} autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="••••••••" required dir="ltr"/><button className="password-toggle" type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?"إخفاء كلمة المرور":"إظهار كلمة المرور"}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div></label>
+          {error&&<p className="login-error" role="alert">{error}</p>}
+          <button className="login-submit" type="submit" disabled={loading}>{loading?<><Activity size={19}/>جارٍ تسجيل الدخول...</>:<>تسجيل الدخول<LogOut size={18}/></>}</button>
+        </form>
+        <p className="login-note"><Lock size={14}/>اتصال آمن ومخصص للمستخدمين المصرح لهم</p>
+        <footer className="login-footer"><span>© 2026 سند</span><span>منصة موثوقة لإدارة فريقك</span></footer>
+      </div>
+    </section>
+    <section className="login-visual" aria-label="مزايا منصة سند">
+      <div className="login-grid-glow"/>
+      <div className="login-visual-content">
+        <div className="login-visual-badge"><ShieldCheck size={17}/><span>بيانات فريقك في أمان</span></div>
+        <h2>كل ما يحتاجه فريقك.<br/><span>في مكان واحد.</span></h2>
+        <p>مساحة عمل موحّدة تمنحك رؤية أوضح، وقرارات أسرع، وتجربة أبسط لكل موظف.</p>
+        <div className="login-features">
+          <article><span><Users size={20}/></span><div><b>إدارة الموظفين</b><small>ملفات وبيانات محدثة</small></div></article>
+          <article><span><Clock3 size={20}/></span><div><b>الحضور والانصراف</b><small>متابعة دقيقة ومباشرة</small></div></article>
+          <article><span><CalendarDays size={20}/></span><div><b>الإجازات والطلبات</b><small>مسارات اعتماد سلسة</small></div></article>
+          <article><span><Network size={20}/></span><div><b>الهيكل التنظيمي</b><small>صورة أوضح لفريقك</small></div></article>
+        </div>
+        <div className="login-trust"><div className="login-avatars"><span>م</span><span>أ</span><span>س</span></div><p><b>تجربة عمل أكثر تنظيمًا</b><small>مصممة لفرق الموارد البشرية الحديثة</small></p></div>
+      </div>
+    </section>
+  </main>
 }
 
 function PasswordChange({rtl,forced=false,onChanged,close}:{rtl:boolean;forced?:boolean;onChanged:()=>void;close?:()=>void}){

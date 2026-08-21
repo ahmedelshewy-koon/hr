@@ -47,31 +47,35 @@ html,body{background:var(--bg)}
 .sidebar{
   inset-block:18px;
   inset-inline-start:18px;
-  width:236px;
+  width:248px;
   height:auto;
-  padding:16px 12px;
+  padding:12px 10px 10px;
   color:#64748b;
   background:var(--surface);
   border:1px solid var(--card-border);
   border-radius:var(--radius-lg);
   box-shadow:var(--card-shadow);
-  overflow-y:auto;
+  overflow:hidden;
 }
-.brand{position:relative;width:100%;height:94px;padding:0;margin:0 0 24px;overflow:hidden;border-radius:16px;background:#fff}
+.brand{position:relative;flex:none;width:100%;height:70px;padding:0;margin:0 0 12px;overflow:hidden;border-radius:14px;background:#fff}
 .brand-logo{width:100%;height:100%;display:block;background:transparent;border-radius:0;padding:0;object-fit:cover;object-position:center;transform:scale(1.18)}
 .brand .mobile-close{position:absolute;inset-block-start:8px;inset-inline-end:8px;z-index:2;width:30px;height:30px;margin:0;border-radius:12px;background:#ffffffdc;color:#2563eb}
-.workspace-label{color:#64748b;padding-inline:12px}
-.sidebar nav{gap:4px}
-.sidebar nav button,.sidebar-bottom>button{color:#64748b;border-radius:12px}
-.sidebar nav button:hover,.sidebar-bottom>button:hover{background:#f8fafc;color:#0b1f4d}
-.sidebar nav button.active{background:#eaf2ff;color:#2563eb;box-shadow:none}
+.workspace-label{flex:none;color:#8793a8;padding-inline:12px;margin-bottom:5px;font-size:10px;letter-spacing:.12em}
+.sidebar nav{min-height:0;flex:1;gap:2px;padding:2px 2px 8px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.sidebar nav::-webkit-scrollbar{width:4px}.sidebar nav::-webkit-scrollbar-track{background:transparent}.sidebar nav::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}.sidebar nav::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+.sidebar nav button,.sidebar-bottom>button{height:39px;color:#667792;border-radius:11px;padding-inline:11px;gap:10px;font-size:13px;line-height:1.35}
+.sidebar nav button svg,.sidebar-bottom>button svg{width:18px;height:18px;stroke-width:1.8}
+.sidebar nav button:hover,.sidebar-bottom>button:hover{background:#f4f7fb;color:#17376f}
+.sidebar nav button.active{position:relative;background:linear-gradient(90deg,#edf4ff,#e5efff);color:#155ae7;box-shadow:inset 0 0 0 1px rgba(37,99,235,.04)}
+.sidebar nav button.active::after{content:"";position:absolute;inset-block:9px;inset-inline-start:0;width:3px;border-radius:999px;background:#2563eb}
 .app[dir="rtl"] .sidebar nav button.active{box-shadow:none}
-.sidebar-bottom{border-top:0;padding-top:16px}
-.profile-mini{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px}
+.sidebar-bottom{position:relative;flex:none;margin-top:0;border-top:1px solid #edf1f7;padding:8px 2px 0;background:#fff}
+.sidebar-bottom::before{content:"";position:absolute;inset-inline:0;bottom:100%;height:18px;pointer-events:none;background:linear-gradient(transparent,#fff)}
+.profile-mini{margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:13px}
 .profile-mini b{color:#0b1f4d}
 .profile-mini span{color:#64748b}
 .mobile-close{color:#2563eb}
-.main{margin-inline-start:260px}
+.main{margin-inline-start:272px}
 .topbar{
   top:18px;
   height:64px;
@@ -194,8 +198,8 @@ html,body{background:var(--bg)}
 
 @media(max-width:1050px){
   .app{gap:16px}
-  .sidebar{width:210px}
-  .main{margin-inline-start:228px}
+  .sidebar{width:220px}
+  .main{margin-inline-start:238px}
   .content{padding:16px 0 40px}
   .stat-grid,.dashboard-grid,.dashboard-grid.lower,.settings-grid{gap:16px}
 }

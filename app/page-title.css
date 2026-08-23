@@ -1,0 +1,80 @@
+/* One page-title treatment across the entire application. */
+.page-heading>div>.eyebrow,
+.page-heading>div>p,
+.approvals-head>div>small,
+.approvals-head>div>p,
+.attendance-page-head>div>small,
+.attendance-page-head>div>p,
+.learning-heading>div>span,
+.learning-heading>div>p,
+.lifecycle-heading>div>span,
+.lifecycle-heading>div>p,
+.lifecycle-subheading>div>span,
+.lifecycle-subheading>div>p,
+.performance-heading>div>span,
+.performance-heading>div>p,
+.performance-subheading>div>span,
+.performance-subheading>div>p,
+.talent-heading>div>span,
+.talent-heading>div>p,
+.portal-welcome>div>span,
+.portal-welcome>div>p{
+  display:none!important;
+}
+
+.page-heading,
+.page-heading.compact,
+.approvals-head,
+.attendance-page-head,
+.learning-heading,
+.lifecycle-heading,
+.performance-heading,
+.talent-heading,
+.portal-welcome{
+  min-height:96px;
+  padding:24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  background:var(--surface);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--card-shadow);
+}
+
+.page-heading h1,
+.approvals-head h1,
+.attendance-page-head h1,
+.learning-heading h1,
+.lifecycle-heading h1,
+.lifecycle-subheading h1,
+.performance-heading h1,
+.performance-subheading h1,
+.talent-heading h1,
+.portal-welcome h1{
+  margin:0!important;
+  color:var(--text)!important;
+  font-family:var(--font-enterprise)!important;
+  font-size:24px!important;
+  font-weight:700!important;
+  line-height:1.35!important;
+  letter-spacing:-.02em!important;
+}
+
+@media(max-width:760px){
+  .page-heading,
+  .page-heading.compact,
+  .approvals-head,
+  .attendance-page-head,
+  .learning-heading,
+  .lifecycle-heading,
+  .performance-heading,
+  .talent-heading,
+  .portal-welcome{
+    min-height:72px;
+    padding:16px;
+    border-radius:16px;
+    flex-wrap:wrap;
+  }
+}

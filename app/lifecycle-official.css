@@ -1,25 +1,31 @@
 /* Shared official A4 template for onboarding and offboarding records. */
 .lifecycle-report.hr-record{width:min(920px,100%);padding:26px 32px 22px;border-radius:8px;color:#172033;font-family:"IBM Plex Sans Arabic",Arial,sans-serif;background:#fff}
 .hr-record .report-controls{margin-bottom:14px}
-.hr-record .record-header{display:grid;grid-template-columns:112px minmax(0,1fr) 230px;gap:22px;align-items:center;padding:0 0 16px;border-bottom:2px solid #173f73}
+.hr-record .record-header{display:grid;grid-template-columns:112px minmax(0,1fr);gap:18px;align-items:center;padding:0 0 12px;border-bottom:2px solid #173f73}
 .hr-record .record-header>img{width:108px;height:58px;display:block;object-fit:contain;object-position:center}
-.hr-record .record-title h1{margin:0;color:#102a43;font-size:20px;line-height:1.35;font-weight:700}
-.hr-record .record-title p{margin:6px 0 0;color:#475467;font-size:12px;font-weight:600}
-.hr-record .record-header dl{margin:0;display:grid;gap:5px}
+.hr-record .record-title{min-width:0}
+.hr-record .record-title h1{margin:0;color:#102a43;font-size:var(--type-section)!important;line-height:var(--leading-heading)!important;font-weight:var(--weight-semibold)!important;white-space:nowrap}
+.hr-record .record-header dl{margin:9px 0 0;display:grid;grid-template-columns:repeat(3,max-content);gap:28px;align-items:start}
 .hr-record .record-header dl>div{display:grid;grid-template-columns:1fr;gap:1px}
 .hr-record dt,.hr-record .record-footer span{color:#667085;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .hr-record dd{margin:0;color:#172033;font-size:10.5px;font-weight:600;overflow-wrap:anywhere}
 .hr-record dd.approved{color:#087443}.hr-record dd.withheld{color:#b42318}
 .hr-record .record-section{margin-top:16px;break-inside:auto}
 .hr-record .record-section>h2{margin:0 0 8px;padding:0 0 6px;border-bottom:1.5px solid #173f73;color:#173f73;font-size:13px;font-weight:700}
-.hr-record .record-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border-top:1px solid #d9dee7;border-inline-start:1px solid #d9dee7}
-.hr-record .record-fields>div{min-height:48px;padding:7px 9px;border-inline-end:1px solid #d9dee7;border-bottom:1px solid #d9dee7;background:#fff}
-.hr-record .record-fields dt{margin-bottom:3px;text-transform:none;letter-spacing:0}
-.hr-record .record-fields dd{font-size:11px;line-height:1.35}
-.hr-record .record-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #d9dee7;border-inline-start:1px solid #d9dee7}
-.hr-record .record-summary>div{min-height:55px;padding:8px 10px;border-inline-end:1px solid #d9dee7;border-bottom:1px solid #d9dee7}
-.hr-record .record-summary span,.hr-record .access-clearance span{display:block;color:#667085;font-size:9.5px;font-weight:600}
-.hr-record .record-summary b{display:block;margin-top:4px;color:#172033;font-size:11px;line-height:1.3}
+.hr-record .record-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;padding:10px;border:1px solid #d9e3ee;border-radius:10px;background:#f6f8fb}
+.hr-record .record-fields>div{position:relative;min-height:58px;padding:9px 12px 10px;border:1px solid #dbe4ef;border-radius:8px;background:#fff;overflow:hidden}
+.hr-record .record-fields>div::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:3px;background:#c7d2e0}
+.hr-record .record-fields>div.primary::before{background:#175cd3}
+.hr-record .record-fields dt{margin-bottom:4px;text-transform:none;letter-spacing:0}
+.hr-record .record-fields dd{font-size:var(--type-label);line-height:var(--leading-body)}
+.hr-record .record-fields>div.primary dd{color:#173f73;font-weight:var(--weight-semibold)}
+.hr-record .record-fields>div.email dd,.hr-record .record-fields>div.code dd{font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1,"lnum" 1;text-align:start}
+.hr-record .record-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #d9e3ee;border-radius:10px;background:#f6f8fb}
+.hr-record .record-summary>div{position:relative;min-height:68px;padding:10px 12px;border:1px solid #dbe4ef;border-radius:8px;background:#fff;overflow:hidden}
+.hr-record .record-summary>div::before{content:"";position:absolute;inset-inline:0;inset-block-start:0;height:3px;background:#c7d2e0}
+.hr-record .record-summary>div.success::before{background:#087443}.hr-record .record-summary>div.warning::before{background:#b54708}
+.hr-record .record-summary span,.hr-record .access-clearance span{display:block;color:#667085;font-size:var(--type-label);font-weight:var(--weight-medium)}
+.hr-record .record-summary b{display:block;margin-top:7px;color:#172033;font-size:var(--type-body);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
 .hr-record .record-summary .success b{color:#087443}.hr-record .record-summary .warning b{color:#b54708}
 .hr-record .record-statement,.hr-record .clearance-result{margin:8px 0 0;padding:8px 10px;border-inline-start:3px solid #087443;background:#f0faf5;color:#065f46;font-size:10.5px;font-weight:700}
 .hr-record .record-statement.warning,.hr-record .clearance-result.outstanding{border-color:#b42318;background:#fff5f4;color:#b42318}
@@ -39,14 +45,14 @@
 .hr-record .record-footer b{margin-top:2px;font-size:9.5px}.hr-record .record-footer p{margin:0;color:#667085;font-size:8.5px;line-height:1.4;text-align:center}
 [dir="rtl"].hr-record .record-header,[dir="rtl"].hr-record .record-fields,[dir="rtl"].hr-record .record-summary,[dir="rtl"].hr-record .record-table,[dir="rtl"].hr-record .record-footer{text-align:right}
 
-@media(max-width:760px){.lifecycle-report.hr-record{padding:18px}.hr-record .record-header{grid-template-columns:90px 1fr}.hr-record .record-header dl{grid-column:1/-1;grid-template-columns:repeat(3,1fr)}.hr-record .record-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.hr-record .record-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.hr-record .record-table{min-width:680px}}
+@media(max-width:760px){.lifecycle-report.hr-record{padding:18px}.hr-record .record-header{grid-template-columns:90px 1fr}.hr-record .record-title h1{white-space:normal}.hr-record .record-header dl{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.hr-record .record-fields{grid-template-columns:1fr}.hr-record .record-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.hr-record .record-table{min-width:680px}}
 @media print{
   @page{size:A4;margin:12mm 11mm}
   html,body{background:#fff!important}
   .lifecycle-report.hr-record{position:static!important;width:100%!important;max-width:none!important;padding:0!important;color:#000!important;font-size:9pt}
   .hr-record .record-header{break-inside:avoid}
   .hr-record .record-header>img{width:95px;height:50px}
-  .hr-record .record-title h1{font-size:15pt}
+  .hr-record .record-title h1{font-size:15pt!important;white-space:nowrap}
   .hr-record .record-section{margin-top:11px}
   .hr-record .record-section>h2{font-size:10pt}
   .hr-record .record-fields,.hr-record .record-summary,.hr-record .record-table,.hr-record .record-statement,.hr-record .clearance-result,.hr-record .access-clearance{-webkit-print-color-adjust:exact;print-color-adjust:exact}

@@ -6,6 +6,7 @@ const migration=await read("drizzle-postgres/0014_complete_hrms.sql");
 const performance=await read("app/api/performance/route.ts");
 const recruitment=await read("app/api/recruitment/route.ts");
 const lifecycle=await read("app/api/lifecycle/route.ts");
+const lifecycleWorkspace=await read("app/lifecycle-workspace.tsx");
 const assets=await read("app/api/assets/route.ts");
 const learning=await read("app/api/learning/route.ts");
 const dashboard=await read("app/api/dashboard/route.ts");
@@ -20,6 +21,7 @@ test("ATS validates candidate stages and interviewer identity",()=>{assert.match
 test("ATS hire conversion uses the shared employee engine once",()=>{assert.match(recruitment,/createEmployeeRecord/);assert.match(recruitment,/Candidate already converted/);assert.match(migration,/idx_candidates_converted_employee/);});
 test("accepted offer starts onboarding",()=>{assert.match(recruitment,/lifecycle_type='onboarding'/);assert.match(recruitment,/lifecycle_tasks/);});
 test("lifecycle creates task ownership and overdue dates",()=>{assert.match(lifecycle,/nextOwner/);assert.match(lifecycle,/due_offset_days/);assert.match(lifecycle,/overdue_tasks/);});
+test("lifecycle start handles an existing active process without an unhandled rejection",()=>{assert.match(lifecycle,/ACTIVE_LIFECYCLE_EXISTS/);assert.match(lifecycle,/ON CONFLICT \(employee_id,lifecycle_type\).*DO NOTHING RETURNING id/);assert.match(lifecycleWorkspace,/activeEmployeeIds/);assert.match(lifecycleWorkspace,/disabled=\{unavailable\}/);assert.match(lifecycleWorkspace,/submit\(.*\)\.catch\(/s);});
 test("offboarding delays deactivation until completion",()=>{assert.match(lifecycle,/if\(row\.lifecycle_type==="offboarding"\)/);assert.match(lifecycle,/UPDATE users SET status='disabled'/);assert.match(lifecycle,/Required lifecycle tasks remain incomplete/);});
 test("offboarding blocks completion with unreturned assets",()=>{assert.match(lifecycle,/Employee has unreturned assets/);});
 test("assets prevent double assignment and preserve return history",()=>{assert.match(migration,/idx_asset_assignments_active/);assert.match(assets,/Asset is not available/);assert.match(assets,/returned_at=CURRENT_TIMESTAMP/);assert.doesNotMatch(assets,/DELETE FROM asset_assignments/);});

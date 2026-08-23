@@ -30,6 +30,7 @@ import "./attendance.css";
 import "./approvals-center.css";
 import "./employee-profile-360.css";
 import "./employee-profile-filters.css";
+import "./page-title.css";
 
 type Lang = "en" | "ar";
 type Page = "dashboard" | "portal" | "approvals" | "employees" | "leave" | "attendance" | "performance" | "recruitment" | "lifecycle" | "assets" | "learning" | "org" | "users" | "reports" | "payroll" | "settings";
@@ -369,6 +370,7 @@ function Dashboard({ rtl, t, setPage, notify }: { rtl: boolean; t: typeof copy.e
     { label: rtl ? "المتأخرون اليوم" : "Late today", value: formatNumber(attendanceToday.filter(row=>String(row.status)==="late"||Number(row.late_minutes)>0).length,rtl), note: rtl ? "حسب سجلات اليوم" : "From today's records", icon: Clock3, tone: "orange" },
   ];
   return <>
+    <h1 className="dashboard-title">{rtl?"لوحة التحكم":"Dashboard"}</h1>
     {error&&<div className="error-banner">{error}</div>}
     <section className="stat-grid">{stats.map(({ label, value, note, icon: Icon, tone }) => <div className="stat-card" key={label}><div className={`stat-icon ${tone}`}><Icon size={20} /></div><div className="stat-value">{value}</div><div className="stat-label">{label}</div><div className={`stat-note ${tone}`}>{note}</div></div>)}</section>
     <section className="dashboard-grid lower">
@@ -821,7 +823,7 @@ function SettingsPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
 
 function TalentReportLinks({rtl}:{rtl:boolean}){const reports=[{type:"performance",en:"Performance",ar:"الأداء"},{type:"recruitment",en:"Recruitment",ar:"التوظيف"},{type:"onboarding",en:"Onboarding",ar:"التهيئة"},{type:"offboarding",en:"Offboarding",ar:"إنهاء الخدمة"},{type:"assets",en:"Assets",ar:"الأصول"},{type:"learning",en:"Learning",ar:"التعلم"}];return <section className="panel reports-panel"><div className="panel-head reports-heading"><div><h2>{rtl?"تقارير نظام الموارد البشرية المكتمل":"Complete HRMS reports"}</h2><p>{rtl?"تطبق صلاحيات الوحدة ونطاق الأقسام تلقائيًا.":"Module permissions and department scope are enforced automatically."}</p></div></div><div className="report-grid">{reports.map(report=><article className="report-card" key={report.type}><span className="report-icon"><FileText/></span><div className="report-copy"><h2>{rtl?report.ar:report.en}</h2><p>CSV · UTF-8</p></div><a className="primary report-export" href={`/api/reports?type=${report.type}&format=csv`}><Download/>{rtl?"تصدير":"Export"}</a></article>)}</div></section>}
 
-function PageHeader({eyebrow,title,text,action}:{eyebrow:string;title:string;text:string;action?:React.ReactNode}){return <section className="page-heading compact"><div>{eyebrow&&<span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{text&&<p>{text}</p>}</div>{action}</section>}
+function PageHeader({title,action}:{eyebrow?:string;title:string;text?:string;action?:React.ReactNode}){return <section className="page-heading compact"><div><h1>{title}</h1></div>{action}</section>}
 function Tabs({items,active,setActive}:{items:{id:string;label:string}[];active:string;setActive:(s:string)=>void}){const employeeSection=items.some(item=>item.id==="employees")&&items.some(item=>item.id==="departments");return <div className={`tabs ${employeeSection?"employee-section-tabs":""}`}>{items.map(x=><button className={active===x.id?"active":""} key={x.id} onClick={()=>setActive(x.id)}>{x.label}</button>)}</div>}
 function FilterBar({rtl,query,setQuery,period,setPeriod,placeholder,count,trailing}:{rtl:boolean;query:string;setQuery:(value:string)=>void;period?:string;setPeriod?:(value:string)=>void;placeholder?:string;count?:number;trailing?:React.ReactNode}){return <div className="filterbar"><label><Search size={16}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder={placeholder??(rtl?"البحث...":"Search...")}/>{query&&<button className="filter-clear" onClick={()=>setQuery("")} aria-label={rtl?"مسح البحث":"Clear search"}><X size={16}/></button>}</label>{setPeriod&&<label className="desktop-filter"><select aria-label={rtl?"تصفية حسب الفترة":"Filter by period"} value={period} onChange={event=>setPeriod(event.target.value)}><option value="all">{rtl?"كل الفترات":"All time"}</option><option value="month">{rtl?"هذا الشهر":"This month"}</option><option value="week">{rtl?"هذا الأسبوع":"This week"}</option></select><ChevronDown size={16}/></label>}{trailing}<span className="spacer"/>{count!==undefined&&<span className="filter-count">{rtl?`${formatNumber(count,rtl)} نتيجة`:`${formatNumber(count,rtl)} result${count===1?"":"s"}`}</span>}</div>}
 

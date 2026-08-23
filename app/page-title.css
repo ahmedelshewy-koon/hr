@@ -31,16 +31,16 @@
 .performance-heading,
 .talent-heading,
 .portal-welcome{
-  min-height:96px;
-  padding:24px;
+  min-height:48px;
+  padding:2px 4px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:20px;
-  background:var(--surface);
-  border:1px solid var(--card-border);
-  border-radius:var(--radius-lg);
-  box-shadow:var(--card-shadow);
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
 }
 
 .page-heading h1,
@@ -72,9 +72,9 @@
   .performance-heading,
   .talent-heading,
   .portal-welcome{
-    min-height:72px;
-    padding:16px;
-    border-radius:16px;
+    min-height:48px;
+    padding:2px 4px;
+    border-radius:0;
     flex-wrap:wrap;
   }
 }

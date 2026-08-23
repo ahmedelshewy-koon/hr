@@ -29,6 +29,16 @@ async function bootstrapAdmin(d1: PostgresDatabase, email:string, password:strin
   return user;
 }
 
+async function recoverConfiguredAdmin(d1: PostgresDatabase, user: LoginUser | null, email: string, password: string) {
+  if (!user || email !== portalLoginEmail() || !(await verifyBootstrapPassword(password))) return user;
+  if (user.role_name !== "Super Admin") return user;
+  if (user.password_hash && await verifyPassword(password, user.password_hash)) return user;
+
+  const passwordHash = await hashPassword(password);
+  await d1.prepare("UPDATE users SET password_hash=?,status='active',must_change_password=0,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(passwordHash,user.id).run();
+  return d1.prepare("SELECT u.id,u.email,u.password_hash,u.password_changed_at,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE u.id=?").bind(user.id).first<LoginUser>();
+}
+
 export async function GET(request: Request) {
   const d1=createDatabase();
   try {
@@ -54,6 +64,7 @@ export async function POST(request: Request) {
     if (!email || password.length < 8 || password.length > 200) return Response.json({ error:"البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status:401,headers:noStore });
     let user = await d1.prepare("SELECT u.id,u.email,u.password_hash,u.password_changed_at,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE lower(u.email)=lower(?)").bind(email).first<LoginUser>();
     if (!user?.password_hash) user=await bootstrapAdmin(d1,email,password);
+    user=await recoverConfiguredAdmin(d1,user,email,password);
     if (user?.locked_until && new Date(user.locked_until).getTime()>Date.now()) return Response.json({ error:"تم إيقاف المحاولات مؤقتاً. حاول مرة أخرى بعد 15 دقيقة" }, { status:429,headers:noStore });
     const valid=Boolean(user&&user.status==="active"&&(!user.employee_id||["active","probation","notice_period"].includes(String(user.employee_status)))&&user.password_hash&&await verifyPassword(password,user.password_hash));
     if (!valid) {

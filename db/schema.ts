@@ -146,7 +146,7 @@ export const performanceReviews = pgTable("performance_reviews", {
 }, (t) => [uniqueIndex("idx_performance_reviews_cycle_employee").on(t.cycleId,t.employeeId),index("idx_performance_reviews_employee_status").on(t.employeeId,t.status)]);
 
 export const performanceGoals = pgTable("performance_goals", {
-  id: serial("id").primaryKey(), reviewId: integer("review_id").notNull(), title: text("title").notNull(), description: text("description"), target: text("target").notNull(), weight: doublePrecision("weight").notNull(), progress: doublePrecision("progress").notNull().default(0), result: doublePrecision("result"), createdByUserId: integer("created_by_user_id").notNull(), ...timestamps,
+  id: serial("id").primaryKey(), reviewId: integer("review_id").notNull(), title: text("title").notNull(), description: text("description"), target: text("target").notNull(), measurementType: text("measurement_type").notNull().default("percentage"), actualResult: text("actual_result"), weight: doublePrecision("weight").notNull(), progress: doublePrecision("progress").notNull().default(0), result: doublePrecision("result"), employeeRating: doublePrecision("employee_rating"), managerRating: doublePrecision("manager_rating"), createdByUserId: integer("created_by_user_id").notNull(), ...timestamps,
 }, (t) => [index("idx_performance_goals_review").on(t.reviewId)]);
 
 export const performanceComments = pgTable("performance_comments", { id:serial("id").primaryKey(),reviewId:integer("review_id").notNull(),authorUserId:integer("author_user_id").notNull(),stage:text("stage").notNull(),comment:text("comment").notNull(),createdAt:timestamp("created_at",{withTimezone:true,mode:"string"}).notNull().defaultNow() });

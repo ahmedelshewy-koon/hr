@@ -56,7 +56,10 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /org-department-grid/);
   assert.match(app, /DepartmentHierarchyDrawer/);
   assert.match(app, /save_department_hierarchy/);
-  assert.match(app, /save_organization_levels/);
+  assert.match(app, /create_department_structure/);
+  assert.match(app, /org-add-department/);
+  assert.match(app, /\{employees\.map\(employee=><option value=\{employee\.id\} key=\{employee\.id\}>/);
+  assert.match(app, /save_department_structure/);
   assert.match(app, /org-team-level-input/);
   assert.match(app, /organizational_level/);
   assert.doesNotMatch(app, /Layla Alotaibi|Youssef Nassar|Commercial Director/);

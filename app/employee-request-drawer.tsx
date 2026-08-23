@@ -12,16 +12,18 @@ const label=(value:string,rtl:boolean)=>rtl?({"Work from home":"عمل من ال
 
 export function EmployeeRequestDrawer({rtl,preset,close,submit}:{rtl:boolean;preset:string;close:()=>void;submit:(payload:Row)=>Promise<void>}){
   const today=new Date().toISOString().slice(0,10);
-  const [data,setData]=useState<{leaveTypes:Row[];leaveBalances:Row[];currentUser?:Row}|null>(null);
+  const [data,setData]=useState<{leaveTypes:Row[];employeeLeaveTypes:Row[];leaveBalances:Row[];currentUser?:Row}|null>(null);
   const [choice,setChoice]=useState(preset||""),[fromDate,setFromDate]=useState(today),[toDate,setToDate]=useState(today),[requestDate,setRequestDate]=useState(today),[amount,setAmount]=useState(""),[reason,setReason]=useState(""),[notes,setNotes]=useState(""),[saving,setSaving]=useState(false),[error,setError]=useState("");
   useEffect(()=>{let active=true;void fetch("/api/hr",{cache:"no-store"}).then(response=>response.json().then(body=>({response,body}))).then(({response,body})=>{if(!response.ok)throw new Error(body.error);if(active)setData(body);}).catch(()=>{if(active)setError(rtl?"تعذر تحميل أنواع الإجازات والأرصدة.":"Unable to load leave types and balances.");});return()=>{active=false};},[rtl]);
-  const leaveTypes=(data?.leaveTypes??[]).filter(row=>row.status==="active"&&row.code!=="OFFICIAL");
+  const employeeId=Number(data?.currentUser?.employee_id)||0;
+  const assignedTypeIds=new Set((data?.employeeLeaveTypes??[]).filter(row=>Number(row.employee_id)===employeeId).map(row=>Number(row.leave_type_id)));
+  const leaveTypes=(data?.leaveTypes??[]).filter(row=>row.status==="active"&&row.code!=="OFFICIAL"&&assignedTypeIds.has(Number(row.id)));
   const defaultLeave=leaveTypes.find(row=>String(row.code).startsWith("ANNUAL"))||leaveTypes[0];
   const effectiveChoice=choice||(defaultLeave?`leave:${defaultLeave.id}`:"");
   const leaveTypeId=effectiveChoice.startsWith("leave:")?Number(effectiveChoice.slice(6)):0;
   const leaveType=leaveTypes.find(row=>Number(row.id)===leaveTypeId);
   const selectedStandard=effectiveChoice.startsWith("request:")?effectiveChoice.slice(8):"";
-  const employeeId=Number(data?.currentUser?.employee_id)||0,year=Number(fromDate.slice(0,4));
+  const year=Number(fromDate.slice(0,4));
   const balance=(data?.leaveBalances??[]).find(row=>Number(row.employee_id)===employeeId&&Number(row.leave_type_id)===leaveTypeId&&Number(row.year)===year);
   const available=Number(balance?.available??(Number(balance?.entitlement||0)-Number(balance?.used||0)-Number(balance?.pending||0)));
   const attachmentRequired=Boolean(Number(leaveType?.attachment_required));

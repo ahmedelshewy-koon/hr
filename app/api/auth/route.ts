@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
     await enforceRateLimit(d1,request,"login",10,900,email||null);
-    if (!email || password.length < 8 || password.length > 200) return Response.json({ error:"البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status:401,headers:noStore });
+    if (!email || password.length < 4 || password.length > 200) return Response.json({ error:"البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status:401,headers:noStore });
     let user = await d1.prepare("SELECT u.id,u.email,u.password_hash,u.password_changed_at,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE lower(u.email)=lower(?)").bind(email).first<LoginUser>();
     if (!user?.password_hash) user=await bootstrapAdmin(d1,email,password);
     user=await recoverConfiguredAdmin(d1,user,email,password);
@@ -94,7 +94,8 @@ export async function PATCH(request: Request) {
     await enforceRateLimit(d1,request,"password-change",5,3600,session.userId);
     const body=await request.json() as {currentPassword?:unknown;newPassword?:unknown};
     const currentPassword=typeof body.currentPassword==="string"?body.currentPassword:"";const newPassword=typeof body.newPassword==="string"?body.newPassword:"";
-    if(newPassword.length<10||newPassword.length>200||!/[A-Za-z]/.test(newPassword)||!/[0-9]/.test(newPassword))return Response.json({error:"كلمة المرور الجديدة يجب أن تكون 10 أحرف على الأقل وتحتوي على حرف ورقم"},{status:400,headers:noStore});
+    if(newPassword.length<4||newPassword.length>200)return Response.json({error:"كلمة المرور الجديدة يجب أن تكون 4 خانات على الأقل"},{status:400,headers:noStore});
+    if(newPassword===currentPassword)return Response.json({error:"كلمة المرور الجديدة يجب أن تختلف عن كلمة المرور الحالية"},{status:400,headers:noStore});
     const user=await d1.prepare("SELECT id,email,password_hash,session_version FROM users WHERE id=? AND status='active'").bind(session.userId).first<{id:number;email:string;password_hash:string|null;session_version:number}>();
     if(!user?.password_hash||!(await verifyPassword(currentPassword,user.password_hash)))return Response.json({error:"كلمة المرور الحالية غير صحيحة"},{status:401,headers:noStore});
     const passwordHash=await hashPassword(newPassword);const nextVersion=Number(user.session_version)+1;

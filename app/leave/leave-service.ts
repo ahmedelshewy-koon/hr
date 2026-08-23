@@ -55,7 +55,8 @@ export async function initializeCurrentLeaveBalances(db:PostgresDatabase,employe
       SELECT e.id AS employee_id,lt.id AS leave_type_id,lp.annual_entitlement,
         ROW_NUMBER() OVER (PARTITION BY e.id,lt.id ORDER BY CASE WHEN lp.country=e.country THEN 0 ELSE 1 END,lp.id DESC) AS rank
       FROM employees e
-      JOIN leave_types lt ON lt.status='active' AND lt.code<>'OFFICIAL'
+      JOIN employee_leave_types elt ON elt.employee_id=e.id
+      JOIN leave_types lt ON lt.id=elt.leave_type_id AND lt.status='active' AND lt.code<>'OFFICIAL'
       JOIN leave_policies lp ON lp.leave_type_id=lt.id AND lp.status='active' AND lp.country IN (e.country,'Both','KSA & Egypt')
       WHERE e.id IN (${placeholders}) AND e.employment_status IN ('active','probation','notice_period')
         AND (EXTRACT(YEAR FROM AGE(make_date(?,12,31),e.start_date::date))*12+EXTRACT(MONTH FROM AGE(make_date(?,12,31),e.start_date::date)))>=COALESCE(lp.min_service_months,0)
@@ -75,6 +76,8 @@ export async function createLeaveRequest(input:{db:PostgresDatabase;request:Requ
     const leaveType=await tx.prepare("SELECT * FROM leave_types WHERE id=? AND status='active'").bind(input.leaveTypeId).first<LeaveType>();
     if(!leaveType) response("Leave type is not active",404);
     if(leaveType.code==="OFFICIAL") response("Official holidays cannot be requested as employee leave",400);
+    const assignment=await tx.prepare("SELECT id FROM employee_leave_types WHERE employee_id=? AND leave_type_id=?").bind(employee.id,leaveType.id).first<{id:number}>();
+    if(!assignment) response("This leave type is not assigned to your employee profile",403);
     if(leaveType.attachment_required&& !input.attachmentName) response("Supporting documentation is required for this leave type; file upload is not available yet. Please contact HR.",409);
     const policy=await resolvePolicy(tx,leaveType.id,employee.country);
     if(!policy&&leaveType.paid) response("No active leave policy applies to this employee and leave type",409);

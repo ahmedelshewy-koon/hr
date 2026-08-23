@@ -1,5 +1,5 @@
 import { ensureAuthSchema, hashPassword, requirePortalSession } from "../../portal-auth";
-import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
+import { createDatabase, type PostgresDatabase, type TransactionDatabase } from "../../../db/postgres";
 import { JOB_TITLE_TRANSLATIONS } from "../../localization";
 import { cancelLeaveRequest, createLeaveRequest, initializeCurrentLeaveBalances, processLeaveRequest } from "../../leave/leave-service";
 import { manualAttendanceCorrection, processAttendanceCorrection, recalculateAttendance, submitAttendanceCorrection } from "../../attendance/attendance-service";
@@ -14,6 +14,7 @@ type AppUser = { id: number; email: string; role_id: number; role_name: string; 
 const SUPER_ADMIN_MODULES = ["dashboard","employee_portal","employee_requests","request_approvals","employees","employee_salaries","job_titles","departments","leave_management","attendance","attendance_adjustments","organization_chart","users","permissions","system_settings","reports"];
 const ACTIONS = ["view","create","edit","delete","approve","export","manage_settings"];
 const SYSTEM_ROLES = ["Super Admin","HR Manager","Department Manager","Employee"] as const;
+const DEFAULT_USER_PASSWORD = "123456";
 const ROLE_DEFAULTS:Record<string,Record<string,readonly string[]>> = {
   "HR Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
@@ -182,6 +183,15 @@ async function audit(d1: PostgresDatabase, request: Request, user: AppUser, acti
 
 function clean(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0,max) : ""; }
 function required(value: unknown, name: string) { const v=clean(value); if(!v) throw new Response(`${name} is required`,{status:400}); return v; }
+function selectedLeaveTypeIds(value: unknown){return [...new Set((Array.isArray(value)?value:[]).map(Number).filter(Number.isInteger).filter(id=>id>0))];}
+async function syncEmployeeLeaveTypes(db:PostgresDatabase|TransactionDatabase,employeeId:number,value:unknown,assignedByUserId:number){
+  const ids=selectedLeaveTypeIds(value);
+  if(!ids.length)throw new Response("Select at least one leave type for the employee",{status:400});
+  const valid=(await db.prepare(`SELECT id FROM leave_types WHERE id IN (${ids.map(()=>"?").join(",")}) AND status='active' AND code<>'OFFICIAL'`).bind(...ids).all<{id:number}>()).results.map(row=>Number(row.id));
+  if(valid.length!==ids.length)throw new Response("One or more selected leave types are unavailable",{status:400});
+  await db.prepare(`DELETE FROM employee_leave_types WHERE employee_id=? AND leave_type_id NOT IN (${ids.map(()=>"?").join(",")})`).bind(employeeId,...ids).run();
+  for(const leaveTypeId of ids)await db.prepare("INSERT INTO employee_leave_types (employee_id,leave_type_id,assigned_by_user_id,created_at,updated_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(employee_id,leave_type_id) DO UPDATE SET assigned_by_user_id=excluded.assigned_by_user_id,updated_at=CURRENT_TIMESTAMP").bind(employeeId,leaveTypeId,assignedByUserId).run();
+}
 function round2(value: number) { return Math.round((value + Number.EPSILON) * 100) / 100; }
 function businessDateTime(timeZone="Africa/Cairo"){
   const parts=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
@@ -300,7 +310,7 @@ export async function GET(request: Request) {
       d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.country AS country,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY q.id DESC LIMIT 250`).all(),
       d1.prepare(`SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY a.work_date DESC,a.id DESC LIMIT 250`).all(),
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
-      d1.prepare("SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").all(),
+      d1.prepare(user.role_name==="Employee"?"SELECT lt.* FROM leave_types lt WHERE lt.status!='archived' AND EXISTS (SELECT 1 FROM employee_leave_types elt WHERE elt.employee_id=? AND elt.leave_type_id=lt.id) ORDER BY lt.id":"SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").bind(...(user.role_name==="Employee"?[employeeIdParam]:[])).all(),
       canViewPermissions?d1.prepare("SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id WHERE r.name IN ('Super Admin','HR Manager','Department Manager','Employee') GROUP BY r.id ORDER BY r.id").all():Promise.resolve({results:[]}),
       canViewUsers?d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.must_change_password,u.last_login_at,u.role_id,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY u.id").all():Promise.resolve({results:[]}),
       user.role_name==="Super Admin"?d1.prepare("SELECT a.*,u.email AS user_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50").all():Promise.resolve({results:[]}),
@@ -309,9 +319,10 @@ export async function GET(request: Request) {
     const permissions = await d1.prepare(`SELECT role_id,module,action,allowed FROM permissions WHERE ${canViewPermissions?"TRUE":"role_id=?"} ORDER BY role_id,module,action`).bind(...(canViewPermissions?[]:[user.role_id])).all();
     const scopedEmployeeIds=(employeeRows.results as {id:number}[]).map(row=>Number(row.id)).filter(Boolean);
     await initializeCurrentLeaveBalances(d1,scopedEmployeeIds,new Date().getUTCFullYear());
-    const [leaveBalanceRows,leavePolicyRows,requestApprovalRows]=await Promise.all([
-      d1.prepare(`SELECT lb.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar,lt.paid,lt.attachment_required,(lb.entitlement-lb.used-lb.pending) AS available,e.name_en AS employee_name,e.name_ar AS employee_name_ar FROM leave_balances lb JOIN employees e ON e.id=lb.employee_id JOIN leave_types lt ON lt.id=lb.leave_type_id WHERE ${employeeScope} ORDER BY lb.year DESC,lt.id`).all(),
+    const [leaveBalanceRows,leavePolicyRows,employeeLeaveTypeRows,requestApprovalRows]=await Promise.all([
+      d1.prepare(`SELECT lb.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar,lt.paid,lt.attachment_required,(lb.entitlement-lb.used-lb.pending) AS available,e.name_en AS employee_name,e.name_ar AS employee_name_ar FROM leave_balances lb JOIN employees e ON e.id=lb.employee_id JOIN leave_types lt ON lt.id=lb.leave_type_id WHERE ${employeeScope} ${user.role_name==="Employee"?"AND EXISTS (SELECT 1 FROM employee_leave_types elt WHERE elt.employee_id=lb.employee_id AND elt.leave_type_id=lb.leave_type_id)":""} ORDER BY lb.year DESC,lt.id`).all(),
       d1.prepare(`SELECT lp.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar FROM leave_policies lp JOIN leave_types lt ON lt.id=lp.leave_type_id WHERE (lp.status='active' AND lp.country IN (SELECT DISTINCT e.country FROM employees e WHERE ${employeeScope})) OR (lp.status='active' AND lp.country IN ('Both','KSA & Egypt')) ORDER BY lp.country,lt.id`).all(),
+      d1.prepare(`SELECT elt.*,lt.code AS leave_type_code,lt.name_en AS leave_type_name_en,lt.name_ar AS leave_type_name_ar FROM employee_leave_types elt JOIN employees e ON e.id=elt.employee_id JOIN leave_types lt ON lt.id=elt.leave_type_id WHERE ${employeeScope} ORDER BY elt.employee_id,lt.id`).all(),
       d1.prepare(`SELECT a.*,u.email AS actor_email,ae.name_en AS actor_name,ae.name_ar AS actor_name_ar FROM approvals a JOIN requests q ON q.id=a.request_id JOIN employees e ON e.id=q.employee_id LEFT JOIN users u ON u.id=a.actor_user_id LEFT JOIN employees ae ON ae.id=u.employee_id WHERE ${employeeScope} ORDER BY a.created_at,a.id`).all(),
     ]);
     const [attendanceCorrectionRows,attendanceCorrectionActionRows,attendanceExceptionRows,attendanceLogRows]=await Promise.all([
@@ -349,7 +360,7 @@ export async function GET(request: Request) {
     ]);
     const pageModules:Record<string,string>={dashboard:"dashboard",portal:"employee_portal",approvals:"request_approvals",employees:"employees",leave:"leave_management",attendance:"attendance",org:"organization_chart",users:"users",payroll:"payroll",settings:"system_settings"};
     const allowedPages=(await Promise.all(Object.entries(pageModules).map(async([page,module])=>await can(d1,user,module,"view")?page:null))).filter(Boolean);
-    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, leavePolicies:leavePolicyRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
+    return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leavePolicies:leavePolicyRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
 }
@@ -364,6 +375,21 @@ export async function POST(request: Request) {
     await enforceRateLimit(d1,request,"hr-write",240,60,user.id);
     const payload=await request.json() as Json;
     const action=required(payload.action,"action");
+    if(action==="create_user"){
+      await authorize(d1,user,"users","edit");
+      const employeeId=Number(payload.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
+      const roleName=required(payload.roleName,"Role");if(!SYSTEM_ROLES.includes(roleName as typeof SYSTEM_ROLES[number]))throw new Response("Invalid system role",{status:400});
+      if(user.role_name==="HR Manager"&&!['Department Manager','Employee'].includes(roleName))throw new Response("HR can create employee and department-manager accounts only",{status:403});
+      const employee=await d1.prepare("SELECT id,work_email,employment_status FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<{id:number;work_email:string|null;employment_status:string}>();
+      const email=clean(employee?.work_email).toLowerCase();if(!employee||!email)throw new Response("The employee must have a work email",{status:400});
+      if(!['active','probation','notice_period'].includes(employee.employment_status))throw new Response("Only current employees can receive an active account",{status:400});
+      const existing=await d1.prepare("SELECT id FROM users WHERE employee_id=? OR lower(email)=lower(?)").bind(employeeId,email).first<{id:number}>();if(existing)throw new Response("An account already exists for this employee or email",{status:409});
+      const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
+      const passwordHash=await hashPassword(DEFAULT_USER_PASSWORD);
+      const created=await d1.prepare("INSERT INTO users (email,employee_id,role_id,status,password_hash,must_change_password,session_version,failed_login_attempts,created_at,updated_at) VALUES (?,?,?,'active',?,1,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(email,employeeId,role!.id,passwordHash).first<{id:number}>();
+      await audit(d1,request,user,"create","users","user",String(created!.id),null,{employeeId,email,roleName,mustChangePassword:true});
+      return Response.json({ok:true,id:created!.id,defaultPassword:DEFAULT_USER_PASSWORD},{status:201});
+    }
     if(action==="save_user"){
       await authorize(d1,user,"users","edit");
       const targetUserId=Number(payload.userId);if(!targetUserId)throw new Response("User is required",{status:400});
@@ -378,7 +404,7 @@ export async function POST(request: Request) {
       }
       const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
       const temporaryPassword=clean(payload.temporaryPassword,200);let passwordHash:string|null=null;
-      if(temporaryPassword){if(temporaryPassword.length<10||!/[A-Za-z]/.test(temporaryPassword)||!/[0-9]/.test(temporaryPassword))throw new Response("Temporary password must be at least 10 characters and contain a letter and number",{status:400});passwordHash=await hashPassword(temporaryPassword);}
+      if(temporaryPassword){if(temporaryPassword.length<4)throw new Response("Temporary password must be at least 4 characters",{status:400});passwordHash=await hashPassword(temporaryPassword);}
       await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(role!.id,status,passwordHash,passwordHash,targetUserId).run();
       await audit(d1,request,user,"update","users","user",String(targetUserId),before,{roleName,status,passwordReset:Boolean(passwordHash)});
       return Response.json({ok:true});
@@ -393,6 +419,7 @@ export async function POST(request: Request) {
         const result=await createEmployeeRecord(tx,{nameEn,nameAr,workEmail:email,startDate:required(payload.startDate,"Start date"),country:required(payload.country,"Country"),departmentId,jobTitleId:Number(payload.jobTitleId)||null,managerId,workLocation:clean(payload.workLocation)||null,employmentType:clean(payload.employmentType)||"full_time"});
         await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
           .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
+        await syncEmployeeLeaveTypes(tx,result.id,payload.leaveTypeIds,user.id);
         return result;
       });
       await audit(d1,request,user,"create","employees","employee",String(created.id),null,{code:created.code,nameEn,email});
@@ -413,6 +440,7 @@ export async function POST(request: Request) {
         .bind(nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,departmentId,Number(payload.jobTitleId)||null,resolvedManagerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,employeeId).run();
       if(departmentChanged)await d1.prepare("UPDATE employees SET organizational_level=CASE WHEN ?::integer IS NULL THEN 1 ELSE COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) END WHERE id=?").bind(resolvedManagerId,resolvedManagerId,employeeId).run();
       await d1.prepare("UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(email,employeeId).run();
+      if(Array.isArray(payload.leaveTypeIds))await syncEmployeeLeaveTypes(d1,employeeId,payload.leaveTypeIds,user.id);
       await audit(d1,request,user,"update","employees","employee",String(employeeId),before,payload);
       return Response.json({ok:true,id:employeeId});
     }

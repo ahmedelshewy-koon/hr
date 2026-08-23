@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
-import { Tajawal } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
-
-const tajawal = Tajawal({
-  variable: "--font-arabic",
-  subsets: ["arabic", "latin"],
-  weight: ["400", "500", "700", "800"],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -35,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body
-        className={`${tajawal.variable} antialiased`}
+        className="antialiased"
       >
         {children}
       </body>

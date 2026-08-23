@@ -31,6 +31,7 @@ import "./approvals-center.css";
 import "./employee-profile-360.css";
 import "./employee-profile-filters.css";
 import "./page-title.css";
+import "./typography.css";
 
 type Lang = "en" | "ar";
 type Page = "dashboard" | "portal" | "approvals" | "employees" | "leave" | "attendance" | "performance" | "recruitment" | "lifecycle" | "assets" | "learning" | "org" | "users" | "reports" | "payroll" | "settings";
@@ -557,16 +558,15 @@ function OrgPage({rtl,notify}:{rtl:boolean;notify:(message:string)=>void}){
   const divisions=childDepartments(Number(directorDepartment?.id)).filter(departmentMatches);
   const directorJob=director?jobById.get(Number(director.job_title_id)):undefined;
   const totalEmployees=employeesData.length;
-  const activeDepartments=departments.filter(department=>Number(department.id)!==Number(directorDepartment?.id));
-  const leaders=activeDepartments.filter(department=>Number(department.manager_employee_id)>0).length;
-  const leadershipCoverage=activeDepartments.length?Math.round(leaders/activeDepartments.length*100):0;
+  const totalDepartments=departments.filter(department=>department.status!=="deleted").length;
+  const totalJobTitles=jobs.filter(job=>job.status!=="deleted").length;
   const openDepartment=departments.find(department=>Number(department.id)===openDepartmentId)||null;
   return <><PageHeader eyebrow={rtl?"الهيكل الإداري":"ORGANIZATION STRUCTURE"} title={rtl?"الرئيس التنفيذي وقطاعات الشركة":"CEO & company divisions"} text={rtl?"ثلاثة قطاعات مستقلة، تتفرع منها الإدارات والفرق والموظفون.":"Three distinct divisions, followed by their departments, teams and employees."}/>
   {error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}
   <section className="org-insights" aria-label={rtl?"ملخص الهيكل":"Structure summary"}>
-    <div className="org-insight primary-insight"><span><Users size={20}/></span><div><b>{formatNumber(totalEmployees,rtl)}</b><small>{rtl?"إجمالي الموظفين":"total employees"}</small></div><em>{rtl?`${formatNumber(divisions.length,rtl)} قطاعات`:`${divisions.length} divisions`}</em></div>
-    <div className="org-insight"><span><ShieldCheck size={20}/></span><div><b>{new Intl.NumberFormat(localeFor(rtl),{style:"percent",maximumFractionDigits:0}).format(leadershipCoverage/100)}</b><small>{rtl?"نسبة الأقسام ذات مدير معتمد":"leadership coverage"}</small></div><em>{formatNumber(leaders,rtl)}/{formatNumber(activeDepartments.length,rtl)}</em></div>
-    <div className="org-insight"><span><BriefcaseBusiness size={20}/></span><div><b>{formatNumber(jobs.length,rtl)}</b><small>{rtl?"مسمى وظيفي":"job titles"}</small></div><em>{rtl?"تنوع الأدوار":"role mix"}</em></div>
+    <div className="org-insight primary-insight"><span><Users size={20}/></span><div><b>{formatNumber(totalEmployees,rtl)}</b><small>{rtl?"عدد الموظفين":"Employees"}</small></div></div>
+    <div className="org-insight"><span><Building2 size={20}/></span><div><b>{formatNumber(totalDepartments,rtl)}</b><small>{rtl?"عدد الأقسام":"Departments"}</small></div></div>
+    <div className="org-insight"><span><BriefcaseBusiness size={20}/></span><div><b>{formatNumber(totalJobTitles,rtl)}</b><small>{rtl?"عدد المسميات الوظيفية":"Job titles"}</small></div></div>
   </section>
   <div className="org-toolbar"><div><b>{rtl?"التسلسل من الرئيس التنفيذي إلى الموظفين":"CEO-to-employee hierarchy"}</b><small>{rtl?"اضغط على أي إدارة لعرض موظفيها وتعديل ترتيبهم الوظيفي":"Open any department to view its people and edit their order"}</small></div><span></span><button className="primary org-add-department" onClick={()=>setAddingDepartment(true)}><Plus size={16}/>{rtl?"إضافة قسم":"Add department"}</button><label className="org-search"><Search size={16}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder={rtl?"ابحث عن قسم أو موظف":"Find a department or employee"}/>{query&&<button onClick={()=>setQuery("")} aria-label={rtl?"مسح البحث":"Clear search"}><X size={16}/></button>}</label></div>
   <div className="panel org-canvas">

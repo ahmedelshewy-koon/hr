@@ -56,9 +56,9 @@
   margin:0!important;
   color:var(--text)!important;
   font-family:var(--font-enterprise)!important;
-  font-size:24px!important;
-  font-weight:700!important;
-  line-height:1.35!important;
+  font-size:var(--type-page)!important;
+  font-weight:var(--weight-semibold)!important;
+  line-height:var(--leading-heading)!important;
   letter-spacing:-.02em!important;
 }
 

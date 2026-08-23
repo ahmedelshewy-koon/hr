@@ -54,6 +54,12 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /const shownDepartments=\(data\?\.departments\s*\?\?\s*\[\]\)/);
   assert.match(app, /Managing Director\|العضو المنتدب/);
   assert.match(app, /org-department-grid/);
+  assert.match(app, /<h1 className="dashboard-title">\{rtl\?"لوحة التحكم":"Dashboard"\}<\/h1>/);
+  assert.match(app, /function PageHeader\(\{title,action\}/);
+  assert.match(app, /rtl\?"عدد الموظفين":"Employees"/);
+  assert.match(app, /rtl\?"عدد الأقسام":"Departments"/);
+  assert.match(app, /rtl\?"عدد المسميات الوظيفية":"Job titles"/);
+  assert.doesNotMatch(app, /rtl\?"نسبة الأقسام ذات مدير معتمد"/);
   assert.match(app, /DepartmentHierarchyDrawer/);
   assert.match(app, /save_department_hierarchy/);
   assert.match(app, /create_department_structure/);

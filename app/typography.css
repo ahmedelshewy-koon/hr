@@ -1,0 +1,66 @@
+/* SANAD global typography system. Keep this stylesheet last in the UI import
+   chain so feature modules consume semantic tokens instead of redefining them. */
+
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-400-arabic.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-400-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:500;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-500-arabic.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:500;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-500-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:600;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-600-arabic.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:600;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-600-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:700;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-700-arabic.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:700;font-display:swap;src:url("/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-700-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122}
+
+html,body,.app,.app[data-lang="ar"],.app[data-lang="en"],button,input,select,textarea{font-family:var(--font-enterprise)}
+
+h1,.page-heading h1,.approvals-head h1,.attendance-page-head h1,.learning-heading h1,
+.lifecycle-heading h1,.lifecycle-subheading h1,.performance-heading h1,.performance-subheading h1,
+.talent-heading h1,.portal-welcome h1,.login-copy h1{
+  font-size:var(--type-page)!important;
+  font-weight:var(--weight-semibold)!important;
+  line-height:var(--leading-heading)!important;
+}
+h2{font-size:var(--type-section);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
+h3,h4,h5,h6{font-size:var(--type-component);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
+.department-card h3,.setting-card h3,.report-card h2,.portal-next h3,
+[class*="empty"] h2,[class*="empty"] h3{font-size:var(--type-component)!important;font-weight:var(--weight-semibold)!important}
+
+button,.primary,.outline,.ghost,.danger-action,.text-button,.select-button,.setting-button,
+.performance-open,.talent-actions button,.talent-mini-list button{
+  font-size:var(--type-body)!important;
+}
+button{font-weight:var(--weight-medium)}
+input,select,textarea{font-size:var(--type-body)!important;font-weight:var(--weight-regular);line-height:var(--leading-body)}
+label,legend,.field>span,.helper-text,small{font-size:var(--type-label);line-height:var(--leading-body)}
+
+th,.data-table .tr.th,.attendance-row.head,.official-holiday-row.head,[role="columnheader"]{
+  font-size:var(--type-label)!important;
+  font-weight:var(--weight-semibold)!important;
+  line-height:var(--leading-heading);
+}
+td,.data-table .tr:not(.th),.attendance-row:not(.head),.official-holiday-row:not(.head),
+[role="cell"],[role="gridcell"]{
+  font-size:var(--type-secondary)!important;
+  font-weight:var(--weight-regular);
+  line-height:var(--leading-body);
+}
+table td b,table td strong,table td span,table td small,
+.data-table .tr:not(.th)>span:not(.status){font-size:var(--type-secondary)}
+
+.sidebar nav button,.sidebar-bottom>button{font-size:var(--type-nav)!important;font-weight:var(--weight-medium)}
+.sidebar nav button.active{font-weight:var(--weight-semibold)}
+.status,.badge,[class*="-badge"],[class*="-status"]{font-size:var(--type-label)!important;line-height:var(--leading-heading)}
+
+.stat-value,.approval-metrics b,.attendance-metrics b,.performance-kpi b,.learning-kpi b,
+.lifecycle-kpi b,.final-score b,.attendance-rate-ring strong,.operational-metrics b,
+.action-items button strong{
+  font-size:var(--type-kpi)!important;
+  font-weight:var(--weight-semibold)!important;
+  line-height:var(--leading-tight)!important;
+}
+
+table,[role="table"],input[type="number"],input[type="date"],input[type="time"],time,
+[class*="stat"],[class*="metric"],[class*="kpi"],[class*="amount"],[class*="salary"],
+[class*="payroll"],[class*="balance"],[class*="date"],[class*="time"],[class*="score"]{
+  font-variant-numeric:tabular-nums lining-nums;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+}

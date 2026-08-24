@@ -11,22 +11,27 @@ type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
 type AppUser = { id: number; email: string; role_id: number; role_name: string; employee_id: number | null; employee_name:string|null; employee_name_ar:string|null; department_id:number|null; department_name:string|null; department_name_ar:string|null; must_change_password:number };
 
-const SUPER_ADMIN_MODULES = ["dashboard","employee_portal","employee_requests","request_approvals","employees","employee_salaries","job_titles","departments","leave_management","attendance","attendance_adjustments","organization_chart","users","permissions","system_settings","reports"];
+const SUPER_ADMIN_MODULES = ["dashboard","employee_portal","employee_requests","request_approvals","employees","employee_salaries","job_titles","departments","leave_management","attendance","attendance_adjustments","performance","recruitment","onboarding","offboarding","assets","learning","organization_chart","users","permissions","system_settings","reports"];
 const ACTIONS = ["view","create","edit","delete","approve","export","manage_settings"];
 const SYSTEM_ROLES = ["Super Admin","HR Manager","Department Manager","Employee"] as const;
+const ROLE_NAMES:Record<string,{en:string;ar:string}>={
+  "Super Admin":{en:"Super Admin",ar:"مدير النظام"},"HR Manager":{en:"HR Manager",ar:"مدير الموارد البشرية"},
+  "Department Manager":{en:"Department Manager",ar:"مدير القسم"},Employee:{en:"Employee",ar:"موظف"},
+};
 const DEFAULT_USER_PASSWORD = "123456";
 const ROLE_DEFAULTS:Record<string,Record<string,readonly string[]>> = {
   "HR Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
     employees:["view","create","edit","export"], employee_salaries:["view","edit"], job_titles:["view","create","edit"], departments:["view","create","edit"],
     leave_management:["view","create","edit","delete","approve","export"], attendance:["view","create","edit","export"], attendance_adjustments:["view","edit","approve"],
+    performance:["view","create","edit","delete","approve","export"], learning:["view","create","edit","delete","approve","export"],
     organization_chart:["view","edit"], users:["view","edit"], system_settings:["view","manage_settings"], reports:["view","export"], payroll:["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"],
   },
   "Department Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
-    employees:["view"], leave_management:["view"], attendance:["view","create"], attendance_adjustments:["view","approve"], organization_chart:["view"], payroll:["view_own_payslip"],
+    employees:["view"], leave_management:["view"], attendance:["view","create"], attendance_adjustments:["view","approve"], performance:["view","edit","approve"], learning:["view","create","edit","approve"], organization_chart:["view"], payroll:["view_own_payslip"],
   },
-  Employee: { dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], attendance:["create"], attendance_adjustments:["view","create"], payroll:["view_own_payslip"] },
+  Employee: { dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], attendance:["create"], attendance_adjustments:["view","create"], performance:["view"], learning:["view"], payroll:["view_own_payslip"] },
 };
 const PAYROLL_ACTIONS = ["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"] as const;
 const PAYROLL_ROLE_DEFAULTS: Record<string, readonly string[]> = {
@@ -66,7 +71,7 @@ const OFFICIAL_HOLIDAYS_2026 = [
 ] as const;
 
 /** Bump whenever the seeded reference data below changes, to force a re-seed. */
-const SEED_VERSION = "2026-08-21-attendance-corrections-1";
+const SEED_VERSION = "2026-08-24-personal-performance-learning-1";
 
 async function ensureSeed(d1: PostgresDatabase) {
   const now = new Date().toISOString();
@@ -80,6 +85,7 @@ async function ensureSeed(d1: PostgresDatabase) {
   await d1.prepare("ALTER TABLE holidays ADD COLUMN IF NOT EXISTS recurrence_type TEXT NOT NULL DEFAULT 'once'").run();
   const roleNames = [...SYSTEM_ROLES];
   for (const name of roleNames) await d1.prepare("INSERT OR IGNORE INTO roles (name, description, is_system, created_at, updated_at) VALUES (?, ?, 1, ?, ?)").bind(name, `${name} system role`, now, now).run();
+  for(const [name,labels] of Object.entries(ROLE_NAMES))await d1.prepare("UPDATE roles SET name_en=COALESCE(name_en,?),name_ar=COALESCE(name_ar,?),updated_at=CURRENT_TIMESTAMP WHERE name=?").bind(labels.en,labels.ar,name).run();
   await d1.prepare("UPDATE users SET role_id=(SELECT id FROM roles WHERE name='HR Manager') WHERE role_id IN (SELECT id FROM roles WHERE name IN ('Admin','HR'))").run();
   await d1.prepare("UPDATE users SET role_id=(SELECT id FROM roles WHERE name='Department Manager') WHERE role_id IN (SELECT id FROM roles WHERE name='Direct Manager')").run();
   await d1.prepare("UPDATE users SET role_id=(SELECT id FROM roles WHERE name='Department Manager') WHERE role_id=(SELECT id FROM roles WHERE name='Employee') AND employee_id IN (SELECT manager_employee_id FROM departments WHERE manager_employee_id IS NOT NULL AND status!='deleted')").run();
@@ -90,7 +96,7 @@ async function ensureSeed(d1: PostgresDatabase) {
   for (const [roleName,moduleDefaults] of Object.entries(ROLE_DEFAULTS)) {
     const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
     if(!role)continue;
-    for(const [moduleName,allowedActions] of Object.entries(moduleDefaults)) for(const action of ACTIONS) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,?,?,?) ON CONFLICT(role_id,module,action) DO NOTHING").bind(role.id,moduleName,action,allowedActions.includes(action)?1:0).run();
+    for(const [moduleName,allowedActions] of Object.entries(moduleDefaults)) for(const action of ACTIONS) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,?,?,?) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=excluded.allowed").bind(role.id,moduleName,action,allowedActions.includes(action)?1:0).run();
   }
   const hrRole = await d1.prepare("SELECT id FROM roles WHERE name='HR Manager'").first<{ id: number }>();
   if (hrRole) for (const action of ["view","manage_settings"]) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,'system_settings',?,1) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=1").bind(hrRole.id,action).run();
@@ -108,13 +114,16 @@ async function ensureSeed(d1: PostgresDatabase) {
   for (const holiday of OFFICIAL_HOLIDAYS_2026) await d1.prepare("INSERT INTO holidays (holiday_date,name_en,name_ar,country,attendance_types,recurrence_type,days,status,created_at,updated_at) SELECT ?,?,?,?,?,?,1,'active',?,? WHERE NOT EXISTS (SELECT 1 FROM holidays WHERE holiday_date=? AND name_ar=?)").bind(...holiday,now,now,holiday[0],holiday[2]).run();
   await d1.prepare("INSERT INTO system_settings (setting_key,value_json,created_at,updated_at) VALUES ('attendance','{\"correctionWindowDays\":30,\"timeZone\":\"Africa/Cairo\"}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO NOTHING").run();
 
+  const demoSetting=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='demo_data'").first<{value_json:string}>();
+  if(enabledSetting(demoSetting))await ensureDemoData(d1);
+
   await d1.prepare("INSERT INTO system_settings (setting_key,value_json,created_at,updated_at) VALUES ('seed_version',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json,updated_at=CURRENT_TIMESTAMP").bind(SEED_VERSION).run();
 }
 
 async function ensureDemoData(d1:PostgresDatabase){
   await deleteDemoData(d1);
   const today=new Date().toISOString().slice(0,10),statuses=["present","present","late","present","leave","present","late","present"];
-  const employees=(await d1.prepare("SELECT id,employee_code FROM employees WHERE employment_status!='deleted' AND employee_code NOT LIKE 'TEST-%' ORDER BY employee_code LIMIT 250").all<{id:number;employee_code:string}>()).results;
+  const employees=(await d1.prepare("SELECT e.id,e.employee_code,e.name_en,e.name_ar,e.department_id,COALESCE(NULLIF(e.manager_id,e.id),NULLIF(d.manager_employee_id,e.id)) AS review_manager_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id WHERE e.employment_status!='deleted' AND e.employee_code NOT LIKE 'TEST-%' ORDER BY e.employee_code LIMIT 250").all<{id:number;employee_code:string;name_en:string;name_ar:string;department_id:number|null;review_manager_id:number|null;department_name:string|null;department_name_ar:string|null}>()).results;
   if(!employees.length)throw new Response("Create at least one real employee before enabling test data",{status:400});
   const requestTypes=["Annual leave","Work from home","Sick leave","Expense reimbursement"] as const;
   const requestStatuses=[["pending_manager","manager"],["pending_hr","hr"],["hr_approved","completed"],["rejected","completed"]] as const;
@@ -129,11 +138,40 @@ async function ensureDemoData(d1:PostgresDatabase){
     await d1.prepare("INSERT INTO requests (request_code,employee_id,type,from_date,to_date,reason,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,'Test data for dashboard','{\"demo\":true}',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(request_code) DO NOTHING")
       .bind(requestCode,employee.id,requestType,today,today,requestStatus,requestStage).run();
   }
+
+  const demoOwner=await d1.prepare("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' AND r.name IN ('Super Admin','HR Manager') ORDER BY CASE r.name WHEN 'Super Admin' THEN 0 ELSE 1 END,u.id LIMIT 1").first<{id:number}>();
+  if(!demoOwner)throw new Response("Create an active administrator before enabling test data",{status:400});
+  const dueDate=new Date(Date.now()+45*86400000).toISOString().slice(0,10),endDate=new Date(Date.now()+90*86400000).toISOString().slice(0,10);
+  const networking=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Networking & IT Essentials','Sanad Learning','online','[SANAD_DEMO_DATA] Practical networking, infrastructure, troubleshooting, and IT support.',?,?,'active',1,24,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
+  const programming=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Modern Programming Fundamentals','Sanad Engineering Academy','internal','[SANAD_DEMO_DATA] Programming practices, clean code, testing, and secure delivery.',?,?,'active',1,12,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
+  const isNetworkingEmployee=(employee:typeof employees[number])=>/el\s*shewy|الشيو/i.test(`${employee.name_en} ${employee.name_ar}`)||/IT Systems|نظم/i.test(`${employee.department_name} ${employee.department_name_ar}`);
+  const isProgrammingEmployee=(employee:typeof employees[number])=>/Software Development|برمجة/i.test(`${employee.department_name} ${employee.department_name_ar}`);
+  for(const employee of employees){
+    if(isNetworkingEmployee(employee))await d1.prepare("INSERT INTO training_enrollments(course_id,employee_id,status,due_date,assigned_by_user_id,created_at,updated_at) VALUES (?,?,'in_progress',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(course_id,employee_id) DO NOTHING").bind(networking!.id,employee.id,dueDate,demoOwner.id).run();
+    if(isProgrammingEmployee(employee))await d1.prepare("INSERT INTO training_enrollments(course_id,employee_id,status,due_date,assigned_by_user_id,created_at,updated_at) VALUES (?,?,'assigned',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(course_id,employee_id) DO NOTHING").bind(programming!.id,employee.id,dueDate,demoOwner.id).run();
+  }
+
+  const reviewCycle=await d1.prepare("INSERT INTO performance_cycles(name,cycle_type,start_date,end_date,status,department_ids,hr_review_required,created_by_user_id,created_at,updated_at) VALUES ('TEST-DEMO | 2026 Performance Review','annual','2026-01-01','2026-12-31','active','demo:all',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(demoOwner.id).first<{id:number}>();
+  for(let index=0;index<employees.length;index++){
+    const employee=employees[index],reviewStatus=index%4===3?"completed":index%4===2?"self_review":"draft",completed=reviewStatus==="completed",selfSubmitted=reviewStatus!=="draft";
+    const review=await d1.prepare("INSERT INTO performance_reviews(cycle_id,employee_id,manager_employee_id,status,self_review,self_rating,manager_review,manager_rating,hr_review,hr_rating,final_score,finalized_by_user_id,finalized_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(reviewCycle!.id,employee.id,employee.review_manager_id||null,reviewStatus,selfSubmitted?"Demo self-review submitted":null,selfSubmitted?4.2:null,completed?"Demo manager review completed":null,completed?4.3:null,completed?"Demo HR approval":null,completed?4.4:null,completed?86:null,completed?demoOwner.id:null,completed).first<{id:number}>();
+    const specializedNetworking=isNetworkingEmployee(employee),specializedProgramming=isProgrammingEmployee(employee);
+    const goalTitles=specializedNetworking?["Network reliability and uptime","IT support response quality"]:specializedProgramming?["Programming delivery and code quality","Automated testing and secure development"]:["Role objectives delivery","Professional growth and collaboration"];
+    for(const title of goalTitles)await d1.prepare("INSERT INTO performance_goals(review_id,title,description,target,measurement_type,actual_result,weight,progress,result,employee_rating,manager_rating,created_by_user_id,created_at,updated_at) VALUES (?,?,?, '100','percentage',?,50,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(review!.id,title,"[SANAD_DEMO_DATA] Role-relevant performance objective",selfSubmitted?"86":null,selfSubmitted?86:0,selfSubmitted?86:null,selfSubmitted?4.2:null,completed?4.3:null,demoOwner.id).run();
+  }
 }
 
 async function deleteDemoData(d1:PostgresDatabase){
   const testEmployees="SELECT id FROM employees WHERE employee_code LIKE 'TEST-%'";
   const testRequests=`SELECT id FROM requests WHERE request_code LIKE 'TEST-REQ-%' OR employee_id IN (${testEmployees})`;
+  const demoReviews="SELECT r.id FROM performance_reviews r JOIN performance_cycles c ON c.id=r.cycle_id WHERE c.name LIKE 'TEST-DEMO | %'";
+  const demoCourses="SELECT id FROM training_courses WHERE description LIKE '[SANAD_DEMO_DATA]%'";
+  await d1.prepare(`DELETE FROM performance_comments WHERE review_id IN (${demoReviews})`).run();
+  await d1.prepare(`DELETE FROM performance_goals WHERE review_id IN (${demoReviews})`).run();
+  await d1.prepare(`DELETE FROM performance_reviews WHERE id IN (${demoReviews})`).run();
+  await d1.prepare("DELETE FROM performance_cycles WHERE name LIKE 'TEST-DEMO | %'").run();
+  await d1.prepare(`DELETE FROM training_enrollments WHERE course_id IN (${demoCourses})`).run();
+  await d1.prepare(`DELETE FROM training_courses WHERE id IN (${demoCourses})`).run();
   await d1.prepare(`DELETE FROM approvals WHERE request_id IN (${testRequests})`).run();
   await d1.prepare(`DELETE FROM requests WHERE request_code LIKE 'TEST-REQ-%' OR employee_id IN (${testEmployees})`).run();
   await d1.prepare(`DELETE FROM daily_attendance WHERE note='Test data' OR employee_id IN (${testEmployees})`).run();
@@ -286,18 +324,19 @@ export async function GET(request: Request) {
     await ensureSeed(d1);
     const portalSession = await requirePortalSession(request,d1);
     const user = await currentUser(d1,portalSession.userId);
-    await authorize(d1,user,"dashboard","view");
     const canPayroll = await can(d1,user,"payroll","view");
-    const canViewUsers=await can(d1,user,"users","view"),canViewPermissions=await can(d1,user,"permissions","view"),canViewSettings=await can(d1,user,"system_settings","view");
+    const canViewUsers=await can(d1,user,"users","view"),canViewPermissions=await can(d1,user,"permissions","view"),canViewSettings=await can(d1,user,"system_settings","view"),canCreateEmployees=await can(d1,user,"employees","create");
     const fullCompany=user.role_name==="Super Admin"||user.role_name==="HR Manager";
     let departmentIds:number[]=[];
     if(user.role_name==="Department Manager"&&user.employee_id){
       departmentIds=(await d1.prepare("WITH RECURSIVE managed AS (SELECT id FROM departments WHERE manager_employee_id=? AND status!='deleted' UNION ALL SELECT d.id FROM departments d JOIN managed m ON d.parent_id=m.id WHERE d.status!='deleted') SELECT DISTINCT id FROM managed").bind(user.employee_id).all<{id:number}>()).results.map(row=>Number(row.id));
-      if(user.department_id&&!departmentIds.includes(Number(user.department_id)))departmentIds.push(Number(user.department_id));
     }
     const departmentList=departmentIds.length?departmentIds.map(Number).join(","):"-1";
-    const employeeScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`e.department_id IN (${departmentList})`:`e.id=${Number(user.employee_id)||-1}`;
-    const departmentScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`d.id IN (${departmentList})`:`d.id=${Number(user.department_id)||-1}`;
+    const visibleDepartmentIds=[...departmentIds];
+    if(user.department_id&&!visibleDepartmentIds.includes(Number(user.department_id)))visibleDepartmentIds.push(Number(user.department_id));
+    const visibleDepartmentList=visibleDepartmentIds.length?visibleDepartmentIds.join(","):"-1";
+    const employeeScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR e.department_id IN (${departmentList}))`:`e.id=${Number(user.employee_id)||-1}`;
+    const departmentScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`d.id IN (${visibleDepartmentList})`:`d.id=${Number(user.department_id)||-1}`;
     const safeEmployeeColumns="e.id,e.employee_code,e.name_en,e.name_ar,e.work_email,e.work_phone,e.department_id,e.job_title_id,e.manager_id,e.organizational_level,e.start_date,e.end_date,e.employment_status,e.country,e.work_location,e.employment_type,e.schedule_type,e.work_days,e.check_in_time,e.check_out_time,e.grace_minutes,e.required_daily_minutes,e.avatar_url,e.created_at,e.updated_at";
     const employeeColumns=fullCompany||user.role_name==="Employee"?"e.*":safeEmployeeColumns;
     const employeeIdParam = user.employee_id ?? 0;
@@ -306,13 +345,13 @@ export async function GET(request: Request) {
     const [employeeRows,departmentRows,jobRows,requestRows,attendanceRows,holidayRows,leaveTypeRows,roleRows,userRows,auditRows,settingRows] = await Promise.all([
       d1.prepare(`SELECT ${employeeColumns},d.name_en AS department_name,d.name_ar AS department_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,m.id AS org_manager_id,m.name_en AS manager_name,m.name_ar AS manager_name_ar FROM employees e LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN departments pd ON pd.id=d.parent_id LEFT JOIN job_titles j ON j.id=e.job_title_id LEFT JOIN employees m ON m.id=CASE WHEN e.manager_id IS NOT NULL AND e.manager_id<>e.id THEN e.manager_id WHEN d.manager_employee_id IS NOT NULL AND d.manager_employee_id<>e.id THEN d.manager_employee_id WHEN pd.manager_employee_id IS NOT NULL AND pd.manager_employee_id<>e.id THEN pd.manager_employee_id ELSE NULL END WHERE e.employment_status!='deleted' AND ${employeeScope} AND ${demoEmployeeFilter} ORDER BY e.department_id,e.organizational_level,e.name_en LIMIT 250`).all(),
       d1.prepare(`SELECT d.*,dm.name_en AS manager_name,dm.name_ar AS manager_name_ar,dm.employee_code AS manager_code,COUNT(e.id) AS employee_count FROM departments d LEFT JOIN employees dm ON dm.id=d.manager_employee_id LEFT JOIN employees e ON e.department_id=d.id AND e.employment_status!='deleted' AND ${demoEmployeeFilter} WHERE ${departmentScope} GROUP BY d.id,dm.name_en,dm.name_ar,dm.employee_code ORDER BY d.name_en`).all(),
-      d1.prepare(`SELECT j.*,d.name_en AS department_name,d.name_ar AS department_name_ar,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id AND ${demoEmployeeFilter} WHERE ${fullCompany?"TRUE":`j.department_id IN (${departmentList})`} GROUP BY j.id,d.name_en,d.name_ar ORDER BY j.name_en`).all(),
+      d1.prepare(`SELECT j.*,d.name_en AS department_name,d.name_ar AS department_name_ar,COUNT(e.id) AS employee_count FROM job_titles j LEFT JOIN departments d ON d.id=j.department_id LEFT JOIN employees e ON e.job_title_id=j.id AND ${demoEmployeeFilter} WHERE ${fullCompany?"TRUE":`j.department_id IN (${visibleDepartmentList})`} GROUP BY j.id,d.name_en,d.name_ar ORDER BY j.name_en`).all(),
       d1.prepare(`SELECT q.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.country AS country,d.name_en AS department_name,d.name_ar AS department_name_ar FROM requests q JOIN employees e ON e.id=q.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY q.id DESC LIMIT 250`).all(),
       d1.prepare(`SELECT a.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${employeeScope} AND ${demoEmployeeFilter} ORDER BY a.work_date DESC,a.id DESC LIMIT 250`).all(),
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
       d1.prepare(user.role_name==="Employee"?"SELECT lt.* FROM leave_types lt WHERE lt.status!='archived' AND EXISTS (SELECT 1 FROM employee_leave_types elt WHERE elt.employee_id=? AND elt.leave_type_id=lt.id) ORDER BY lt.id":"SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").bind(...(user.role_name==="Employee"?[employeeIdParam]:[])).all(),
-      canViewPermissions?d1.prepare("SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id WHERE r.name IN ('Super Admin','HR Manager','Department Manager','Employee') GROUP BY r.id ORDER BY r.id").all():Promise.resolve({results:[]}),
-      canViewUsers?d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.must_change_password,u.last_login_at,u.role_id,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY u.id").all():Promise.resolve({results:[]}),
+      (canViewPermissions||canViewUsers||canCreateEmployees)?d1.prepare(`SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id ${user.role_name==="Super Admin"?"":"WHERE r.is_system=1 AND r.name IN ('Department Manager','Employee')"} GROUP BY r.id ORDER BY r.is_system DESC,r.id`).all():Promise.resolve({results:[]}),
+      canViewUsers?d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.must_change_password,u.last_login_at,u.role_id,r.name AS role_name,r.name_en AS role_name_en,r.name_ar AS role_name_ar,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id ORDER BY u.id").all():Promise.resolve({results:[]}),
       user.role_name==="Super Admin"?d1.prepare("SELECT a.*,u.email AS user_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50").all():Promise.resolve({results:[]}),
       canViewSettings?d1.prepare("SELECT setting_key,value_json,updated_at FROM system_settings ORDER BY setting_key").all():Promise.resolve({results:[]}),
     ]);
@@ -358,8 +397,8 @@ export async function GET(request: Request) {
         ? d1.prepare("SELECT * FROM insurance_rates ORDER BY country,effective_from DESC LIMIT 200").all()
         : emptyResults,
     ]);
-    const pageModules:Record<string,string>={dashboard:"dashboard",portal:"employee_portal",approvals:"request_approvals",employees:"employees",leave:"leave_management",attendance:"attendance",org:"organization_chart",users:"users",payroll:"payroll",settings:"system_settings"};
-    const allowedPages=(await Promise.all(Object.entries(pageModules).map(async([page,module])=>await can(d1,user,module,"view")?page:null))).filter(Boolean);
+    const pageModules:Record<string,string[]>={dashboard:["dashboard"],portal:["employee_portal"],approvals:["request_approvals"],employees:["employees"],leave:["leave_management"],attendance:["attendance"],performance:["performance"],recruitment:["recruitment"],lifecycle:["onboarding","offboarding"],assets:["assets"],learning:["learning"],org:["organization_chart"],users:["users"],reports:["reports"],payroll:["payroll"],settings:["system_settings"]};
+    const allowedPages=(await Promise.all(Object.entries(pageModules).map(async([page,modules])=>(await Promise.all(modules.map(module=>can(d1,user,module,"view")))).some(Boolean)?page:null))).filter(Boolean);
     return Response.json({ currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leavePolicies:leavePolicyRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiError(error); }
   finally { await d1.close(); }
@@ -375,37 +414,52 @@ export async function POST(request: Request) {
     await enforceRateLimit(d1,request,"hr-write",240,60,user.id);
     const payload=await request.json() as Json;
     const action=required(payload.action,"action");
+    if(action==="create_role"){
+      await authorize(d1,user,"permissions","manage_settings");
+      const nameEn=required(payload.nameEn,"English role name"),nameAr=required(payload.nameAr,"Arabic role name"),cloneRoleId=Number(payload.cloneRoleId)||0;
+      const duplicate=await d1.prepare("SELECT id FROM roles WHERE lower(COALESCE(name_en,name))=lower(?) OR name_ar=?").bind(nameEn,nameAr).first<{id:number}>();if(duplicate)throw new Response("A role with this name already exists",{status:409});
+      const key=`custom:${nameEn.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"role"}:${Date.now()}`;
+      const created=await d1.transaction(async tx=>{
+        const role=await tx.prepare("INSERT INTO roles(name,name_en,name_ar,description,is_system,created_at,updated_at) VALUES (?,?,?,?,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(key,nameEn,nameAr,clean(payload.description,1000)||null).first<{id:number}>();
+        const sourceId=cloneRoleId||Number((await tx.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>())?.id);
+        const universe=(await tx.prepare("SELECT DISTINCT module,action FROM permissions ORDER BY module,action").all()).results as {module:string;action:string}[];
+        const source=(await tx.prepare("SELECT module,action,allowed FROM permissions WHERE role_id=?").bind(sourceId).all()).results as {module:string;action:string;allowed:number}[];
+        const allowed=new Map(source.map(item=>[`${item.module}:${item.action}`,Number(item.allowed)]));
+        for(const item of universe)await tx.prepare("INSERT INTO permissions(role_id,module,action,allowed) VALUES (?,?,?,?)").bind(role!.id,item.module,item.action,allowed.get(`${item.module}:${item.action}`)||0).run();
+        return role!.id;
+      });
+      await audit(d1,request,user,"create","permissions","role",String(created),null,{nameEn,nameAr,cloneRoleId:cloneRoleId||null});
+      return Response.json({ok:true,id:created},{status:201});
+    }
     if(action==="create_user"){
       await authorize(d1,user,"users","edit");
       const employeeId=Number(payload.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
-      const roleName=required(payload.roleName,"Role");if(!SYSTEM_ROLES.includes(roleName as typeof SYSTEM_ROLES[number]))throw new Response("Invalid system role",{status:400});
-      if(user.role_name==="HR Manager"&&!['Department Manager','Employee'].includes(roleName))throw new Response("HR can create employee and department-manager accounts only",{status:403});
+      const roleId=Number(payload.roleId)||0,role=roleId?await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(roleId).first<{id:number;name:string;is_system:number}>():await d1.prepare("SELECT id,name,is_system FROM roles WHERE name=?").bind(required(payload.roleName,"Role")).first<{id:number;name:string;is_system:number}>();if(!role)throw new Response("Invalid access role",{status:400});
+      if(user.role_name==="HR Manager"&&(Number(role.is_system)!==1||!['Department Manager','Employee'].includes(role.name)))throw new Response("HR can assign employee and department-manager roles only",{status:403});
       const employee=await d1.prepare("SELECT id,work_email,employment_status FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<{id:number;work_email:string|null;employment_status:string}>();
       const email=clean(employee?.work_email).toLowerCase();if(!employee||!email)throw new Response("The employee must have a work email",{status:400});
       if(!['active','probation','notice_period'].includes(employee.employment_status))throw new Response("Only current employees can receive an active account",{status:400});
       const existing=await d1.prepare("SELECT id FROM users WHERE employee_id=? OR lower(email)=lower(?)").bind(employeeId,email).first<{id:number}>();if(existing)throw new Response("An account already exists for this employee or email",{status:409});
-      const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
       const passwordHash=await hashPassword(DEFAULT_USER_PASSWORD);
       const created=await d1.prepare("INSERT INTO users (email,employee_id,role_id,status,password_hash,must_change_password,session_version,failed_login_attempts,created_at,updated_at) VALUES (?,?,?,'active',?,1,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(email,employeeId,role!.id,passwordHash).first<{id:number}>();
-      await audit(d1,request,user,"create","users","user",String(created!.id),null,{employeeId,email,roleName,mustChangePassword:true});
+      await audit(d1,request,user,"create","users","user",String(created!.id),null,{employeeId,email,roleId:role.id,roleName:role.name,mustChangePassword:true});
       return Response.json({ok:true,id:created!.id,defaultPassword:DEFAULT_USER_PASSWORD},{status:201});
     }
     if(action==="save_user"){
       await authorize(d1,user,"users","edit");
       const targetUserId=Number(payload.userId);if(!targetUserId)throw new Response("User is required",{status:400});
-      const roleName=required(payload.roleName,"Role");if(!SYSTEM_ROLES.includes(roleName as typeof SYSTEM_ROLES[number]))throw new Response("Invalid system role",{status:400});
+      const requestedRoleId=Number(payload.roleId)||0,requestedRole=requestedRoleId?await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(requestedRoleId).first<{id:number;name:string;is_system:number}>():await d1.prepare("SELECT id,name,is_system FROM roles WHERE name=?").bind(required(payload.roleName,"Role")).first<{id:number;name:string;is_system:number}>();if(!requestedRole)throw new Response("Invalid access role",{status:400});const roleName=requestedRole.name;
       const status=clean(payload.status)==="disabled"?"disabled":"active";
       const before=await d1.prepare("SELECT u.id,u.email,u.role_id,u.status,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?").bind(targetUserId).first<Record<string,unknown>>();
       if(!before)throw new Response("User not found",{status:404});
-      if(user.role_name==="HR Manager"&&(!["Department Manager","Employee"].includes(roleName)||["Super Admin","HR Manager"].includes(String(before.role_name))))throw new Response("HR can manage employee and department-manager accounts only",{status:403});
+      if(user.role_name==="HR Manager"&&(Number(requestedRole.is_system)!==1||!["Department Manager","Employee"].includes(roleName)||["Super Admin","HR Manager"].includes(String(before.role_name))))throw new Response("HR can manage employee and department-manager accounts only",{status:403});
       if(before.role_name==="Super Admin"&&(roleName!=="Super Admin"||status!=="active")){
         const admins=await d1.prepare("SELECT COUNT(*)::int AS count FROM users u JOIN roles r ON r.id=u.role_id WHERE r.name='Super Admin' AND u.status='active'").first<{count:number}>();
         if(Number(admins?.count)<=1)throw new Response("The last active system administrator cannot be changed",{status:400});
       }
-      const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
       const temporaryPassword=clean(payload.temporaryPassword,200);let passwordHash:string|null=null;
       if(temporaryPassword){if(temporaryPassword.length<4)throw new Response("Temporary password must be at least 4 characters",{status:400});passwordHash=await hashPassword(temporaryPassword);}
-      await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(role!.id,status,passwordHash,passwordHash,targetUserId).run();
+      await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(requestedRole.id,status,passwordHash,passwordHash,targetUserId).run();
       await audit(d1,request,user,"update","users","user",String(targetUserId),before,{roleName,status,passwordReset:Boolean(passwordHash)});
       return Response.json({ok:true});
     }
@@ -413,6 +467,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"employees","create");
       const nameEn=required(payload.nameEn,"English name"), nameAr=required(payload.nameAr,"Arabic name"), email=required(payload.workEmail,"Work email").toLowerCase();
       const departmentId=Number(payload.departmentId)||null;
+      const accessRoleId=Number(payload.accessRoleId)||Number((await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>())?.id),accessRole=await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(accessRoleId).first<{id:number;name:string;is_system:number}>();if(!accessRole)throw new Response("Access role is required",{status:400});if(user.role_name==="HR Manager"&&(Number(accessRole.is_system)!==1||!["Department Manager","Employee"].includes(accessRole.name)))throw new Response("HR can assign employee and department-manager roles only",{status:403});const passwordHash=await hashPassword(DEFAULT_USER_PASSWORD);
       const created=await d1.transaction(async tx=>{
         const structure=departmentId?await tx.prepare("SELECT COALESCE(d.manager_employee_id,pd.manager_employee_id) AS manager_employee_id FROM departments d LEFT JOIN departments pd ON pd.id=d.parent_id WHERE d.id=? AND d.status!='deleted'").bind(departmentId).first<{manager_employee_id:number|null}>():null;
         const managerId=Number(structure?.manager_employee_id)||null;
@@ -420,9 +475,10 @@ export async function POST(request: Request) {
         await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
           .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
         await syncEmployeeLeaveTypes(tx,result.id,payload.leaveTypeIds,user.id);
+        await tx.prepare("INSERT INTO users(email,employee_id,role_id,status,password_hash,must_change_password,session_version,failed_login_attempts,created_at,updated_at) VALUES (?,?,?,'active',?,1,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(email,result.id,accessRole.id,passwordHash).run();
         return result;
       });
-      await audit(d1,request,user,"create","employees","employee",String(created.id),null,{code:created.code,nameEn,email});
+      await audit(d1,request,user,"create","employees","employee",String(created.id),null,{code:created.code,nameEn,email,accessRoleId:accessRole.id});
       return Response.json({ok:true,id:created.id,employeeCode:created.code},{status:201});
     }
     if(action==="update_employee") {
@@ -481,6 +537,34 @@ export async function POST(request: Request) {
       });
       await audit(d1,request,user,"create","departments","department",String(result.id),null,{nameEn,nameAr,parentId,managerEmployeeId,employeeIds});
       return Response.json({ok:true,id:result.id},{status:201});
+    }
+    if(action==="save_department_parents") {
+      await authorize(d1,user,"departments","edit");
+      const assignments=Array.isArray(payload.assignments)?payload.assignments:[];
+      if(!assignments.length)return Response.json({ok:true,updated:0});
+      const departmentRows=(await d1.prepare("SELECT id,parent_id FROM departments WHERE status!='deleted'").all<{id:number;parent_id:number|null}>()).results;
+      const validIds=new Set(departmentRows.map(row=>Number(row.id)));
+      const proposedParents=new Map(departmentRows.map(row=>[Number(row.id),Number(row.parent_id)||null]));
+      const updates:{departmentId:number;parentId:number|null;previousParentId:number|null}[]=[];
+      const seen=new Set<number>();
+      for(const assignment of assignments as Record<string,unknown>[]){
+        const departmentId=Number(assignment.departmentId),parentId=Number(assignment.parentId)||null;
+        if(!departmentId||!validIds.has(departmentId))throw new Response("Department not found",{status:404});
+        if(seen.has(departmentId))throw new Response("Each department can only be updated once",{status:400});
+        if(parentId&&!validIds.has(parentId))throw new Response("Parent department not found",{status:404});
+        if(parentId===departmentId)throw new Response("A department cannot be its own parent",{status:400});
+        seen.add(departmentId);
+        const previousParentId=proposedParents.get(departmentId)||null;
+        proposedParents.set(departmentId,parentId);
+        if(previousParentId!==parentId)updates.push({departmentId,parentId,previousParentId});
+      }
+      for(const departmentId of validIds){
+        const visited=new Set<number>();let current:number|null=departmentId;
+        while(current){if(visited.has(current))throw new Response("The department hierarchy cannot contain a cycle",{status:400});visited.add(current);current=proposedParents.get(current)||null;}
+      }
+      await d1.transaction(async tx=>{for(const update of updates)await tx.prepare("UPDATE departments SET parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(update.parentId,update.departmentId).run();});
+      for(const update of updates)await audit(d1,request,user,"update","departments","department",String(update.departmentId),{parentId:update.previousParentId},{parentId:update.parentId});
+      return Response.json({ok:true,updated:updates.length});
     }
     if(action==="save_department") {
       const departmentId=Number(payload.departmentId)||null;
@@ -609,7 +693,6 @@ export async function POST(request: Request) {
       }
       const managerEmployeeId=Number(payload.managerEmployeeId)||null;
       if(managerEmployeeId&&!employeeById.has(managerEmployeeId)) throw new Response("Department manager not found",{status:404});
-      if(managerEmployeeId&&!selectedIds.has(managerEmployeeId)) throw new Response("The department manager must belong to the department",{status:400});
       let inheritedManagerId:number|null=null,ancestorId=parentId;const checkedAncestors=new Set<number>();
       while(!managerEmployeeId&&ancestorId&&!checkedAncestors.has(ancestorId)){
         checkedAncestors.add(ancestorId);
@@ -648,7 +731,7 @@ export async function POST(request: Request) {
       const departmentId=Number(payload.departmentId), managerEmployeeId=Number(payload.managerEmployeeId);
       if(!departmentId||!managerEmployeeId) throw new Response("Department and manager are required",{status:400});
       const members=(await d1.prepare("SELECT id,manager_id FROM employees WHERE department_id=? AND employment_status!='deleted'").bind(departmentId).all()).results as {id:number;manager_id:number|null}[];
-      if(!members.some(member=>Number(member.id)===managerEmployeeId)) throw new Response("The department manager must belong to this department",{status:400});
+      if(!await d1.prepare("SELECT id FROM employees WHERE id=? AND employment_status!='deleted'").bind(managerEmployeeId).first()) throw new Response("Department manager not found",{status:404});
       const supplied=Array.isArray(payload.assignments)?payload.assignments as Json[]:[];
       const memberIds=new Set(members.map(member=>Number(member.id)));
       const parents=new Map<number,number|null>();
@@ -656,7 +739,7 @@ export async function POST(request: Request) {
         const assignment=supplied.find(item=>Number(item.employeeId)===Number(member.id));
         const requested=Number(assignment?.managerId)||null;
         const parent=Number(member.id)===managerEmployeeId?null:(requested||managerEmployeeId);
-        if(parent!==null&&!memberIds.has(parent)) throw new Response("Every direct manager must belong to the same department",{status:400});
+        if(parent!==null&&parent!==managerEmployeeId&&!memberIds.has(parent)) throw new Response("Every direct manager must belong to the same department or be its department manager",{status:400});
         if(parent===Number(member.id)) throw new Response("An employee cannot manage themselves",{status:400});
         parents.set(Number(member.id),parent);
       }

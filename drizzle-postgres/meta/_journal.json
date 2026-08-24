@@ -127,6 +127,13 @@
       "when": 1787500482275,
       "tag": "0017_lame_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787501000000,
+      "tag": "0018_access_role_templates",
+      "breakpoints": true
     }
   ]
 }

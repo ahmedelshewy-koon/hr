@@ -38,7 +38,7 @@ export const employees = pgTable("employees", {
 }, (t) => [uniqueIndex("idx_employees_employee_code").on(t.employeeCode), uniqueIndex("idx_employees_work_email").on(t.workEmail), index("idx_employees_department_status").on(t.departmentId, t.employmentStatus), index("idx_employees_manager").on(t.managerId)]);
 
 export const roles = pgTable("roles", {
-  id: serial("id").primaryKey(), name: text("name").notNull(), description: text("description"), isSystem: integer("is_system").notNull().default(0), ...timestamps,
+  id: serial("id").primaryKey(), name: text("name").notNull(), nameEn: text("name_en"), nameAr: text("name_ar"), description: text("description"), isSystem: integer("is_system").notNull().default(0), ...timestamps,
 }, (t) => [uniqueIndex("idx_roles_name").on(t.name)]);
 
 export const users = pgTable("users", {

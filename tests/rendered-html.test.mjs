@@ -54,6 +54,7 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /const shownDepartments=\(data\?\.departments\s*\?\?\s*\[\]\)/);
   assert.match(app, /Managing Director\|العضو المنتدب/);
   assert.match(app, /org-department-grid/);
+  assert.match(app, /pageStyle\.textContent="@page \{ size: A4 landscape; margin: 8mm; \}"/);
   assert.match(app, /<h1 className="dashboard-title">\{rtl\?"لوحة التحكم":"Dashboard"\}<\/h1>/);
   assert.match(app, /function PageHeader\(\{title,action\}/);
   assert.match(app, /rtl\?"عدد الموظفين":"Employees"/);
@@ -88,6 +89,21 @@ test("provides personal account login, password change, and logout controls", as
   assert.match(portalAuth, /HttpOnly; SameSite=Lax/);
   assert.match(portalAuth, /PBKDF2/);
   assert.match(portalAuth, /sessionVersion/);
+});
+
+test("creates employee login accounts only from access management with the requested default password", async () => {
+  const [app, authRoute, hrRoute, employeeService] = await Promise.all([
+    readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/employees/employee-service.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(hrRoute, /action==="create_user"/);
+  assert.match(hrRoute, /DEFAULT_USER_PASSWORD = "123456"/);
+  assert.match(hrRoute, /must_change_password/);
+  assert.match(app, /ريست إلى 123456/);
+  assert.match(authRoute, /newPassword\.length<4/);
+  assert.doesNotMatch(employeeService, /INSERT INTO users/);
 });
 
 test("enforces four-role server-side data scope", async () => {

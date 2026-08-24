@@ -5,7 +5,7 @@ type Row=Record<string,unknown>;
 async function employeeScope(db:ReturnType<typeof createDatabase>,actor:{roleName:string;employeeId:number|null}){
   if(["Super Admin","HR Manager"].includes(actor.roleName))return null;
   if(actor.roleName==="Employee")return actor.employeeId?[actor.employeeId]:[];
-  if(actor.roleName==="Department Manager"&&actor.employeeId){const rows=(await db.prepare("WITH RECURSIVE managed AS (SELECT id FROM departments WHERE manager_employee_id=? AND status!='deleted' UNION ALL SELECT d.id FROM departments d JOIN managed m ON d.parent_id=m.id WHERE d.status!='deleted') SELECT e.id FROM employees e WHERE e.department_id IN (SELECT id FROM managed) AND e.employment_status!='deleted'").bind(actor.employeeId).all()).results;return rows.map(row=>Number(row.id));}
+  if(actor.roleName==="Department Manager"&&actor.employeeId){const rows=(await db.prepare("WITH RECURSIVE managed AS (SELECT id FROM departments WHERE manager_employee_id=? AND status!='deleted' UNION ALL SELECT d.id FROM departments d JOIN managed m ON d.parent_id=m.id WHERE d.status!='deleted') SELECT e.id FROM employees e WHERE e.department_id IN (SELECT id FROM managed) AND e.employment_status!='deleted'").bind(actor.employeeId).all()).results;return [...new Set([actor.employeeId,...rows.map(row=>Number(row.id))])];}
   return [];
 }
 export async function GET(request:Request){const db=createDatabase();try{

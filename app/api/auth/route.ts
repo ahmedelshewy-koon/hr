@@ -5,6 +5,9 @@ import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
 
 type LoginUser = { id:number; email:string; password_hash:string|null; password_changed_at?:string|null; status:string; session_version:number; failed_login_attempts:number; locked_until:string|null; must_change_password:number; role_name:string; employee_id:number|null; employee_status:string|null };
 
+const PAGE_MODULES:Record<string,string[]>={dashboard:["dashboard"],portal:["employee_portal"],approvals:["request_approvals"],employees:["employees"],leave:["leave_management"],attendance:["attendance"],performance:["performance"],recruitment:["recruitment"],lifecycle:["onboarding","offboarding"],assets:["assets"],learning:["learning"],org:["organization_chart"],users:["users"],reports:["reports"],payroll:["payroll"],settings:["system_settings"]};
+async function allowedPagesForUser(d1:PostgresDatabase,userId:number,roleName:string){if(roleName==="Super Admin")return Object.keys(PAGE_MODULES);const rows=(await d1.prepare("SELECT p.module FROM users u JOIN permissions p ON p.role_id=u.role_id WHERE u.id=? AND p.action='view' AND p.allowed=1").bind(userId).all()).results as {module:string}[];const modules=new Set(rows.map(row=>row.module));return Object.entries(PAGE_MODULES).filter(([,required])=>required.some(module=>modules.has(module))).map(([page])=>page);}
+
 async function requirePlatformAccess(request: Request) {
   const user = await getChatGPTUser();
   const hostname = new URL(request.url).hostname;
@@ -45,8 +48,9 @@ export async function GET(request: Request) {
     await requirePlatformAccess(request);await ensureAuthSchema(d1);
     const session = await readPortalSession(request);
     if (!session) return Response.json({ authenticated:false, user:null }, { headers:noStore });
-    const user = await d1.prepare("SELECT u.id,u.email,u.status,u.session_version,u.must_change_password,u.employee_id,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=?").bind(session.userId).first<Record<string,unknown>>();
+    const user = await d1.prepare("SELECT u.id,u.email,u.status,u.session_version,u.must_change_password,u.employee_id,r.name AS role_name,r.name_en AS role_name_en,r.name_ar AS role_name_ar,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=?").bind(session.userId).first<Record<string,unknown>>();
     const valid=Boolean(user&&user.status==="active"&&Number(user.session_version)===session.sessionVersion&&String(user.email).toLowerCase()===session.email);
+    if(valid)user!.allowed_pages=await allowedPagesForUser(d1,Number(user!.id),String(user!.role_name));
     return Response.json({ authenticated:valid, user:valid?user:null }, { headers:valid?noStore:{...noStore,"set-cookie":clearPortalSessionCookie(isSecure(request))} });
   } catch(error) { return error instanceof Response ? error : Response.json({ error:"Unable to check login" }, { status:500,headers:noStore }); }
   finally { await d1.close(); }
@@ -80,7 +84,8 @@ export async function POST(request: Request) {
     const expiryDays=Math.max(0,Number(securityValues.passwordExpiryDays)||0);if(expiryDays&&(!user!.password_hash||!user!.password_changed_at||new Date(user!.password_changed_at).getTime()<Date.now()-expiryDays*86400000)){user!.must_change_password=1;await d1.prepare("UPDATE users SET must_change_password=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(user!.id).run();}
     const sessionSeconds=Math.min(86400,Math.max(900,(Number(securityValues.sessionMinutes)||480)*60));
     const token = await createPortalSession(user!,sessionSeconds);
-    return Response.json({ authenticated:true, user:{id:user!.id,email:user!.email,role_name:user!.role_name,employee_id:user!.employee_id,must_change_password:user!.must_change_password} }, { headers:{ "set-cookie":portalSessionCookie(token,isSecure(request),sessionSeconds), ...noStore } });
+    const roleLabels=await d1.prepare("SELECT name_en,name_ar FROM roles WHERE name=?").bind(user!.role_name).first<{name_en:string|null;name_ar:string|null}>(),allowedPages=await allowedPagesForUser(d1,user!.id,user!.role_name);
+    return Response.json({ authenticated:true, user:{id:user!.id,email:user!.email,role_name:user!.role_name,role_name_en:roleLabels?.name_en,role_name_ar:roleLabels?.name_ar,employee_id:user!.employee_id,must_change_password:user!.must_change_password,allowed_pages:allowedPages} }, { headers:{ "set-cookie":portalSessionCookie(token,isSecure(request),sessionSeconds), ...noStore } });
   } catch(error) { return error instanceof Response ? error : Response.json({ error:"تعذر تسجيل الدخول" }, { status:500,headers:noStore }); }
   finally { await d1.close(); }
 }

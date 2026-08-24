@@ -121,6 +121,7 @@ function CompletionReport({rtl,lifecycle,tasks,assets,ownerOptions,close}:{rtl:b
   const employeeFields:[string,unknown][]=[
     [rtl?"اسم الموظف":"Employee Name",employee],[rtl?"الرقم الوظيفي":"Employee ID",lifecycle.employee_code],
     [rtl?"المسمى الوظيفي":"Job Title",rtl?(lifecycle.job_title_name_ar||lifecycle.job_title_name):lifecycle.job_title_name],
+    [rtl?"الشركة / الكيان":"Company / Entity",rtl?(lifecycle.organization_entity_name_ar||lifecycle.organization_entity_name):lifecycle.organization_entity_name],
     [rtl?"الإدارة / القسم":"Department",rtl?(lifecycle.department_name_ar||lifecycle.department_name):lifecycle.department_name],
     [rtl?"المدير المباشر":"Direct Manager",rtl?(lifecycle.manager_name_ar||lifecycle.manager_name):lifecycle.manager_name],
     [rtl?"البريد الوظيفي":"Work Email",lifecycle.work_email],[rtl?"نوع الإجراء":"Employment / Action Type",processLabel(lifecycle.lifecycle_type,rtl)],

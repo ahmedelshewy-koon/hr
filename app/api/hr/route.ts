@@ -22,7 +22,7 @@ const DEFAULT_USER_PASSWORD = "123456";
 const ROLE_DEFAULTS:Record<string,Record<string,readonly string[]>> = {
   "HR Manager": {
     dashboard:["view"], employee_portal:["view"], employee_requests:["view","create"], request_approvals:["view","approve"],
-    employees:["view","create","edit","export"], employee_salaries:["view","edit"], job_titles:["view","create","edit"], departments:["view","create","edit"],
+    employees:["view","create","edit","delete","export"], employee_salaries:["view","edit"], job_titles:["view","create","edit"], departments:["view","create","edit"],
     leave_management:["view","create","edit","delete","approve","export"], attendance:["view","create","edit","export"], attendance_adjustments:["view","edit","approve"],
     performance:["view","create","edit","delete","approve","export"], learning:["view","create","edit","delete","approve","export"],
     organization_chart:["view","edit"], users:["view","edit"], system_settings:["view","manage_settings"], reports:["view","export"], payroll:["view","create_run","edit_draft","approve","lock","reopen","view_own_payslip"],
@@ -500,6 +500,22 @@ export async function POST(request: Request) {
       await audit(d1,request,user,"update","employees","employee",String(employeeId),before,payload);
       return Response.json({ok:true,id:employeeId});
     }
+    if(action==="delete_employee") {
+      await authorize(d1,user,"employees","delete");
+      const employeeId=Number(payload.employeeId);
+      if(!employeeId)throw new Response("Employee is required",{status:400});
+      if(Number(user.employee_id)===employeeId)throw new Response("You cannot delete your own employee record",{status:400});
+      const before=await d1.prepare("SELECT * FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Record<string,unknown>>();
+      if(!before)throw new Response("Employee not found",{status:404});
+      await d1.transaction(async tx=>{
+        await tx.prepare("UPDATE users SET status='disabled',session_version=session_version+1,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(employeeId).run();
+        await tx.prepare("UPDATE departments SET manager_employee_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE manager_employee_id=?").bind(employeeId).run();
+        await tx.prepare("UPDATE employees SET manager_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE manager_id=? AND employment_status!='deleted'").bind(employeeId).run();
+        await tx.prepare("UPDATE employees SET employment_status='deleted',end_date=COALESCE(end_date,CURRENT_DATE::text),manager_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(employeeId).run();
+      });
+      await audit(d1,request,user,"delete","employees","employee",String(employeeId),before,{employmentStatus:"deleted",userDisabled:true});
+      return Response.json({ok:true,id:employeeId});
+    }
     if(action==="save_job_title") {
       const jobTitleId=Number(payload.jobTitleId)||null;
       await authorize(d1,user,"job_titles",jobTitleId?"edit":"create");
@@ -589,6 +605,29 @@ export async function POST(request: Request) {
       const result=await d1.prepare("INSERT INTO departments (name_en,name_ar,parent_id,status,created_at,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,status).first<{id:number}>();
       await audit(d1,request,user,"create","departments","department",String(result!.id),null,{nameEn,nameAr,parentId,status});
       return Response.json({ok:true,id:result!.id},{status:201});
+    }
+    if(action==="delete_department") {
+      await authorize(d1,user,"departments","delete");
+      const departmentId=Number(payload.departmentId)||0;
+      if(!departmentId)throw new Response("Department is required",{status:400});
+      const department=await d1.prepare("SELECT * FROM departments WHERE id=? AND status!='deleted'").bind(departmentId).first<Record<string,unknown>>();
+      if(!department)throw new Response("Department not found",{status:404});
+      const parentId=Number(department.parent_id)||null;
+      if(!parentId)throw new Response("The top-level executive department cannot be deleted",{status:400});
+      const parent=await d1.prepare("SELECT id,manager_employee_id FROM departments WHERE id=? AND status!='deleted'").bind(parentId).first<{id:number;manager_employee_id:number|null}>();
+      if(!parent)throw new Response("Parent department not found",{status:404});
+      const employeeCount=Number((await d1.prepare("SELECT COUNT(*) AS count FROM employees WHERE department_id=? AND employment_status!='deleted'").bind(departmentId).first<{count:number}>())?.count)||0;
+      const childCount=Number((await d1.prepare("SELECT COUNT(*) AS count FROM departments WHERE parent_id=? AND status!='deleted'").bind(departmentId).first<{count:number}>())?.count)||0;
+      const previousManagerId=Number(department.manager_employee_id)||null,parentManagerId=Number(parent.manager_employee_id)||null;
+      await d1.transaction(async tx=>{
+        await tx.prepare("UPDATE departments SET parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE parent_id=? AND status!='deleted'").bind(parentId,departmentId).run();
+        await tx.prepare("UPDATE employees SET department_id=?,manager_id=CASE WHEN id=?::integer THEN NULL ELSE ?::integer END,organizational_level=CASE WHEN id=?::integer THEN 0 ELSE GREATEST(organizational_level,1) END,updated_at=CURRENT_TIMESTAMP WHERE department_id=? AND employment_status!='deleted'").bind(parentId,parentManagerId,parentManagerId,parentManagerId,departmentId).run();
+        await tx.prepare("UPDATE job_titles SET department_id=?,updated_at=CURRENT_TIMESTAMP WHERE department_id=?").bind(parentId,departmentId).run();
+        await tx.prepare("UPDATE departments SET status='deleted',parent_id=NULL,manager_employee_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(departmentId).run();
+      });
+      if(previousManagerId){const employeeRole=await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>();if(employeeRole)await d1.prepare("UPDATE users SET role_id=?,session_version=session_version+1,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND role_id=(SELECT id FROM roles WHERE name='Department Manager') AND NOT EXISTS (SELECT 1 FROM departments WHERE manager_employee_id=? AND status!='deleted')").bind(employeeRole.id,previousManagerId,previousManagerId).run();}
+      await audit(d1,request,user,"delete","departments","department",String(departmentId),department,{status:"deleted",movedToDepartmentId:parentId,movedEmployees:employeeCount,promotedChildDepartments:childCount});
+      return Response.json({ok:true,departmentId,movedToDepartmentId:parentId,movedEmployees:employeeCount,promotedChildDepartments:childCount});
     }
     if(action==="save_system_settings") {
       await authorize(d1,user,"system_settings","manage_settings");

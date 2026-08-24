@@ -38,6 +38,7 @@
 .employee-card-actions{margin-top:auto;padding:8px 12px;border-top:1px solid var(--line);display:flex;justify-content:center;gap:8px}
 .employee-card-actions button{width:32px;height:32px;border:1px solid var(--line);border-radius:12px;background:white;color:#64748b;display:grid;place-items:center}
 .employee-card-actions button:hover{background:#eaf2ff;color:#2563eb;border-color:#c7dbfb}
+.employee-card-actions .employee-delete-action{color:#dc2626;border-color:#fecaca;background:#fff7f7}.employee-card-actions .employee-delete-action:hover{color:#b91c1c;border-color:#fca5a5;background:#feecec}
 .employee-view-switch{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:12px;background:#f8fafc}
 .filterbar .employee-view-switch button{width:34px;height:32px;padding:0;border:0;border-radius:9px;display:grid;place-items:center;background:transparent;color:#64748b}
 .filterbar .employee-view-switch button.active{background:white;color:#2563eb;box-shadow:0 1px 4px #0b1f4d14}

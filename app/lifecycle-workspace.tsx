@@ -5,6 +5,7 @@ import "./lifecycle-workspace.css";
 import "./lifecycle-admin.css";
 import "./lifecycle-report.css";
 import "./lifecycle-official.css";
+import {localizedDisplayValue} from "./localization";
 
 type Value=ReturnType<typeof JSON.parse>;type Row=Record<string,Value>;
 const api=async(path:string,payload?:Row):Promise<Row>=>{const response=await fetch(path,payload?{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}:{cache:"no-store"}),data=await response.json().catch(()=>({})) as Row;if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);return data;};
@@ -17,7 +18,7 @@ const date=(value:unknown,rtl:boolean,withTime=false)=>{
   return new Intl.DateTimeFormat(rtl?"ar-EG":"en-US",withTime?{dateStyle:"medium",timeStyle:"short"}:{year:"numeric",month:"short",day:"numeric"}).format(parsed);
 };
 const processLabel=(type:string,rtl:boolean)=>type==="onboarding"?(rtl?"تهيئة موظف جديد":"Onboarding"):(rtl?"إنهاء خدمة موظف":"Offboarding");
-const statusLabel=(status:string,rtl:boolean)=>({pending:rtl?"لم تبدأ":"Pending",in_progress:rtl?"قيد التنفيذ":"In Progress",completed:rtl?"مكتملة":"Completed",blocked:rtl?"متوقفة":"Blocked",cancelled:rtl?"ملغاة":"Cancelled"}[status]||status);
+const statusLabel=(status:string,rtl:boolean)=>({pending:rtl?"لم تبدأ":"Pending",in_progress:rtl?"قيد التنفيذ":"In Progress",completed:rtl?"مكتملة":"Completed",blocked:rtl?"متوقفة":"Blocked",cancelled:rtl?"ملغاة":"Cancelled"}[status]||localizedDisplayValue(status,rtl));
 const knownArabicTaskTitles:Record<string,string>={
   "employee documents":"استكمال مستندات التعيين",
   "account creation":"إنشاء حسابات العمل",
@@ -131,7 +132,7 @@ function CompletionReport({rtl,lifecycle,tasks,assets,ownerOptions,close}:{rtl:b
   if(!onboarding&&lifecycle.notes)employeeFields.push([rtl?"سبب الانفصال":"Separation Reason",lifecycle.notes]);
 
   return <div className="lifecycle-report-layer"><button className="lifecycle-scrim" onClick={close} aria-label={rtl?"إغلاق":"Close"}/><section className="lifecycle-report hr-record" dir={rtl?"rtl":"ltr"}>
-    <div className="report-controls"><button className="outline" onClick={close}><X size={16}/>{rtl?"إغلاق":"Close"}</button><button className="primary" onClick={()=>window.print()} disabled={!finalApproved}><Printer size={16}/>{rtl?"طباعة / حفظ PDF":"Print / Save PDF"}</button></div>
+    <div className="report-controls"><button className="outline" onClick={close}><X size={16}/>{rtl?"إغلاق":"Close"}</button><button className="primary" onClick={()=>window.print()} disabled={!finalApproved}><Printer size={16}/>{rtl?"طباعة أو حفظ مستند":"Print / Save PDF"}</button></div>
     <header className="record-header">
       <img src="/sanad-logo.png" alt={rtl?"شعار سند":"SANAD logo"}/>
       <div className="record-title">

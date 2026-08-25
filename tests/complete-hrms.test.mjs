@@ -4,7 +4,8 @@ import {readFile} from "node:fs/promises";
 const read=path=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
 const migration=await read("drizzle-postgres/0014_complete_hrms.sql");
 const performance=await read("app/api/performance/route.ts");
-const recruitment=await read("app/api/recruitment/route.ts");
+const recruitmentRoute=await read("app/api/recruitment/route.ts");
+const recruitment=await read("app/recruitment/recruitment-api.ts");
 const lifecycle=await read("app/api/lifecycle/route.ts");
 const lifecycleWorkspace=await read("app/lifecycle-workspace.tsx");
 const assets=await read("app/api/assets/route.ts");
@@ -17,7 +18,7 @@ test("complete HRMS migration creates every module table",()=>{for(const table o
 test("migration does not alter Payroll",()=>{assert.doesNotMatch(migration,/ALTER TABLE (?:payroll|salary|loans|tax|insurance)/i);});
 test("performance validates exact KPI weight and duplicate finalization",()=>{assert.match(performance,/KPI weights must total exactly 100/);assert.match(performance,/Review already finalized/);assert.match(performance,/final_score/);});
 test("performance enforces employee and manager scope",()=>{assert.match(performance,/Only the employee can submit/);assert.match(performance,/Manager scope required/);assert.match(performance,/requireEmployeeScope/);});
-test("ATS validates candidate stages and interviewer identity",()=>{assert.match(recruitment,/candidateMoves/);assert.match(recruitment,/Only the assigned interviewer/);assert.match(recruitment,/transition\(row\.stage,next,candidateMoves/);});
+test("ATS validates configured application stages and interviewer identity",()=>{assert.match(recruitment,/Only the next or previous configured stage may be selected/);assert.match(recruitment,/Only an assigned interviewer can evaluate this interview/);assert.match(recruitment,/Use accepted offer conversion to hire a candidate/);});
 test("ATS hire conversion uses the shared employee engine once",()=>{assert.match(recruitment,/createEmployeeRecord/);assert.match(recruitment,/Candidate already converted/);assert.match(migration,/idx_candidates_converted_employee/);});
 test("accepted offer starts onboarding",()=>{assert.match(recruitment,/lifecycle_type='onboarding'/);assert.match(recruitment,/lifecycle_tasks/);});
 test("lifecycle creates task ownership and overdue dates",()=>{assert.match(lifecycle,/nextOwner/);assert.match(lifecycle,/due_offset_days/);assert.match(lifecycle,/overdue_tasks/);});
@@ -27,7 +28,7 @@ test("offboarding blocks completion with unreturned assets",()=>{assert.match(li
 test("assets prevent double assignment and preserve return history",()=>{assert.match(migration,/idx_asset_assignments_active/);assert.match(assets,/Asset is not available/);assert.match(assets,/returned_at=CURRENT_TIMESTAMP/);assert.doesNotMatch(assets,/DELETE FROM asset_assignments/);});
 test("learning enforces unique enrollment and terminal transitions",()=>{assert.match(migration,/training_enrollments_unique/);assert.match(learning,/Employee already enrolled/);assert.match(learning,/Completion requires manager or HR verification/);});
 test("learning calculates certification expiry",()=>{assert.match(learning,/validity_months/);assert.match(learning,/certificate_expiry/);});
-test("all new write APIs enforce origin, rate limit, permission, and audit",()=>{for(const source of [performance,recruitment,lifecycle,assets,learning]){assert.match(source,/enforceWriteOrigin/);assert.match(source,/enforceRateLimit/);assert.match(source,/requireModule/);assert.match(source,/audit\(/);}});
+test("all new write APIs enforce origin, rate limit, permission, and audit",()=>{for(const source of [performance,recruitment,lifecycle,assets,learning]){assert.match(source,/enforceWriteOrigin/);assert.match(source,/enforceRateLimit/);assert.match(source,/requireModule/);assert.match(source,/audit\(/);}assert.match(recruitmentRoute,/handleRecruitmentPost/);});
 test("employee 360 exposes focused module tabs",()=>{for(const tab of ["performance","lifecycle","assets","learning"])assert.match(profile,new RegExp(`tab==="${tab}"`));assert.match(profile,/LIMIT \? OFFSET \?/);});
 test("dashboard includes all new operational queues",()=>{for(const metric of ["performance_incomplete","open_jobs","candidates_action","new_hires_onboarding","employees_offboarding","unreturned_assets","training_overdue","certifications_expiring"])assert.match(dashboard,new RegExp(metric));});
 test("reports cover six new exports with permission checks",()=>{for(const type of ["performance","recruitment","onboarding","offboarding","assets","learning"])assert.match(reports,new RegExp(`type==="${type}"`));assert.match(reports,/requirePermission/);});

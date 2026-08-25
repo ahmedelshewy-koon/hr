@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, ChevronRight, Info, X } from "lucide-react";
+import { localizedDisplayValue } from "./localization";
 
 // Bootstrap rows are intentionally heterogeneous projections from the shared HR endpoint.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row=Record<string,any>;
 const standard=["Work from home","Late arrival","Early departure","Expense reimbursement","Experience certificate","Other request"];
 const locale=(rtl:boolean)=>rtl?"ar-SA-u-nu-arab":"en-GB";
-const label=(value:string,rtl:boolean)=>rtl?({"Work from home":"عمل من المنزل","Late arrival":"طلب تأخير","Early departure":"انصراف مبكر","Expense reimbursement":"استرداد مصروفات","Experience certificate":"شهادة خبرة","Other request":"طلب آخر"}[value]||value):value;
+const label=(value:string,rtl:boolean)=>rtl?({"Work from home":"عمل من المنزل","Late arrival":"طلب تأخير","Early departure":"انصراف مبكر","Expense reimbursement":"استرداد مصروفات","Experience certificate":"شهادة خبرة","Other request":"طلب آخر"}[value]||localizedDisplayValue(value,true)):value;
 
 export function EmployeeRequestDrawer({rtl,preset,close,submit}:{rtl:boolean;preset:string;close:()=>void;submit:(payload:Row)=>Promise<void>}){
   const today=new Date().toISOString().slice(0,10);

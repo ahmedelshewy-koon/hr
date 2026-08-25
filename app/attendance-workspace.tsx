@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertTriangle, CalendarDays, Check, ChevronRight, Clock3, FileClock, Filter, Pencil, RefreshCw, Search, ShieldCheck, TimerReset, UserRoundCheck, X } from "lucide-react";
+import { localizedDisplayValue } from "./localization";
 
 // The bootstrap endpoint intentionally returns heterogeneous SQL projections.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,7 +12,7 @@ const locale=(rtl:boolean)=>rtl?"ar-SA-u-nu-arab":"en-GB";
 const number=(value:number,rtl:boolean)=>new Intl.NumberFormat(locale(rtl)).format(value);
 const date=(value:unknown,rtl:boolean,withTime=false)=>new Intl.DateTimeFormat(locale(rtl),withTime?{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}:{day:"numeric",month:"short",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T${withTime?String(value).slice(11,19)||"12:00:00":"12:00:00"}`));
 const labels:Record<string,[string,string]>={missing_check_in:["Missing check-in","غياب تسجيل الحضور"],missing_check_out:["Missing check-out","غياب تسجيل الانصراف"],late_arrival:["Late arrival","تأخر عن الحضور"],early_departure:["Early departure","انصراف مبكر"],insufficient_hours:["Insufficient hours","ساعات غير كافية"],absent:["Absent","غياب"],attendance_conflict:["Attendance conflict","تعارض في الحضور"],approved_leave_conflict:["Approved leave conflict","تعارض مع إجازة معتمدة"],forgot_check_in:["Forgot check-in","نسيت تسجيل الحضور"],forgot_check_out:["Forgot check-out","نسيت تسجيل الانصراف"],wrong_check_in:["Wrong check-in time","وقت حضور غير صحيح"],wrong_check_out:["Wrong check-out time","وقت انصراف غير صحيح"],late_justification:["Late arrival justification","تبرير التأخير"],early_departure_justification:["Early departure justification","تبرير الانصراف المبكر"],other:["Other attendance issue","مشكلة حضور أخرى"],pending_manager:["Pending Manager","بانتظار المدير"],pending_hr:["Pending HR","بانتظار الموارد البشرية"],resolved:["Resolved","تمت المعالجة"],rejected_manager:["Rejected by Manager","مرفوض من المدير"],rejected_hr:["Rejected by HR","مرفوض من الموارد البشرية"],open:["Open","مفتوح"],correction_requested:["Correction requested","تم طلب تصحيح"],dismissed:["Dismissed","مستبعد"]};
-const label=(value:unknown,rtl:boolean)=>labels[String(value)]?.[rtl?1:0]||String(value||"—").replaceAll("_"," ").replace(/\b\w/g,x=>x.toUpperCase());
+const label=(value:unknown,rtl:boolean)=>labels[String(value)]?.[rtl?1:0]||localizedDisplayValue(value,rtl);
 const active=(status:unknown)=>["open","correction_requested","pending_manager","pending_hr"].includes(String(status));
 async function api(payload?:Row){const response=await fetch("/api/hr",payload?{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}:{cache:"no-store"});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`Request failed (${response.status})`);return body;}
 

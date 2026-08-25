@@ -38,7 +38,7 @@ export async function GET(request:Request){
       }
       return fallback;
     };
-    let visibleLifecycles=(lifecycles.results as Record<string,unknown>[]).map(lifecycle=>{
+    let visibleLifecycles=(lifecycles.results as Record<string,unknown>[]).map((lifecycle):Record<string,unknown>=>{
       const completedBy=String(lifecycle.completed_by_name||"");
       const responsible=String(lifecycle.responsible_name||"");
       const responsibleTask=taskRows.find(task=>Number(task.lifecycle_id)===Number(lifecycle.id)&&task.status!=="completed");

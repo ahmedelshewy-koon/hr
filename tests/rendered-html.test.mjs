@@ -46,7 +46,10 @@ test("keeps starter preview assets out of the production app", async () => {
 });
 
 test("renders workforce departments, job titles, and organization chart from API data", async () => {
-  const app = await readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8");
+  const [app, api] = await Promise.all([
+    readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8"),
+  ]);
   // Tables render the search-filtered projections, which are themselves derived from the API payload.
   assert.match(app, /<JobTitleTable[^>]*rows=\{shownJobTitles\}/);
   assert.match(app, /const shownJobTitles=\(data\?\.jobTitles\s*\?\?\s*\[\]\)/);
@@ -55,6 +58,13 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /Managing Director\|العضو المنتدب/);
   assert.match(app, /org-department-grid/);
   assert.match(app, /pageStyle\.textContent="@page \{ size: A4 landscape; margin: 8mm; \}"/);
+  assert.match(app, /className="org-print-page-header"><img src="\/sanad-logo\.png" alt="Sanad"\/><div><h1>\{title\}<\/h1><p>\{subtitle\}<\/p><\/div>/);
+  assert.match(app, /title=\{rtl\?"الهيكل العام لشركة أسس"/);
+  assert.match(app, /\{key:"asas-saudi",departments:asasSaudiDepartment\?/);
+  assert.match(app, /\{key:"asas-egypt",departments:asasEgyptDepartment\?/);
+  assert.match(app, /\{key:"koon-software",departments:koonSoftwareDepartments\}/);
+  assert.match(app, /\{key:"koon-agency",departments:koonAgencyDepartments\}/);
+  assert.match(app, /nodes-\$\{Math\.min\(level\.length,8\)\}/);
   assert.match(app, /<h1 className="dashboard-title">\{rtl\?"لوحة التحكم":"Dashboard"\}<\/h1>/);
   assert.match(app, /function PageHeader\(\{title,action\}/);
   assert.match(app, /rtl\?"عدد الموظفين":"Employees"/);
@@ -67,6 +77,9 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /org-add-department/);
   assert.match(app, /\{employees\.map\(employee=><option value=\{employee\.id\} key=\{employee\.id\}>/);
   assert.match(app, /save_department_structure/);
+  assert.match(app, /delete_department/);
+  assert.match(app, /rtl\?"حذف القسم":"Delete department"/);
+  assert.match(api, /manager_id=CASE WHEN id=\?::integer THEN NULL ELSE \?::integer END/);
   assert.match(app, /org-team-level-input/);
   assert.match(app, /organizational_level/);
   assert.doesNotMatch(app, /Layla Alotaibi|Youssef Nassar|Commercial Director/);

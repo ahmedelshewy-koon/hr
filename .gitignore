@@ -43,3 +43,13 @@ yarn-error.log*
 /.dev-server.pid
 /dev-server.*.log
 /.postgres-data/
+/.postgres-server.log
+
+# local build / dev / QA artifacts
+/.codex-build-*/
+.codex-dev-*.log
+/.site-*.tar.gz
+/.site-stage-*/
+/qa.err.log
+/qa.out.log
+*.tsbuildinfo

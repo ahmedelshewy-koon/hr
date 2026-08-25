@@ -1,4 +1,5 @@
 import type { PostgresDatabase } from "../../db/postgres";
+import { CONTRACT_EXPIRY_WARNING_DAYS } from "../employees/contract-policy";
 
 export async function createNotification(db:PostgresDatabase,input:{userId:number;type:string;titleKey:string;messageKey?:string;entityType?:string;entityId?:string|number;targetPath?:string;dedupeKey:string}){
   await db.prepare("INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at) VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING").bind(input.userId,input.type,input.titleKey,input.messageKey||null,input.entityType||null,input.entityId==null?null:String(input.entityId),input.targetPath||null,input.dedupeKey).run();
@@ -31,6 +32,23 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
     FROM documents d JOIN document_categories c ON c.code=d.category AND c.employee_can_view=1 JOIN users u ON u.employee_id=d.employee_id AND u.status='active'
     WHERE d.status='active' AND d.expiry_date BETWEEN CURRENT_DATE::text AND (CURRENT_DATE+30)::text
     ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+  await db.prepare(`WITH expiring AS (
+      SELECT e.id,e.manager_id,e.end_date FROM employees e
+      WHERE e.employment_status IN ('active','probation','notice_period')
+        AND e.end_date BETWEEN CURRENT_DATE::text AND (CURRENT_DATE+${CONTRACT_EXPIRY_WARNING_DAYS})::text
+    ), recipients AS (
+      SELECT e.id AS employee_id,e.end_date,u.id AS user_id,'portal'::text AS target_path
+      FROM expiring e JOIN users u ON u.employee_id=e.id AND u.status='active'
+      UNION
+      SELECT e.id,e.end_date,u.id,concat('employees?employee=',e.id)::text
+      FROM expiring e JOIN users u ON u.employee_id=e.manager_id AND u.status='active'
+      UNION
+      SELECT e.id,e.end_date,u.id,concat('employees?employee=',e.id)::text
+      FROM expiring e JOIN users u ON u.status='active' JOIN roles r ON r.id=u.role_id AND r.name IN ('Super Admin','HR Manager')
+    )
+    INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT user_id,'contract','contract_expiring_soon',end_date,'employee',employee_id::text,target_path,concat('employee:',employee_id,':contract-expiry:',end_date)::text,CURRENT_TIMESTAMP
+    FROM recipients ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
   await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT u.id,'performance','performance_review_overdue',c.end_date,'performance_review',r.id::text,'performance',concat('performance:',r.id,':overdue')::text,CURRENT_TIMESTAMP
     FROM performance_reviews r JOIN performance_cycles c ON c.id=r.cycle_id JOIN users u ON u.employee_id=r.employee_id AND u.status='active'
@@ -49,5 +67,29 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
     SELECT u.id,'learning','certification_expiring',x.certificate_expiry,'training_enrollment',x.id::text,'learning',concat('training:',x.id,':expiry:',x.certificate_expiry)::text,CURRENT_TIMESTAMP
     FROM training_enrollments x JOIN users u ON u.employee_id=x.employee_id AND u.status='active'
     WHERE x.status='completed' AND x.certificate_expiry BETWEEN CURRENT_DATE::text AND (CURRENT_DATE+30)::text
+    ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+  await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT u.id,'recruitment','interview_starting_soon',to_char(i.scheduled_at,'YYYY-MM-DD HH24:MI'),'interview',i.id::text,'recruitment',concat('interview:',i.id,':starting-soon:',p.employee_id)::text,CURRENT_TIMESTAMP
+    FROM interviews i JOIN interview_participants p ON p.interview_id=i.id JOIN users u ON u.employee_id=p.employee_id AND u.status='active'
+    WHERE i.status='scheduled' AND i.scheduled_at BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP+INTERVAL '2 hours'
+    ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+  await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT u.id,'recruitment','evaluation_pending',j.title,'interview',i.id::text,'recruitment',concat('interview:',i.id,':evaluation-pending:',p.employee_id)::text,CURRENT_TIMESTAMP
+    FROM interviews i JOIN interview_participants p ON p.interview_id=i.id JOIN users u ON u.employee_id=p.employee_id AND u.status='active'
+    JOIN candidate_applications a ON a.id=i.application_id JOIN job_openings j ON j.id=a.job_id
+    LEFT JOIN interview_evaluations ev ON ev.interview_id=i.id AND ev.interviewer_employee_id=p.employee_id AND ev.status='submitted'
+    WHERE i.status IN ('scheduled','completed') AND COALESCE(i.end_at,i.scheduled_at+(i.duration_minutes*INTERVAL '1 minute'))<CURRENT_TIMESTAMP AND ev.id IS NULL
+    ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+  await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT u.id,'recruitment','hiring_decision_required',j.title,'candidate_application',a.id::text,'recruitment',concat('application:',a.id,':decision-required:',u.id)::text,CURRENT_TIMESTAMP
+    FROM candidate_applications a JOIN recruitment_stages s ON s.id=a.current_stage_id JOIN job_openings j ON j.id=a.job_id
+    JOIN users u ON u.employee_id IN (j.recruiter_employee_id,j.hiring_manager_employee_id) AND u.status='active'
+    WHERE a.status='active' AND s.stage_type='final_review'
+    ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+  await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT u.id,'recruitment','offer_approval_pending',j.title,'job_offer',o.id::text,'recruitment',concat('offer:',o.id,':approval-pending:',u.id)::text,o.updated_at
+    FROM job_offers o JOIN candidate_applications a ON a.id=o.application_id JOIN job_openings j ON j.id=a.job_id
+    JOIN users u ON u.status='active' JOIN roles r ON r.id=u.role_id AND r.name IN ('Super Admin','HR Manager')
+    WHERE o.status='draft' AND o.approval_status='pending'
     ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
 }

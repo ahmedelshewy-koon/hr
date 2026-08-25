@@ -5,6 +5,7 @@ import { cancelLeaveRequest, createLeaveRequest, initializeCurrentLeaveBalances,
 import { manualAttendanceCorrection, processAttendanceCorrection, recalculateAttendance, submitAttendanceCorrection } from "../../attendance/attendance-service";
 import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
 import { createEmployeeRecord } from "../../employees/employee-service";
+import { resolvedContractEndDate } from "../../employees/contract-policy";
 // The shared employee engine preserves sequence allocation via pg_get_serial_sequence('employees','id').
 
 type Json = Record<string, unknown>;
@@ -466,14 +467,16 @@ export async function POST(request: Request) {
     if(action==="create_employee") {
       await authorize(d1,user,"employees","create");
       const nameEn=required(payload.nameEn,"English name"), nameAr=required(payload.nameAr,"Arabic name"), email=required(payload.workEmail,"Work email").toLowerCase();
+      const startDate=required(payload.startDate,"Work start"),endDate=resolvedContractEndDate(startDate,clean(payload.endDate));
+      if(!endDate||endDate<startDate)throw new Response("Work end must be on or after work start",{status:400});
       const departmentId=Number(payload.departmentId)||null;
       const accessRoleId=Number(payload.accessRoleId)||Number((await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>())?.id),accessRole=await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(accessRoleId).first<{id:number;name:string;is_system:number}>();if(!accessRole)throw new Response("Access role is required",{status:400});if(user.role_name==="HR Manager"&&(Number(accessRole.is_system)!==1||!["Department Manager","Employee"].includes(accessRole.name)))throw new Response("HR can assign employee and department-manager roles only",{status:403});const passwordHash=await hashPassword(DEFAULT_USER_PASSWORD);
       const created=await d1.transaction(async tx=>{
         const structure=departmentId?await tx.prepare("SELECT COALESCE(d.manager_employee_id,pd.manager_employee_id) AS manager_employee_id FROM departments d LEFT JOIN departments pd ON pd.id=d.parent_id WHERE d.id=? AND d.status!='deleted'").bind(departmentId).first<{manager_employee_id:number|null}>():null;
         const managerId=Number(structure?.manager_employee_id)||null;
-        const result=await createEmployeeRecord(tx,{nameEn,nameAr,workEmail:email,startDate:required(payload.startDate,"Start date"),country:required(payload.country,"Country"),departmentId,jobTitleId:Number(payload.jobTitleId)||null,managerId,workLocation:clean(payload.workLocation)||null,employmentType:clean(payload.employmentType)||"full_time"});
+        const result=await createEmployeeRecord(tx,{nameEn,nameAr,workEmail:email,startDate,country:required(payload.country,"Country"),departmentId,jobTitleId:Number(payload.jobTitleId)||null,managerId,workLocation:clean(payload.workLocation)||null,employmentType:clean(payload.employmentType)||"full_time"});
         await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-          .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
+          .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,endDate,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
         await syncEmployeeLeaveTypes(tx,result.id,payload.leaveTypeIds,user.id);
         await tx.prepare("INSERT INTO users(email,employee_id,role_id,status,password_hash,must_change_password,session_version,failed_login_attempts,created_at,updated_at) VALUES (?,?,?,'active',?,1,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").bind(email,result.id,accessRole.id,passwordHash).run();
         return result;
@@ -488,12 +491,14 @@ export async function POST(request: Request) {
       const before=await d1.prepare("SELECT * FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Record<string,unknown>>();
       if(!before) throw new Response("Employee not found",{status:404});
       const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name"),email=required(payload.workEmail,"Work email").toLowerCase();
+      const startDate=required(payload.startDate,"Work start"),endDate=resolvedContractEndDate(startDate,clean(payload.endDate));
+      if(!endDate||endDate<startDate)throw new Response("Work end must be on or after work start",{status:400});
       const departmentId=Number(payload.departmentId)||null,departmentChanged=departmentId!==Number(before.department_id||0);
       const structure=departmentChanged&&departmentId?await d1.prepare("SELECT COALESCE(d.manager_employee_id,pd.manager_employee_id) AS manager_employee_id FROM departments d LEFT JOIN departments pd ON pd.id=d.parent_id WHERE d.id=? AND d.status!='deleted'").bind(departmentId).first<{manager_employee_id:number|null}>():null;
       const managerId=departmentChanged?(Number(structure?.manager_employee_id)||null):(Number(before.manager_id)||null);
       const resolvedManagerId=managerId===employeeId?null:managerId;
       await d1.prepare("UPDATE employees SET name_en=?,name_ar=?,work_email=?,fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,gender=?,birth_date=?,identification_number=?,address=?,department_id=?,job_title_id=?,manager_id=?,start_date=?,end_date=?,employment_status=?,salary=?,salary_currency=?,country=?,work_location=?,employment_type=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-        .bind(nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,departmentId,Number(payload.jobTitleId)||null,resolvedManagerId,required(payload.startDate,"Start date"),clean(payload.endDate)||null,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,employeeId).run();
+        .bind(nameEn,nameAr,email,clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,departmentId,Number(payload.jobTitleId)||null,resolvedManagerId,startDate,endDate,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",required(payload.country,"Country"),clean(payload.workLocation)||null,clean(payload.employmentType)||"full_time",clean(payload.scheduleType)||"fixed",clean(payload.workDays)||"0,1,2,3,4",clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,Number(payload.requiredDailyMinutes)||480,clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,employeeId).run();
       if(departmentChanged)await d1.prepare("UPDATE employees SET organizational_level=CASE WHEN ?::integer IS NULL THEN 1 ELSE COALESCE((SELECT organizational_level+1 FROM employees WHERE id=?),1) END WHERE id=?").bind(resolvedManagerId,resolvedManagerId,employeeId).run();
       await d1.prepare("UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE employee_id=?").bind(email,employeeId).run();
       if(Array.isArray(payload.leaveTypeIds))await syncEmployeeLeaveTypes(d1,employeeId,payload.leaveTypeIds,user.id);
@@ -539,26 +544,27 @@ export async function POST(request: Request) {
     if(action==="create_department_structure") {
       await authorize(d1,user,"departments","create");
       const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name"),parentId=Number(payload.parentId)||null,managerEmployeeId=Number(payload.managerEmployeeId)||null;
+      const unitType=clean(payload.unitType)==="company"?"company":"department";
       if(parentId&&!await d1.prepare("SELECT id FROM departments WHERE id=? AND status!='deleted'").bind(parentId).first())throw new Response("Parent department not found",{status:404});
-      const duplicate=await d1.prepare("SELECT id FROM departments WHERE (lower(name_en)=lower(?) OR name_ar=?) AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr).first<{id:number}>();
-      if(duplicate)throw new Response("A department with the same name already exists",{status:409});
+      const duplicate=await d1.prepare("SELECT id FROM departments WHERE (lower(name_en)=lower(?) OR name_ar=?) AND parent_id IS NOT DISTINCT FROM ? AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr,parentId).first<{id:number}>();
+      if(duplicate)throw new Response("A department with the same name already exists under this parent",{status:409});
       const employeeIds=[...new Set((Array.isArray(payload.employeeIds)?payload.employeeIds:[]).map(Number).filter(Boolean))];
       const requestedIds=[...new Set([...employeeIds,...(managerEmployeeId?[managerEmployeeId]:[])])];
       if(requestedIds.length){const found=(await d1.prepare(`SELECT id FROM employees WHERE id IN (${requestedIds.map(()=>"?").join(",")}) AND employment_status!='deleted'`).bind(...requestedIds).all<{id:number}>()).results;if(found.length!==requestedIds.length)throw new Response("One or more selected employees were not found",{status:404});}
       const result=await d1.transaction(async tx=>{
-        const department=await tx.prepare("INSERT INTO departments (name_en,name_ar,parent_id,manager_employee_id,status,created_at,updated_at) VALUES (?,?,?,?,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,managerEmployeeId).first<{id:number}>();
+        const department=await tx.prepare("INSERT INTO departments (name_en,name_ar,parent_id,manager_employee_id,unit_type,status,created_at,updated_at) VALUES (?,?,?,?,?,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,managerEmployeeId,unitType).first<{id:number}>();
         for(const employeeId of employeeIds)await tx.prepare("UPDATE employees SET department_id=?,manager_id=?,organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(department!.id,employeeId===managerEmployeeId?null:managerEmployeeId,employeeId===managerEmployeeId?0:1,employeeId).run();
         if(managerEmployeeId){const managerRole=await tx.prepare("SELECT id FROM roles WHERE name='Department Manager'").first<{id:number}>();if(managerRole)await tx.prepare("UPDATE users SET role_id=?,session_version=session_version+1,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND role_id=(SELECT id FROM roles WHERE name='Employee')").bind(managerRole.id,managerEmployeeId).run();}
         return department!;
       });
-      await audit(d1,request,user,"create","departments","department",String(result.id),null,{nameEn,nameAr,parentId,managerEmployeeId,employeeIds});
+      await audit(d1,request,user,"create","departments","department",String(result.id),null,{nameEn,nameAr,parentId,managerEmployeeId,unitType,employeeIds});
       return Response.json({ok:true,id:result.id},{status:201});
     }
     if(action==="save_department_parents") {
       await authorize(d1,user,"departments","edit");
       const assignments=Array.isArray(payload.assignments)?payload.assignments:[];
       if(!assignments.length)return Response.json({ok:true,updated:0});
-      const departmentRows=(await d1.prepare("SELECT id,parent_id FROM departments WHERE status!='deleted'").all<{id:number;parent_id:number|null}>()).results;
+      const departmentRows=(await d1.prepare("SELECT id,parent_id,name_en,name_ar FROM departments WHERE status!='deleted'").all<{id:number;parent_id:number|null;name_en:string;name_ar:string}>()).results;
       const validIds=new Set(departmentRows.map(row=>Number(row.id)));
       const proposedParents=new Map(departmentRows.map(row=>[Number(row.id),Number(row.parent_id)||null]));
       const updates:{departmentId:number;parentId:number|null;previousParentId:number|null}[]=[];
@@ -578,6 +584,8 @@ export async function POST(request: Request) {
         const visited=new Set<number>();let current:number|null=departmentId;
         while(current){if(visited.has(current))throw new Response("The department hierarchy cannot contain a cycle",{status:400});visited.add(current);current=proposedParents.get(current)||null;}
       }
+      const siblingNames=new Set<string>();
+      for(const department of departmentRows){const parentKey=proposedParents.get(Number(department.id))??"root";for(const [language,name] of [["en",department.name_en],["ar",department.name_ar]]){const normalizedName=clean(name).toLocaleLowerCase();if(!normalizedName)continue;const key=`${parentKey}:${language}:${normalizedName}`;if(siblingNames.has(key))throw new Response("Departments with the same name cannot share the same parent",{status:409});siblingNames.add(key);}}
       await d1.transaction(async tx=>{for(const update of updates)await tx.prepare("UPDATE departments SET parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(update.parentId,update.departmentId).run();});
       for(const update of updates)await audit(d1,request,user,"update","departments","department",String(update.departmentId),{parentId:update.previousParentId},{parentId:update.parentId});
       return Response.json({ok:true,updated:updates.length});
@@ -587,23 +595,24 @@ export async function POST(request: Request) {
       await authorize(d1,user,"departments",departmentId?"edit":"create");
       const nameEn=required(payload.nameEn,"English name"),nameAr=required(payload.nameAr,"Arabic name");
       const parentId=Number(payload.parentId)||null;
+      const unitType=clean(payload.unitType)==="company"?"company":"department";
       const status=clean(payload.status)==="archived"?"archived":"active";
       if(departmentId&&parentId===departmentId)throw new Response("A department cannot be its own parent",{status:400});
       if(parentId){
         const parent=await d1.prepare("SELECT id FROM departments WHERE id=? AND status!='deleted'").bind(parentId).first<{id:number}>();if(!parent)throw new Response("Parent department not found",{status:404});
         if(departmentId){let current:number|null=parentId;const visited=new Set<number>();while(current){if(current===departmentId)throw new Response("The department hierarchy cannot contain a cycle",{status:400});if(visited.has(current))break;visited.add(current);const row:{parent_id:number|null}|null=await d1.prepare("SELECT parent_id FROM departments WHERE id=?").bind(current).first<{parent_id:number|null}>();current=Number(row?.parent_id)||null;}}
       }
-      const duplicate=await d1.prepare("SELECT id FROM departments WHERE (lower(name_en)=lower(?) OR name_ar=?) AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr).first<{id:number}>();
-      if(duplicate&&Number(duplicate.id)!==departmentId)throw new Response("A department with the same name already exists",{status:409});
+      const duplicate=await d1.prepare("SELECT id FROM departments WHERE (lower(name_en)=lower(?) OR name_ar=?) AND parent_id IS NOT DISTINCT FROM ? AND status!='deleted' ORDER BY id LIMIT 1").bind(nameEn,nameAr,parentId).first<{id:number}>();
+      if(duplicate&&Number(duplicate.id)!==departmentId)throw new Response("A department with the same name already exists under this parent",{status:409});
       if(departmentId){
         const before=await d1.prepare("SELECT * FROM departments WHERE id=? AND status!='deleted'").bind(departmentId).first<Record<string,unknown>>();
         if(!before)throw new Response("Department not found",{status:404});
-        await d1.prepare("UPDATE departments SET name_en=?,name_ar=?,parent_id=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(nameEn,nameAr,parentId,status,departmentId).run();
-        await audit(d1,request,user,"update","departments","department",String(departmentId),before,{nameEn,nameAr,parentId,status});
+        await d1.prepare("UPDATE departments SET name_en=?,name_ar=?,parent_id=?,unit_type=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(nameEn,nameAr,parentId,unitType,status,departmentId).run();
+        await audit(d1,request,user,"update","departments","department",String(departmentId),before,{nameEn,nameAr,parentId,unitType,status});
         return Response.json({ok:true,id:departmentId});
       }
-      const result=await d1.prepare("INSERT INTO departments (name_en,name_ar,parent_id,status,created_at,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,status).first<{id:number}>();
-      await audit(d1,request,user,"create","departments","department",String(result!.id),null,{nameEn,nameAr,parentId,status});
+      const result=await d1.prepare("INSERT INTO departments (name_en,name_ar,parent_id,unit_type,status,created_at,updated_at) VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(nameEn,nameAr,parentId,unitType,status).first<{id:number}>();
+      await audit(d1,request,user,"create","departments","department",String(result!.id),null,{nameEn,nameAr,parentId,unitType,status});
       return Response.json({ok:true,id:result!.id},{status:201});
     }
     if(action==="delete_department") {
@@ -703,6 +712,7 @@ export async function POST(request: Request) {
     if(action==="save_department_structure") {
       await authorize(d1,user,"departments","edit");
       const departmentId=Number(payload.departmentId),parentId=Number(payload.parentId)||null;
+      const unitType=clean(payload.unitType)==="company"?"company":"department";
       if(!departmentId) throw new Response("Department is required",{status:400});
       const department=await d1.prepare("SELECT * FROM departments WHERE id=? AND status!='deleted'").bind(departmentId).first<Record<string,unknown>>();
       if(!department) throw new Response("Department not found",{status:404});
@@ -748,7 +758,7 @@ export async function POST(request: Request) {
       }
       const removed=employeeRows.filter(row=>Number(row.department_id)===departmentId&&!selectedIds.has(Number(row.id)));
       await d1.batch([
-        d1.prepare("UPDATE departments SET parent_id=?,manager_employee_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parentId,managerEmployeeId,departmentId),
+        d1.prepare("UPDATE departments SET parent_id=?,manager_employee_id=?,unit_type=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parentId,managerEmployeeId,unitType,departmentId),
         ...removed.map(row=>d1.prepare("UPDATE employees SET department_id=NULL,manager_id=NULL,organizational_level=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.id)),
         ...assignments.map(item=>d1.prepare("UPDATE employees SET department_id=?,manager_id=?,organizational_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(departmentId,item.employeeId===managerEmployeeId?null:reportingManagerId,item.level,item.employeeId)),
       ]);
@@ -762,8 +772,8 @@ export async function POST(request: Request) {
         const employeeRole=await d1.prepare("SELECT id FROM roles WHERE name='Employee'").first<{id:number}>();
         if(employeeRole)await d1.prepare("UPDATE users SET role_id=?,session_version=session_version+1,updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND role_id=(SELECT id FROM roles WHERE name='Department Manager') AND NOT EXISTS (SELECT 1 FROM departments WHERE manager_employee_id=? AND status!='deleted')").bind(employeeRole.id,previousManagerId,previousManagerId).run();
       }
-      await audit(d1,request,user,"update","departments","department",String(departmentId),department,{parentId,managerEmployeeId,assignments,removedEmployeeIds:removed.map(row=>row.id)});
-      return Response.json({ok:true,departmentId,parentId,managerEmployeeId,count:assignments.length});
+      await audit(d1,request,user,"update","departments","department",String(departmentId),department,{parentId,managerEmployeeId,unitType,assignments,removedEmployeeIds:removed.map(row=>row.id)});
+      return Response.json({ok:true,departmentId,parentId,managerEmployeeId,unitType,count:assignments.length});
     }
     if(action==="save_department_hierarchy") {
       await authorize(d1,user,"departments","edit");

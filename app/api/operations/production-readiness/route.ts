@@ -6,8 +6,10 @@ const REQUIRED_TABLES = [
   "requests", "approvals", "attendance_logs", "daily_attendance", "holidays",
   "leave_types", "leave_policies", "leave_balances", "documents", "audit_logs",
   "performance_rating_scales", "performance_cycles", "performance_reviews",
-  "performance_goals", "performance_comments", "job_openings", "candidates",
-  "interviews", "job_offers", "lifecycle_templates", "lifecycle_template_tasks",
+  "performance_goals", "performance_comments", "job_openings", "job_requirements",
+  "candidates", "candidate_applications", "candidate_documents", "candidate_match_results",
+  "recruitment_stages", "interview_templates", "interview_plans", "interview_plan_stages",
+  "interviews", "interview_participants", "interview_evaluations", "job_offers", "lifecycle_templates", "lifecycle_template_tasks",
   "employee_lifecycles", "lifecycle_tasks", "assets", "asset_assignments",
   "training_courses", "training_enrollments",
 ] as const;

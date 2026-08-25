@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, ChevronRight, Clock3, FileText, Home, Plus, ReceiptText, Stethoscope, TimerReset, Wallet, X } from "lucide-react";
 import { AttendanceCorrectionDrawer, CorrectionDetail } from "./attendance-workspace";
+import { localizedDisplayValue } from "./localization";
 
 // Bootstrap rows are intentionally heterogeneous projections from the shared HR endpoint.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,10 +16,10 @@ type PortalData = {
 const locale=(rtl:boolean)=>rtl?"ar-SA-u-nu-arab":"en-GB";
 const number=(value:number,rtl:boolean)=>new Intl.NumberFormat(locale(rtl),{maximumFractionDigits:2}).format(value);
 const date=(value:string,rtl:boolean,options:Intl.DateTimeFormatOptions={day:"numeric",month:"short",year:"numeric"})=>new Intl.DateTimeFormat(locale(rtl),options).format(new Date(`${value.slice(0,10)}T12:00:00`));
-const requestName=(value:string,rtl:boolean)=>rtl?({"Annual Leave":"إجازة سنوية","Sick Leave":"إجازة مرضية","Work from home":"عمل من المنزل","Late arrival":"طلب تأخير","Early departure":"انصراف مبكر","Expense reimbursement":"استرداد مصروفات","Experience certificate":"شهادة خبرة"}[value]||value):value;
+const requestName=(value:string,rtl:boolean)=>rtl?({"Annual Leave":"إجازة سنوية","Sick Leave":"إجازة مرضية","Work from home":"عمل من المنزل","Late arrival":"طلب تأخير","Early departure":"انصراف مبكر","Expense reimbursement":"استرداد مصروفات","Experience certificate":"شهادة خبرة"}[value]||localizedDisplayValue(value,true)):value;
 const statusLabel=(value:string,rtl:boolean)=>{
   const labels:Record<string,[string,string]>={pending_manager:["Waiting for Manager","بانتظار المدير"],pending_hr:["Waiting for HR","بانتظار الموارد البشرية"],hr_approved:["Approved","معتمد"],manager_rejected:["Rejected by Manager","مرفوض من المدير"],hr_rejected:["Rejected by HR","مرفوض من الموارد البشرية"],cancelled:["Cancelled","ملغي"]};
-  return labels[value]?.[rtl?1:0]||value.replaceAll("_"," ");
+  return labels[value]?.[rtl?1:0]||localizedDisplayValue(value,rtl);
 };
 const tone=(value:string)=>value==="hr_approved"?"green":value.includes("rejected")||value==="cancelled"?"rose":"amber";
 

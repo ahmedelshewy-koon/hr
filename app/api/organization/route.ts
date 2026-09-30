@@ -8,10 +8,11 @@ import { enforceWriteOrigin, requireActor } from '../api-security';
 import { requireModule, body } from '../../talent/talent-service';
 import { organizationReady, readOrganizationCatalog } from '../../organization/assignment-service';
 import { saveHrAssignment } from '../../organization/hr-assignment-service';
+import { seesWholeCompany } from '../../employees/hr-data-scope';
 
 export async function GET(request:Request){return withDatabase('Unable to load organization settings',async db=>{
   const actor=await requireActor(request,db);await requireModule(db,actor,'system_settings','view');
-  if(!['Super Admin','HR Manager'].includes(actor.roleName))throw new Response('Forbidden',{status:403});
+  if(!seesWholeCompany(actor))throw new Response('Forbidden',{status:403});
   if(!await organizationReady(db))return Response.json({ready:false});
   const snapshot=await db.transaction(async tx=>{
     await tx.prepare('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY').run();
@@ -32,7 +33,7 @@ export async function GET(request:Request){return withDatabase('Unable to load o
  */
 export async function POST(request:Request){return withDatabase('Unable to save organization settings',async db=>{
   enforceWriteOrigin(request);const actor=await requireActor(request,db);
-  if(!['Super Admin','HR Manager'].includes(actor.roleName))throw new Response('Forbidden',{status:403});
+  if(!seesWholeCompany(actor))throw new Response('Forbidden',{status:403});
   if(!await organizationReady(db))throw new Response('Migration has not been applied',{status:409});
   const input=await body(request);
   const action=String(input.action||'save');

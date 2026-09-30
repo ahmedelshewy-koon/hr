@@ -9,6 +9,7 @@ import { COURSE_MOVES, ENROLLMENT_MOVES, LEARNER_STATUS_SQL, LEARNING_ADMIN_ROLE
 import { parseEvaluation } from "../../talent/learning-evaluation";
 import type { Evaluation } from "../../talent/learning-evaluation";
 import { approveCertificate, buildCertificate, saveCertificate } from "../../talent/learning-certificate";
+import { branchHrEmployeeIds } from "../../employees/hr-data-scope";
 
 type Row=Record<string,unknown>;
 const dbToday=async(db:Db)=>String((await db.prepare("SELECT CURRENT_DATE::text AS today").first<{today:string}>())?.today);
@@ -28,12 +29,15 @@ export async function GET(request:Request){
       // A manager's own new program has nobody assigned yet; it must stay visible so they can attach materials and assign it.
       ownCourses=true;
     }
+    // A branch HR sees the whole program catalog but only its own employees' enrollments.
+    let enrollmentArgs:unknown[]=[];
+    if(!courseScope){const branchHr=await branchHrEmployeeIds(db,actor);if(branchHr){enrollmentScope="WHERE x.employee_id=ANY(?::int[])";enrollmentArgs=[branchHr];}}
     const scoped=Boolean(courseScope);
     // Course statistics only count live work: cancelled assignments and people who left are excluded so they cannot skew the rates.
     const liveEnrollments=`(SELECT x.* FROM training_enrollments x JOIN employees emp ON emp.id=x.employee_id AND emp.employment_status IN ${LEARNER_STATUS_SQL} WHERE x.status!='cancelled')`;
     const courseSql=`SELECT c.*,(SELECT i.name_en FROM employees i WHERE i.id=c.instructor_employee_id) AS instructor_employee_name,(SELECT i.name_ar FROM employees i WHERE i.id=c.instructor_employee_id) AS instructor_employee_name_ar,COUNT(e.id)::int AS enrollment_count,COUNT(e.id) FILTER(WHERE e.status='assigned')::int AS assigned_count,COUNT(e.id) FILTER(WHERE e.status='in_progress')::int AS in_progress_count,COUNT(e.id) FILTER(WHERE e.status='completed')::int AS completion_count,COUNT(e.id) FILTER(WHERE e.status='failed')::int AS failed_count,COUNT(e.id) FILTER(WHERE e.status IN ('assigned','in_progress') AND e.due_date<CURRENT_DATE::text)::int AS overdue_count,CASE WHEN COUNT(e.id)=0 THEN 0 ELSE ROUND(100.0*COUNT(e.id) FILTER(WHERE e.status='completed')/COUNT(e.id))::int END AS completion_rate FROM training_courses c LEFT JOIN ${liveEnrollments} e ON e.course_id=c.id ${courseScope} GROUP BY c.id ${scoped?`HAVING COUNT(e.id)>0${ownCourses?" OR c.created_by_user_id=?":""}`:""} ORDER BY CASE WHEN c.status='active' THEN 0 ELSE 1 END,c.start_date DESC NULLS LAST,c.id DESC LIMIT 1000`;
     const enrollmentSql=`SELECT x.*,c.title AS course_title,c.duration_hours,c.instructor_name,(SELECT i.name_en FROM employees i WHERE i.id=c.instructor_employee_id) AS instructor_employee_name,c.provider,c.course_type,c.mandatory,c.status AS course_status,c.start_date AS course_start_date,c.end_date AS course_end_date,c.validity_months,e.employee_code,e.name_en AS employee_name,e.name_ar AS employee_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM training_enrollments x JOIN training_courses c ON c.id=x.course_id JOIN employees e ON e.id=x.employee_id AND e.employment_status IN ${LEARNER_STATUS_SQL} LEFT JOIN departments d ON d.id=e.department_id ${enrollmentScope} ORDER BY CASE WHEN x.status IN ('assigned','in_progress') AND x.due_date<CURRENT_DATE::text THEN 0 WHEN x.status IN ('assigned','in_progress') THEN 1 ELSE 2 END,x.due_date NULLS LAST,x.id DESC LIMIT 5000`;
-    const [courses,enrollments,today,canCreate,canEdit]=await Promise.all([db.prepare(courseSql).bind(...scopeArgs,...(ownCourses?[actor.id]:[])).all(),db.prepare(enrollmentSql).bind(...scopeArgs).all(),dbToday(db),hasPermission(db,actor,"learning","create"),hasPermission(db,actor,"learning","edit")]);
+    const [courses,enrollments,today,canCreate,canEdit]=await Promise.all([db.prepare(courseSql).bind(...scopeArgs,...(ownCourses?[actor.id]:[])).all(),db.prepare(enrollmentSql).bind(...scopeArgs,...enrollmentArgs).all(),dbToday(db),hasPermission(db,actor,"learning","create"),hasPermission(db,actor,"learning","edit")]);
     // Materials travel with the programs the caller can already see; uploaded files carry no storage key, they are opened through /api/learning/materials/:id.
     const courseIds=courses.results.map(course=>Number(course.id));
     const materials=courseIds.length?(await db.prepare(`SELECT id,course_id,title,kind,url,file_name,content_type,size_bytes,created_by_user_id,created_at FROM training_materials WHERE course_id IN (${courseIds.map(()=>"?").join(",")}) ORDER BY id`).bind(...courseIds).all()).results:[];

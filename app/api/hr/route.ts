@@ -19,6 +19,7 @@ import { mapAttendanceDeviceUser } from "../../attendance/zkteco-service";
 import { readBiometricWorkspace } from "../../attendance/biometric-query";
 import { apiFailure, enforceRateLimit, enforceWriteOrigin, loadPermissions } from "../api-security";
 import { MANAGED_DEPARTMENTS_CTE } from "../../organization/department-scope";
+import { HR_DATA_SCOPES, branchHrCanSee, branchHrEmployeeIds, branchHrEmployeeSql, isBranchScopedHr, normalizeHrDataScope } from "../../employees/hr-data-scope";
 import { createEmployeeRecord } from "../../employees/employee-service";
 import { resolvedContractEndDate } from "../../employees/contract-policy";
 import { scheduledDailyMinutes } from "../../employees/schedule-policy";
@@ -28,7 +29,7 @@ import { readPageAvailability } from "../../page-availability-store";
 
 type Json = Record<string, unknown>;
 type Row = Record<string, unknown>;
-type AppUser = { id: number; email: string; role_id: number; role_name: string; employee_id: number | null; employee_name:string|null; employee_name_ar:string|null; department_id:number|null; department_name:string|null; department_name_ar:string|null; must_change_password:number };
+type AppUser = { id: number; email: string; role_id: number; role_name: string; hr_data_scope?: string | null; employee_id: number | null; employee_name:string|null; employee_name_ar:string|null; department_id:number|null; department_name:string|null; department_name_ar:string|null; must_change_password:number };
 
 const SUPER_ADMIN_MODULES = ["dashboard","employee_portal","employee_requests","request_approvals","employees","employee_salaries","job_titles","departments","leave_management","attendance","attendance_adjustments","recruitment","onboarding","offboarding","assets","learning","organization_chart","users","permissions","system_settings","reports"];
 const ACTIONS = ["view","create","edit","delete","approve","export","manage_settings"];
@@ -203,7 +204,7 @@ async function deleteDemoData(d1:PostgresDatabase){
 function enabledSetting(row:{value_json?:string}|null){try{return Boolean(JSON.parse(row?.value_json||"{}").enabled);}catch{return false;}}
 
 async function currentUser(d1: PostgresDatabase, userId:number): Promise<AppUser> {
-  const user = await d1.prepare("SELECT u.id,u.email,u.role_id,u.employee_id,u.must_change_password,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=? AND u.status='active'").bind(userId).first<AppUser>();
+  const user = await d1.prepare("SELECT u.id,u.email,u.role_id,u.employee_id,u.must_change_password,u.hr_data_scope,r.name AS role_name,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=? AND u.status='active'").bind(userId).first<AppUser>();
   if(!user)throw new Response("Account disabled",{status:403});
   return user;
 }
@@ -218,12 +219,24 @@ async function authorize(d1: PostgresDatabase, user: AppUser, module: string, ac
   if (!(await can(d1,user,module,action))) throw new Response("Permission denied", { status: 403 });
 }
 
+const scopeActor=(user:AppUser)=>({id:user.id,roleName:user.role_name,employeeId:user.employee_id,hrDataScope:user.hr_data_scope});
+
 async function canAccessEmployee(d1:PostgresDatabase,user:AppUser,employeeId:number){
-  if(user.role_name==="Super Admin"||user.role_name==="HR Manager")return true;
+  // A branch HR (hr_data_scope='assigned') only reaches the employees it is responsible for.
+  if(user.role_name==="Super Admin"||user.role_name==="HR Manager")return branchHrCanSee(d1,scopeActor(user),employeeId);
   if(user.role_name==="Employee")return Number(user.employee_id)===employeeId;
   if(user.role_name!=="Department Manager"||!user.employee_id)return false;
   const row=await d1.prepare(`${MANAGED_DEPARTMENTS_CTE} SELECT e.id FROM employees e WHERE e.id=? AND e.department_id IN (SELECT id FROM managed)`).bind(user.employee_id,employeeId).first<{id:number}>();
   return Boolean(row);
+}
+
+async function assertEmployeeInScope(d1:PostgresDatabase,user:AppUser,employeeId:number){
+  if(!(await canAccessEmployee(d1,user,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
+}
+
+/** Company-wide HR settings (HR rules, companies, organization) stay with Super Admin and the whole-company HR manager. */
+function assertNotBranchHr(user:AppUser){
+  if(isBranchScopedHr(scopeActor(user)))throw new Response("This setting is managed by the HR manager",{status:403});
 }
 
 async function audit(d1: PostgresDatabase|TransactionDatabase, request: Request, user: AppUser, action: string, module: string, recordType?: string, recordId?: string, previous?: unknown, next?: unknown) {
@@ -342,7 +355,7 @@ export async function GET(request: Request) {
     if(new URL(request.url).searchParams.get("view")==="biometric"){
       await authorize(d1,user,"attendance","view");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can view biometric devices",{status:403});
-      return Response.json(await readBiometricWorkspace(d1,new URL(request.url)),{headers:{"cache-control":"no-store"}});
+      return Response.json(await readBiometricWorkspace(d1,new URL(request.url),await branchHrEmployeeIds(d1,scopeActor(user))),{headers:{"cache-control":"no-store"}});
     }
     // This handler asks ~22 permission questions. Loading the role's grid once turns
     // that many round trips into one, which matters because the dashboard polls here.
@@ -358,7 +371,8 @@ export async function GET(request: Request) {
     const visibleDepartmentIds=[...departmentIds];
     if(user.department_id&&!visibleDepartmentIds.includes(Number(user.department_id)))visibleDepartmentIds.push(Number(user.department_id));
     const visibleDepartmentList=visibleDepartmentIds.length?visibleDepartmentIds.join(","):"-1";
-    const employeeScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR e.department_id IN (${departmentList}))`:`e.id=${Number(user.employee_id)||-1}`;
+    const branchHrSql=await branchHrEmployeeSql(d1,scopeActor(user));
+    const employeeScope=fullCompany?(branchHrSql??"TRUE"):user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR e.department_id IN (${departmentList}))`:`e.id=${Number(user.employee_id)||-1}`;
     const hrSql=await effectiveHrSql(d1);
     const requestEmployeeScope=fullCompany?`(${hrSql}=${Number(user.id)} OR e.id=${Number(user.employee_id)||-1})`:user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR (${EMPLOYEE_MANAGER_SQL})=${Number(user.employee_id)||-1})`:employeeScope;
     const departmentScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`d.id IN (${visibleDepartmentList})`:`d.id=${Number(user.department_id)||-1}`;
@@ -376,7 +390,7 @@ export async function GET(request: Request) {
       d1.prepare("SELECT * FROM holidays WHERE status!='deleted' ORDER BY holiday_date").all(),
       d1.prepare(user.role_name==="Employee"?"SELECT lt.* FROM leave_types lt WHERE lt.status!='archived' AND EXISTS (SELECT 1 FROM employee_leave_types elt WHERE elt.employee_id=? AND elt.leave_type_id=lt.id) ORDER BY lt.id":"SELECT * FROM leave_types WHERE status!='archived' ORDER BY id").bind(...(user.role_name==="Employee"?[employeeIdParam]:[])).all(),
       (canViewPermissions||canViewUsers||canCreateEmployees)?d1.prepare(`SELECT r.*,COUNT(u.id) AS user_count FROM roles r LEFT JOIN users u ON u.role_id=r.id ${user.role_name==="Super Admin"?"":"WHERE r.is_system=1 AND r.name IN ('Department Manager','Employee')"} GROUP BY r.id ORDER BY r.is_system DESC,r.id`).all():Promise.resolve({results:[]}),
-      canViewUsers?d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.must_change_password,u.last_login_at,u.role_id,r.name AS role_name,r.name_en AS role_name_en,r.name_ar AS role_name_ar,e.name_en AS employee_name,e.name_ar AS employee_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id ORDER BY u.id").all():Promise.resolve({results:[]}),
+      canViewUsers?d1.prepare("SELECT u.id,u.email,u.employee_id,u.status,u.hr_data_scope,u.must_change_password,u.last_login_at,u.role_id,r.name AS role_name,r.name_en AS role_name_en,r.name_ar AS role_name_ar,e.name_en AS employee_name,e.name_ar AS employee_name_ar,j.name_en AS job_title_name,j.name_ar AS job_title_name_ar,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN job_titles j ON j.id=e.job_title_id"+(branchHrSql?` WHERE e.id IS NOT NULL AND ${branchHrSql}`:"")+" ORDER BY u.id").all():Promise.resolve({results:[]}),
       user.role_name==="Super Admin"?d1.prepare("SELECT a.*,u.email AS user_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 50").all():Promise.resolve({results:[]}),
       canViewSettings?d1.prepare("SELECT setting_key,value_json,updated_at FROM system_settings ORDER BY setting_key").all():Promise.resolve({results:[]}),
     ]);
@@ -395,24 +409,25 @@ export async function GET(request: Request) {
       d1.prepare(`SELECT l.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar FROM attendance_logs l JOIN employees e ON e.id=l.employee_id WHERE ${employeeScope} ORDER BY l.event_at DESC,l.id DESC LIMIT 2000`).all(),
     ]);
     const emptyResults = Promise.resolve({ results: [] as Record<string, unknown>[] });
+    const payrollScope=branchHrSql?` WHERE ${branchHrSql}`:"";
     const [salaryStructureRows,salaryAllowanceRows,payrollRunRows,payrollItemRows,payrollAllowanceLineRows,loanRows,taxBracketRows,insuranceRateRows] = await Promise.all([
       canPayroll
-        ? d1.prepare("SELECT s.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code FROM salary_structures s JOIN employees e ON e.id=s.employee_id ORDER BY s.employee_id,s.effective_from DESC LIMIT 1000").all()
+        ? d1.prepare("SELECT s.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code FROM salary_structures s JOIN employees e ON e.id=s.employee_id"+payrollScope+" ORDER BY s.employee_id,s.effective_from DESC LIMIT 1000").all()
         : d1.prepare("SELECT s.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code FROM salary_structures s JOIN employees e ON e.id=s.employee_id WHERE s.employee_id=? ORDER BY s.effective_from DESC LIMIT 200").bind(employeeIdParam).all(),
       canPayroll
-        ? d1.prepare("SELECT sa.* FROM salary_allowances sa ORDER BY sa.salary_structure_id LIMIT 4000").all()
+        ? d1.prepare("SELECT sa.* FROM salary_allowances sa"+(branchHrSql?" JOIN salary_structures s ON s.id=sa.salary_structure_id JOIN employees e ON e.id=s.employee_id"+payrollScope:"")+" ORDER BY sa.salary_structure_id LIMIT 4000").all()
         : d1.prepare("SELECT sa.* FROM salary_allowances sa JOIN salary_structures s ON s.id=sa.salary_structure_id WHERE s.employee_id=? ORDER BY sa.salary_structure_id LIMIT 500").bind(employeeIdParam).all(),
       canPayroll
         ? d1.prepare("SELECT * FROM payroll_runs ORDER BY year DESC,month DESC,country LIMIT 200").all()
         : emptyResults,
       canPayroll
-        ? d1.prepare("SELECT pi.*,pr.month,pr.year,pr.country,pr.status AS run_status,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code,e.work_email FROM payroll_items pi JOIN payroll_runs pr ON pr.id=pi.payroll_run_id JOIN employees e ON e.id=pi.employee_id ORDER BY pr.year DESC,pr.month DESC,e.name_en LIMIT 1000").all()
+        ? d1.prepare("SELECT pi.*,pr.month,pr.year,pr.country,pr.status AS run_status,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code,e.work_email FROM payroll_items pi JOIN payroll_runs pr ON pr.id=pi.payroll_run_id JOIN employees e ON e.id=pi.employee_id"+payrollScope+" ORDER BY pr.year DESC,pr.month DESC,e.name_en LIMIT 1000").all()
         : emptyResults,
       canPayroll
-        ? d1.prepare("SELECT pi.id AS payroll_item_id,sa.type,sa.amount,sa.percentage,ss.basic_salary AS structure_basic_salary,ROUND((COALESCE(sa.amount,(COALESCE(sa.percentage,0)/100.0)*ss.basic_salary))::numeric,2) AS resolved_amount FROM payroll_items pi JOIN payroll_runs pr ON pr.id=pi.payroll_run_id JOIN salary_structures ss ON ss.employee_id=pi.employee_id AND ss.effective_from::date<=(make_date(pr.year,pr.month,1)+INTERVAL '1 month'-INTERVAL '1 day')::date AND (ss.effective_to IS NULL OR ss.effective_to::date>=make_date(pr.year,pr.month,1)) JOIN salary_allowances sa ON sa.salary_structure_id=ss.id ORDER BY pi.id LIMIT 6000").all()
+        ? d1.prepare("SELECT pi.id AS payroll_item_id,sa.type,sa.amount,sa.percentage,ss.basic_salary AS structure_basic_salary,ROUND((COALESCE(sa.amount,(COALESCE(sa.percentage,0)/100.0)*ss.basic_salary))::numeric,2) AS resolved_amount FROM payroll_items pi JOIN payroll_runs pr ON pr.id=pi.payroll_run_id JOIN salary_structures ss ON ss.employee_id=pi.employee_id AND ss.effective_from::date<=(make_date(pr.year,pr.month,1)+INTERVAL '1 month'-INTERVAL '1 day')::date AND (ss.effective_to IS NULL OR ss.effective_to::date>=make_date(pr.year,pr.month,1)) JOIN salary_allowances sa ON sa.salary_structure_id=ss.id"+(branchHrSql?" JOIN employees e ON e.id=pi.employee_id"+payrollScope:"")+" ORDER BY pi.id LIMIT 6000").all()
         : emptyResults,
       canPayroll
-        ? d1.prepare("SELECT l.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code FROM loans_advances l JOIN employees e ON e.id=l.employee_id ORDER BY l.status,l.issued_at DESC LIMIT 500").all()
+        ? d1.prepare("SELECT l.*,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.employee_code FROM loans_advances l JOIN employees e ON e.id=l.employee_id"+payrollScope+" ORDER BY l.status,l.issued_at DESC LIMIT 500").all()
         : emptyResults,
       canPayroll
         ? d1.prepare("SELECT * FROM tax_brackets ORDER BY country,effective_from DESC,min_amount ASC LIMIT 500").all()
@@ -433,9 +448,10 @@ export async function GET(request: Request) {
     const hiddenManagerIds=[...new Set(employeeRows.results.filter(r=>r.manager_id&&!visibleIds.has(Number(r.manager_id))).map(r=>Number(r.manager_id)))];
     const hiddenManagerStatus=fullCompany&&hiddenManagerIds.length?new Map((await d1.prepare('SELECT id,employment_status FROM employees WHERE id=ANY(?::int[])').bind(hiddenManagerIds).all<{id:number;employment_status:string}>()).results.map(r=>[Number(r.id),r.employment_status])):new Map<number,string>();
     for(const row of employeeRows.results){if(row.manager_id&&!visibleIds.has(Number(row.manager_id))){row.manager_name=null;row.manager_name_ar=null;row.org_manager_id=null;const status=hiddenManagerStatus.get(Number(row.manager_id));row.manager_scope=!fullCompany?'restricted':status===undefined?'missing':status==='deleted'?'deleted':'restricted';}if(organization){Object.assign(row,assignmentById.get(Number(row.id)));}}
+    if(branchHrSql){if(organization)organization.hrRules=[];companyHrCatalog.hrCandidates=[];}
     if(organization&&!fullCompany){organization.departments=organization.departments.filter(r=>visibleDepartmentIds.includes(Number(r.id)));organization.hrRules=[];for(const unit of organization.departments){if(!visibleIds.has(Number(unit.manager_employee_id)))unit.manager_employee_id=null;}organization.positions=organization.positions.filter(p=>!p.department_id||visibleDepartmentIds.includes(Number(p.department_id)));companyHrCatalog.hrResponsibles=companyHrCatalog.hrResponsibles.filter(h=>visibleIds.has(Number(h.employee_id)));companyHrCatalog.hrCandidates=[];}
 
-    return Response.json({ organization, employeeScope:fullCompany?'full':'limited', ...companyHrCatalog, currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
+    return Response.json({ organization, employeeScope:fullCompany&&!branchHrSql?'full':'limited',hrDataScope:normalizeHrDataScope(user.hr_data_scope),hrDataScopes:HR_DATA_SCOPES, ...companyHrCatalog, currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiFailure(error,"Unexpected server error"); }
   finally { await d1.close(); }
 }
@@ -452,6 +468,7 @@ export async function POST(request: Request) {
     const action=required(payload.action,"action");
     if(action==="save_company"||action==="save_hr_responsible"){
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Forbidden",{status:403});
+      assertNotBranchHr(user);
       await authorize(d1,user,"system_settings","manage_settings");
       const result=await d1.transaction(async tx=>{
         // One audit row per save with the exact before/after record. Migrated company saves are audited by saveOrganizationEntity.
@@ -513,6 +530,7 @@ export async function POST(request: Request) {
     if(action==="create_user"){
       await authorize(d1,user,"users","edit");
       const employeeId=Number(payload.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       const roleId=Number(payload.roleId)||0,role=roleId?await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(roleId).first<{id:number;name:string;is_system:number}>():await d1.prepare("SELECT id,name,is_system FROM roles WHERE name=?").bind(required(payload.roleName,"Role")).first<{id:number;name:string;is_system:number}>();if(!role)throw new Response("Invalid access role",{status:400});
       if(user.role_name==="HR Manager"&&(Number(role.is_system)!==1||!['Department Manager','Employee'].includes(role.name)))throw new Response("HR can assign employee and department-manager roles only",{status:403});
       const employee=await d1.prepare("SELECT id,work_email,employment_status FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<{id:number;work_email:string|null;employment_status:string}>();
@@ -529,8 +547,14 @@ export async function POST(request: Request) {
       const targetUserId=Number(payload.userId);if(!targetUserId)throw new Response("User is required",{status:400});
       const requestedRoleId=Number(payload.roleId)||0,requestedRole=requestedRoleId?await d1.prepare("SELECT id,name,is_system FROM roles WHERE id=?").bind(requestedRoleId).first<{id:number;name:string;is_system:number}>():await d1.prepare("SELECT id,name,is_system FROM roles WHERE name=?").bind(required(payload.roleName,"Role")).first<{id:number;name:string;is_system:number}>();if(!requestedRole)throw new Response("Invalid access role",{status:400});const roleName=requestedRole.name;
       const status=clean(payload.status)==="disabled"?"disabled":"active";
-      const before=await d1.prepare("SELECT u.id,u.email,u.role_id,u.status,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?").bind(targetUserId).first<Record<string,unknown>>();
+      const before=await d1.prepare("SELECT u.id,u.email,u.role_id,u.status,u.employee_id,u.hr_data_scope,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?").bind(targetUserId).first<Record<string,unknown>>();
       if(!before)throw new Response("User not found",{status:404});
+      if(before.employee_id)await assertEmployeeInScope(d1,user,Number(before.employee_id));
+      // Only Super Admin decides whether an HR account sees the whole company or only the employees it is responsible for.
+      const requestedHrScope=payload.hrDataScope===undefined||payload.hrDataScope===null?null:String(payload.hrDataScope);
+      if(requestedHrScope!==null&&!(HR_DATA_SCOPES as readonly string[]).includes(requestedHrScope))throw new Response("Invalid HR visibility",{status:400});
+      const hrDataScope=requestedHrScope!==null&&requestedHrScope!==normalizeHrDataScope(before.hr_data_scope)?requestedHrScope:null;
+      if(hrDataScope!==null&&user.role_name!=="Super Admin")throw new Response("Only the system administrator can change HR visibility",{status:403});
       if(user.role_name==="HR Manager"&&(Number(requestedRole.is_system)!==1||!["Department Manager","Employee"].includes(roleName)||["Super Admin","HR Manager"].includes(String(before.role_name))))throw new Response("HR can manage employee and department-manager accounts only",{status:403});
       if(before.role_name==="Super Admin"&&(roleName!=="Super Admin"||status!=="active")){
         const admins=await d1.prepare("SELECT COUNT(*)::int AS count FROM users u JOIN roles r ON r.id=u.role_id WHERE r.name='Super Admin' AND u.status='active'").first<{count:number}>();
@@ -538,8 +562,8 @@ export async function POST(request: Request) {
       }
       const temporaryPassword=clean(payload.temporaryPassword,200);let passwordHash:string|null=null;
       if(temporaryPassword){if(temporaryPassword.length<4)throw new Response("Temporary password must be at least 4 characters",{status:400});passwordHash=await hashPassword(temporaryPassword);}
-      await d1.prepare("UPDATE users SET role_id=?,status=?,password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(requestedRole.id,status,passwordHash,passwordHash,targetUserId).run();
-      await audit(d1,request,user,"update","users","user",String(targetUserId),before,{roleName,status,passwordReset:Boolean(passwordHash)});
+      await d1.prepare("UPDATE users SET role_id=?,status=?,hr_data_scope=COALESCE(?,hr_data_scope),password_hash=COALESCE(?,password_hash),must_change_password=CASE WHEN ?::text IS NULL THEN must_change_password ELSE 1 END,session_version=session_version+1,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(requestedRole.id,status,hrDataScope,passwordHash,passwordHash,targetUserId).run();
+      await audit(d1,request,user,"update","users","user",String(targetUserId),before,{roleName,status,passwordReset:Boolean(passwordHash),...(hrDataScope!==null?{hrDataScope}:{})});
       return Response.json({ok:true});
     }
     if(action==="create_employee") {
@@ -570,6 +594,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"employees","edit");
       const employeeId=Number(payload.employeeId);
       if(!employeeId) throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       await d1.transaction(async tx=>{
         await saveEmployeeProfile(tx,employeeId,payload,{id:user.id,ip:request.headers.get('cf-connecting-ip'),employeeId:user.employee_id,roleName:user.role_name},async db=>{
           if(Array.isArray(payload.leaveTypeIds))await syncEmployeeLeaveTypes(db,employeeId,payload.leaveTypeIds,user.id);
@@ -581,6 +606,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"employees","delete");
       const employeeId=Number(payload.employeeId);
       if(!employeeId)throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       if(Number(user.employee_id)===employeeId)throw new Response("You cannot delete your own employee record",{status:400});
       const before=await d1.prepare("SELECT * FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Record<string,unknown>>();
       if(!before)throw new Response("Employee not found",{status:404});
@@ -774,6 +800,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance_adjustments","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can make a manual correction",{status:403});
       const employeeId=Number(payload.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       return Response.json(await manualAttendanceCorrection({db:d1,request,actor:{id:user.id,employeeId:user.employee_id,roleName:user.role_name},employeeId,attendanceDate:required(payload.attendanceDate,"Attendance date"),field:required(payload.field,"Field"),newValue:payload.newValue,reason:payload.reason}));
     }
     if(action==="scan_attendance_exceptions") {
@@ -808,6 +835,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance_adjustments","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can map biometric users",{status:403});
       const deviceUserId=Number(payload.deviceUserId),employeeId=Number(payload.employeeId);if(!deviceUserId||!employeeId)throw new Response("Biometric user and employee are required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       const before=await d1.prepare("SELECT * FROM attendance_device_users WHERE id=?").bind(deviceUserId).first<Row>();if(!before)throw new Response("Biometric user not found",{status:404});
       const result=await mapAttendanceDeviceUser({db:d1,deviceUserId,employeeId});
       await audit(d1,request,user,"biometric_user_mapped","attendance_adjustments","attendance_device_user",String(deviceUserId),before,result);
@@ -917,6 +945,7 @@ export async function POST(request: Request) {
         await authorize(d1,user,'system_settings','manage_settings');
         if(!['Super Admin','HR Manager'].includes(user.role_name))throw new Response('Forbidden',{status:403});
       }else await authorize(d1,user,target.module,"delete");
+      if(entity==='employee')await assertEmployeeInScope(d1,user,id);
       await d1.transaction(async tx=>{
         await tx.prepare('SELECT pg_advisory_xact_lock(78231)').run();
         if(entity==='employee')await validateEmployeeWrite(tx,id,{employmentStatus:'archived'},await tx.prepare('SELECT * FROM employees WHERE id=?').bind(id).first()||{});
@@ -934,6 +963,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"payroll","edit_draft");
       const employeeId=Number(payload.employeeId);
       if(!employeeId) throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       const employee=await d1.prepare("SELECT id,country FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<{id:number;country:string}>();
       if(!employee) throw new Response("Employee not found",{status:404});
       const basicSalary=Number(payload.basicSalary);
@@ -962,6 +992,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"payroll","edit_draft");
       const employeeId=Number(payload.employeeId);
       if(!employeeId) throw new Response("Employee is required",{status:400});
+      await assertEmployeeInScope(d1,user,employeeId);
       const employee=await d1.prepare("SELECT id FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<{id:number}>();
       if(!employee) throw new Response("Employee not found",{status:404});
       const totalAmount=Number(payload.totalAmount), monthlyInstallment=Number(payload.monthlyInstallment);

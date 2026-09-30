@@ -8,10 +8,13 @@ import { ensureAuthSchema, requirePortalSession } from "../../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../../db/postgres";
 import { apiFailure, loadPermissions } from "../../api-security";
 import { canViewEmployeeProfile, profileFieldPolicy } from "../../../employees/profile-access";
+import { branchHrCanSee, isBranchScopedHr } from "../../../employees/hr-data-scope";
 
-type Viewer={id:number;role_id:number;role_name:string;employee_id:number|null};
+type Viewer={id:number;role_id:number;role_name:string;employee_id:number|null;hr_data_scope?:string|null};
 type Row=Record<string,unknown>;
 async function canAccess(db:PostgresDatabase,user:Viewer,employeeId:number){
+  const scopeActor={id:user.id,roleName:user.role_name,employeeId:user.employee_id,hrDataScope:user.hr_data_scope};
+  if(isBranchScopedHr(scopeActor))return branchHrCanSee(db,scopeActor,employeeId);
   const managed=user.role_name==="Department Manager"&&Boolean(user.employee_id)&&Boolean(await db.prepare(`${MANAGED_DEPARTMENTS_CTE} SELECT e.id FROM employees e WHERE e.id=? AND e.department_id IN (SELECT id FROM managed)`).bind(user.employee_id,employeeId).first<Row>());
   return canViewEmployeeProfile({roleName:user.role_name,isSelf:Number(user.employee_id)===employeeId,isInManagedScope:managed});
 }
@@ -20,7 +23,7 @@ export async function GET(request:Request,context:{params:Promise<{id:string}>})
   const db=createDatabase();
   try{
     await ensureAuthSchema(db);const session=await requirePortalSession(request,db),{id}=await context.params,employeeId=Number(id);if(!employeeId)throw new Response("Employee not found",{status:404});
-    const user=await db.prepare("SELECT u.id,u.role_id,u.employee_id,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'").bind(session.userId).first<Viewer>();if(!user)throw new Response("Account disabled",{status:403});
+    const user=await db.prepare("SELECT u.id,u.role_id,u.employee_id,u.hr_data_scope,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'").bind(session.userId).first<Viewer>();if(!user)throw new Response("Account disabled",{status:403});
     if(!(await canAccess(db,user,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
     // One query for the whole permission grid: this handler asks up to fourteen questions.
     const perms=await loadPermissions(db,{roleId:user.role_id,roleName:user.role_name});

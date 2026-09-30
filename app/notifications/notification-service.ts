@@ -57,7 +57,7 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
     WHERE d.status='active' AND d.expiry_date BETWEEN CURRENT_DATE::text AND (CURRENT_DATE+30)::text
     ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
   await db.prepare(`WITH expiring AS (
-      SELECT e.id,e.manager_id,e.end_date FROM employees e
+      SELECT e.* FROM employees e
       WHERE e.employment_status IN ('active','probation','notice_period')
         AND e.end_date BETWEEN CURRENT_DATE::text AND (CURRENT_DATE+${CONTRACT_EXPIRY_WARNING_DAYS})::text
     ), recipients AS (
@@ -69,6 +69,8 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
       UNION
       SELECT e.id,e.end_date,u.id,concat('employees?employee=',e.id)::text
       FROM expiring e JOIN users u ON u.status='active' JOIN roles r ON r.id=u.role_id AND r.name IN ('Super Admin','HR Manager')
+      -- A branch HR (hr_data_scope='assigned') is only told about the employees it is responsible for.
+      WHERE r.name='Super Admin' OR COALESCE(u.hr_data_scope,'all')='all' OR u.id=${hrSql}
     )
     INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT user_id,'contract','contract_expiring_soon',end_date,'employee',employee_id::text,target_path,concat('employee:',employee_id,':contract-expiry:',end_date)::text,CURRENT_TIMESTAMP

@@ -23,16 +23,17 @@ export function parseAttendanceReportFilters(url: URL): AttendanceReportFilters 
   return { employeeId, from, to, country };
 }
 
-const FROM_CLAUSE = "FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments dep ON dep.id=e.department_id WHERE e.employment_status!='deleted' AND a.work_date>=? AND a.work_date<=? AND (?=0 OR a.employee_id=?) AND (?='' OR e.country=?)";
-const bindings = (filters: AttendanceReportFilters) => [filters.from, filters.to, filters.employeeId, filters.employeeId, filters.country, filters.country];
+const FROM_CLAUSE = "FROM daily_attendance a JOIN employees e ON e.id=a.employee_id LEFT JOIN departments dep ON dep.id=e.department_id WHERE e.employment_status!='deleted' AND a.work_date>=? AND a.work_date<=? AND (?=0 OR a.employee_id=?) AND (?='' OR e.country=?) AND (?::int[] IS NULL OR a.employee_id=ANY(?::int[]))";
+/** `employeeIds` limits the report to those employees (a branch HR); null means every employee. */
+const bindings = (filters: AttendanceReportFilters, employeeIds: number[] | null = null) => [filters.from, filters.to, filters.employeeId, filters.employeeId, filters.country, filters.country, employeeIds, employeeIds];
 const ROW_COLUMNS = "a.id,a.work_date,a.scheduled_in,a.scheduled_out,a.actual_in,a.actual_out,a.worked_minutes,a.required_minutes,a.late_minutes,a.early_minutes,a.overtime_minutes,a.status,e.id AS employee_id,e.employee_code,e.name_en AS employee_name,e.name_ar AS employee_name_ar,dep.name_en AS department_name,dep.name_ar AS department_name_ar";
 const ORDER = " ORDER BY a.work_date,e.name_en,a.id";
 
-export async function readAttendanceReport(db: PostgresDatabase, filters: AttendanceReportFilters, page: number) {
+export async function readAttendanceReport(db: PostgresDatabase, filters: AttendanceReportFilters, page: number, employeeIds: number[] | null = null) {
   const safePage = Math.max(1, Math.min(100000, Math.floor(page) || 1));
   const [summary, records] = await Promise.all([
-    db.prepare("SELECT count(*)::integer AS total_rows,count(*) FILTER (WHERE NULLIF(BTRIM(a.actual_in),'') IS NOT NULL)::integer AS attended_days,count(*) FILTER (WHERE a.late_minutes>0)::integer AS late_days,COALESCE(sum(a.late_minutes),0)::integer AS late_minutes,count(*) FILTER (WHERE a.early_minutes>0)::integer AS early_days,COALESCE(sum(a.early_minutes),0)::integer AS early_minutes,count(*) FILTER (WHERE a.overtime_minutes>0)::integer AS overtime_days,COALESCE(sum(a.overtime_minutes),0)::integer AS overtime_minutes,COALESCE(sum(a.worked_minutes),0)::integer AS worked_minutes,count(*) FILTER (WHERE a.status='absent')::integer AS absent_days,count(*) FILTER (WHERE a.status='leave')::integer AS leave_days " + FROM_CLAUSE).bind(...bindings(filters)).first<Record<string, number>>(),
-    db.prepare("SELECT " + ROW_COLUMNS + " " + FROM_CLAUSE + ORDER + " LIMIT ? OFFSET ?").bind(...bindings(filters), ATTENDANCE_REPORT_PAGE_SIZE, (safePage - 1) * ATTENDANCE_REPORT_PAGE_SIZE).all(),
+    db.prepare("SELECT count(*)::integer AS total_rows,count(*) FILTER (WHERE NULLIF(BTRIM(a.actual_in),'') IS NOT NULL)::integer AS attended_days,count(*) FILTER (WHERE a.late_minutes>0)::integer AS late_days,COALESCE(sum(a.late_minutes),0)::integer AS late_minutes,count(*) FILTER (WHERE a.early_minutes>0)::integer AS early_days,COALESCE(sum(a.early_minutes),0)::integer AS early_minutes,count(*) FILTER (WHERE a.overtime_minutes>0)::integer AS overtime_days,COALESCE(sum(a.overtime_minutes),0)::integer AS overtime_minutes,COALESCE(sum(a.worked_minutes),0)::integer AS worked_minutes,count(*) FILTER (WHERE a.status='absent')::integer AS absent_days,count(*) FILTER (WHERE a.status='leave')::integer AS leave_days " + FROM_CLAUSE).bind(...bindings(filters, employeeIds)).first<Record<string, number>>(),
+    db.prepare("SELECT " + ROW_COLUMNS + " " + FROM_CLAUSE + ORDER + " LIMIT ? OFFSET ?").bind(...bindings(filters, employeeIds), ATTENDANCE_REPORT_PAGE_SIZE, (safePage - 1) * ATTENDANCE_REPORT_PAGE_SIZE).all(),
   ]);
   return { summary: summary || {}, records: records.results, page: safePage, pageSize: ATTENDANCE_REPORT_PAGE_SIZE, total: Number(summary?.total_rows) || 0 };
 }
@@ -49,10 +50,10 @@ const cell = (value: unknown) => {
 
 export const weekday = (day: unknown, arabic: boolean) => /^\d{4}-\d{2}-\d{2}$/.test(String(day)) ? new Intl.DateTimeFormat(arabic ? "ar-EG" : "en-GB", { weekday: "long", timeZone: "UTC" }).format(new Date(String(day) + "T12:00:00Z")) : "";
 
-export async function exportAttendanceReportCsv(db: PostgresDatabase, filters: AttendanceReportFilters, arabic: boolean) {
+export async function exportAttendanceReportCsv(db: PostgresDatabase, filters: AttendanceReportFilters, arabic: boolean, employeeIds: number[] | null = null) {
   const [summary, rows] = await Promise.all([
-    db.prepare("SELECT COALESCE(sum(a.worked_minutes),0)::integer AS worked_minutes,COALESCE(sum(a.late_minutes),0)::integer AS late_minutes,COALESCE(sum(a.early_minutes),0)::integer AS early_minutes,COALESCE(sum(a.overtime_minutes),0)::integer AS overtime_minutes,count(*)::integer AS total_rows " + FROM_CLAUSE).bind(...bindings(filters)).first<Record<string, number>>(),
-    db.prepare("SELECT " + ROW_COLUMNS + " " + FROM_CLAUSE + ORDER + " LIMIT ?").bind(...bindings(filters), ATTENDANCE_REPORT_EXPORT_LIMIT).all(),
+    db.prepare("SELECT COALESCE(sum(a.worked_minutes),0)::integer AS worked_minutes,COALESCE(sum(a.late_minutes),0)::integer AS late_minutes,COALESCE(sum(a.early_minutes),0)::integer AS early_minutes,COALESCE(sum(a.overtime_minutes),0)::integer AS overtime_minutes,count(*)::integer AS total_rows " + FROM_CLAUSE).bind(...bindings(filters, employeeIds)).first<Record<string, number>>(),
+    db.prepare("SELECT " + ROW_COLUMNS + " " + FROM_CLAUSE + ORDER + " LIMIT ?").bind(...bindings(filters, employeeIds), ATTENDANCE_REPORT_EXPORT_LIMIT).all(),
   ]);
   const statuses = arabic ? STATUS_AR : STATUS_EN;
   const header = arabic

@@ -2,6 +2,7 @@ import { validateEmployeeWrite } from '../../organization/assignment-service';
 import { withDatabase } from "../route-helpers";
 import { canAccessEmployee, enforceRateLimit, enforceWriteOrigin, requireActor } from "../api-security";
 import { audit, body, nextOwner, notifyEmployee, number, required, requireEmployeeScope, requireModule, text } from "../../talent/talent-service";
+import { seesWholeCompany } from "../../employees/hr-data-scope";
 
 export async function GET(request:Request){
   return withDatabase("Unable to load employee lifecycle", async db => {
@@ -51,7 +52,7 @@ export async function GET(request:Request){
       const entity=organizationEntity(Number(lifecycle.employee_id));
       return {...lifecycle,...safeCompletedBy,...safeResponsible,organization_entity_name:entity?.name_en||lifecycle.department_name,organization_entity_name_ar:entity?.name_ar||entity?.name_en||lifecycle.department_name_ar||lifecycle.department_name};
     });
-    if(!["Super Admin","HR Manager"].includes(actor.roleName)){const scoped=[] as Record<string,unknown>[];for(const lifecycle of visibleLifecycles)if(await canAccessEmployee(db,actor,Number(lifecycle.employee_id)))scoped.push(lifecycle);visibleLifecycles=scoped;}
+    if(!seesWholeCompany(actor)){const scoped=[] as Record<string,unknown>[];for(const lifecycle of visibleLifecycles)if(await canAccessEmployee(db,actor,Number(lifecycle.employee_id)))scoped.push(lifecycle);visibleLifecycles=scoped;}
     const visibleIds=new Set(visibleLifecycles.map(lifecycle=>Number(lifecycle.id))),visibleEmployeeIds=new Set(visibleLifecycles.map(lifecycle=>Number(lifecycle.employee_id)));
     const visibleTasks=taskRows.filter(task=>visibleIds.has(Number(task.lifecycle_id))).map(task=>{
       const ownerName=String(task.owner_name||"");

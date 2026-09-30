@@ -2,6 +2,7 @@ import { commitTeamTransfer, previewTeamTransfer, type TransferInput } from '../
 import { withDatabase } from '../../route-helpers';
 import { enforceWriteOrigin, requireActor } from '../../api-security';
 import { requireModule, body } from '../../../talent/talent-service';
+import { seesWholeCompany } from '../../../employees/hr-data-scope';
 
 /**
  * Team organizational transfer. Same authorization boundary as the employee profile save (HR roles + employees/edit).
@@ -10,7 +11,7 @@ import { requireModule, body } from '../../../talent/talent-service';
  */
 export async function POST(request:Request){return withDatabase('Unable to transfer team',async db=>{
   enforceWriteOrigin(request);const actor=await requireActor(request,db);
-  if(!['Super Admin','HR Manager'].includes(actor.roleName))throw new Response('Employee editing is restricted to HR',{status:403});
+  if(!seesWholeCompany(actor))throw new Response('Employee editing is restricted to HR',{status:403});
   await requireModule(db,actor,'employees','edit');
   const input=await body(request) as unknown as TransferInput&{mode?:string};
   if(input.mode==='commit'){

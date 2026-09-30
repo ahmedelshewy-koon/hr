@@ -892,12 +892,14 @@ function UserAccessCards({rtl,rows,roles,currentRole,reload,notify}:{rtl:boolean
     const name=rtl?(row.employee_name_ar||row.employee_name||row.email):(row.employee_name||row.email);
     const role=roles.find(item=>Number(item.id)===Number(row.role_id))||row;
     const editing=editingId===Number(row.id);
+    // Only Super Admin decides whether an HR account sees everyone or only the employees it is responsible for.
+    const hrScope=row.hr_data_scope==="assigned"?"assigned":"all",hrScopeEditable=currentRole==="Super Admin"&&row.role_name==="HR Manager";
     return <article className="user-access-card" key={row.id}>
       <Avatar initials={personInitials(name)}/>
       <h3>{name}</h3>
       <span className="user-card-job">{(rtl?(row.job_title_name_ar||row.job_title_name):(row.job_title_name||row.job_title_name_ar))||(rtl?"المسمى الوظيفي غير محدد":"Job title not specified")}</span>
       <span className="user-card-email" dir="ltr">{row.email}</span>
-      <div className="user-card-badges"><span className="user-card-role">{roleLabel(role,rtl)}</span>
+      <div className="user-card-badges"><span className="user-card-role">{roleLabel(role,rtl)}</span>{row.role_name==="HR Manager"&&hrScope==="assigned"&&<span className="user-card-role">{rtl?"HR فرع":"Branch HR"}</span>}
       <span className={`user-card-status ${row.status==="active"?"active":"disabled"}`}>{row.status==="active"?(rtl?"نشط":"Active"):(rtl?"موقوف":"Disabled")}</span>
       </div>
       <div className="user-card-actions">
@@ -907,6 +909,7 @@ function UserAccessCards({rtl,rows,roles,currentRole,reload,notify}:{rtl:boolean
       {editing&&<div className="user-card-edit" id={`user-access-edit-${row.id}`}>
         <label><span>{rtl?"دور المستخدم":"Access role"}</span><select value={row.role_id} disabled={protectedAccount} onChange={event=>void save(row,{roleId:Number(event.target.value)})}>{roles.map(item=><option value={item.id} key={item.id}>{roleLabel(item,rtl)}</option>)}</select></label>
         <label><span>{rtl?"الحالة":"Status"}</span><select value={row.status} disabled={protectedAccount} onChange={event=>void save(row,{status:event.target.value})}><option value="active">{rtl?"نشط":"Active"}</option><option value="disabled">{rtl?"موقوف":"Disabled"}</option></select></label>
+        {hrScopeEditable&&<label><span>{rtl?"الموظفون الظاهرون":"Visible employees"}</span><select value={hrScope} onChange={event=>void save(row,{hrDataScope:event.target.value})}><option value="all">{rtl?"كل الموظفين (مدير الموارد البشرية)":"All employees (HR manager)"}</option><option value="assigned">{rtl?"الموظفون المسؤول عنهم فقط (HR فرع)":"Only employees they are responsible for (branch HR)"}</option></select></label>}
       </div>}
     </article>;
   })}</div>;

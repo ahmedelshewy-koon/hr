@@ -202,6 +202,7 @@ export const users = pgTable(
     }),
     status: text("status").notNull().default("active"),
     mustChangePassword: integer("must_change_password").notNull().default(0),
+    hrDataScope: text("hr_data_scope").notNull().default("all"),
     lastLoginAt: timestamp("last_login_at", {
       withTimezone: true,
       mode: "string",

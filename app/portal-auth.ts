@@ -113,6 +113,8 @@ async function applyAuthSchema(d1: PostgresDatabase) {
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0").run();
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ").run();
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ").run();
+  // 'all' = whole company (HR manager); 'assigned' = only the employees this HR account is responsible for.
+  await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_data_scope TEXT NOT NULL DEFAULT 'all'").run();
   await d1.prepare("ALTER TABLE roles ADD COLUMN IF NOT EXISTS name_en TEXT").run();
   await d1.prepare("ALTER TABLE roles ADD COLUMN IF NOT EXISTS name_ar TEXT").run();
   await d1.prepare("UPDATE roles SET name_en=COALESCE(name_en,name),name_ar=COALESCE(name_ar,CASE name WHEN 'Super Admin' THEN 'مدير النظام' WHEN 'HR Manager' THEN 'مدير الموارد البشرية' WHEN 'Department Manager' THEN 'مدير القسم' WHEN 'Employee' THEN 'موظف' END) WHERE name IN ('Super Admin','HR Manager','Department Manager','Employee')").run();

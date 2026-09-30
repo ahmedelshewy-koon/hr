@@ -1,7 +1,8 @@
 import { organizationDuplicateError } from '../organization/duplicate-error';
 import { organizationResponse } from '../organization/org-errors';
 import { ensureAuthSchema, requirePortalSession } from "../portal-auth";
-import { MANAGED_DEPARTMENTS_CTE, isCompanyWideRole } from "../organization/department-scope";
+import { MANAGED_DEPARTMENTS_CTE } from "../organization/department-scope";
+import { branchHrCanSee, isBranchScopedHr, normalizeHrDataScope, seesWholeCompany, type HrDataScope } from "../employees/hr-data-scope";
 import type { PostgresDatabase } from "../../db/postgres";
 
 export type ApiActor = {
@@ -10,6 +11,8 @@ export type ApiActor = {
   roleName: string;
   employeeId: number | null;
   email: string;
+  /** HR visibility: 'all' (whole company) or 'assigned' (branch HR, only the employees it is responsible for). */
+  hrDataScope: HrDataScope;
 };
 
 const SAFE_FETCH_SITES = ["same-origin", "same-site", "none"];
@@ -74,10 +77,10 @@ export async function requireActor(request: Request, db: PostgresDatabase): Prom
   const session = await requirePortalSession(request, db);
   const actor = await db
     .prepare(
-      "SELECT u.id,u.email,u.employee_id,u.role_id,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'",
+      "SELECT u.id,u.email,u.employee_id,u.role_id,u.hr_data_scope,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.status='active'",
     )
     .bind(session.userId)
-    .first<{ id: number; email: string; employee_id: number | null; role_id: number; role_name: string }>();
+    .first<{ id: number; email: string; employee_id: number | null; role_id: number; role_name: string; hr_data_scope: string | null }>();
   if (!actor) throw new Response("Account disabled", { status: 403 });
   return {
     id: Number(actor.id),
@@ -85,6 +88,7 @@ export async function requireActor(request: Request, db: PostgresDatabase): Prom
     employeeId: actor.employee_id == null ? null : Number(actor.employee_id),
     roleId: Number(actor.role_id),
     roleName: String(actor.role_name),
+    hrDataScope: normalizeHrDataScope(actor.hr_data_scope),
   };
 }
 
@@ -144,8 +148,9 @@ export async function canAccessEmployee(
   actor: ApiActor,
   employeeId: number,
 ) {
-  if (isCompanyWideRole(actor.roleName)) return true;
+  if (seesWholeCompany(actor)) return true;
   if (Number(actor.employeeId) === employeeId) return true;
+  if (isBranchScopedHr(actor)) return branchHrCanSee(db, actor, employeeId);
   if (actor.roleName !== "Department Manager" || !actor.employeeId) return false;
   const row = await db
     .prepare(

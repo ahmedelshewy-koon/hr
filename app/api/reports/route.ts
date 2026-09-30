@@ -1,4 +1,5 @@
 import { effectiveHrSql } from '../../employees/hr-assignment';
+import { branchHrEmployeeIds, type ScopeActor } from "../../employees/hr-data-scope";
 import { MANAGED_DEPARTMENTS_CTE } from "../../organization/department-scope";
 import { type PostgresDatabase } from "../../../db/postgres";
 import { withDatabase } from "../route-helpers";
@@ -9,7 +10,7 @@ import { excelWorkbook } from "../../reports/excel-workbook";
 
 type Row=Record<string,unknown>;
 const csv=(rows:Row[],columns:{key:string;label:string}[],arabic:boolean)=>[columns.map(column=>column.label),...rows.map(row=>columns.map(column=>csvValue(column.key,row[column.key],arabic)))].map(values=>values.map(csvCell).join(",")).join("\r\n");
-async function scopeIds(db:PostgresDatabase,actor:{roleName:string;employeeId:number|null}){if(["Super Admin","HR Manager"].includes(actor.roleName))return null;if(actor.roleName==="Employee")return actor.employeeId?[actor.employeeId]:[];if(actor.roleName==="Department Manager"&&actor.employeeId){const rows=(await db.prepare(`${MANAGED_DEPARTMENTS_CTE} SELECT e.id FROM employees e WHERE e.department_id IN (SELECT id FROM managed) AND e.employment_status!='deleted'`).bind(actor.employeeId).all()).results;return rows.map(row=>Number(row.id));}return [];}
+async function scopeIds(db:PostgresDatabase,actor:ScopeActor){const branchHr=await branchHrEmployeeIds(db,actor);if(branchHr)return branchHr;if(["Super Admin","HR Manager"].includes(actor.roleName))return null;if(actor.roleName==="Employee")return actor.employeeId?[actor.employeeId]:[];if(actor.roleName==="Department Manager"&&actor.employeeId){const rows=(await db.prepare(`${MANAGED_DEPARTMENTS_CTE} SELECT e.id FROM employees e WHERE e.department_id IN (SELECT id FROM managed) AND e.employment_status!='deleted'`).bind(actor.employeeId).all()).results;return rows.map(row=>Number(row.id));}return [];}
 export async function GET(request:Request){
   return withDatabase("Unable to generate report", async db => {
   const actor=await requireActor(request,db),url=new URL(request.url),type=url.searchParams.get("type")||"attendance",format=url.searchParams.get("format")||"json",ids=await scopeIds(db,actor),args:unknown[]=[],where:string[]=[];

@@ -1,6 +1,7 @@
 import type { PostgresDatabase } from "../../db/postgres";
 import type { ApiActor, PermissionSet } from "../api/api-security";
 import { MANAGED_DEPARTMENTS_CTE, isCompanyWideRole } from "../organization/department-scope";
+import { branchHrEmployeeIds } from "../employees/hr-data-scope";
 import { addDays, cairoToday, previousPeriod, type ReportPeriod } from "./report-period";
 import type {
   ApprovalsReport, AssetsReport, AttendanceReport, AttendanceTotals, CountRow, DatedPerson, DocumentsReport, LearningReport,
@@ -28,7 +29,9 @@ const daysFrom = (from: string, to: string) => Math.round((Date.parse(to) - Date
 const counts = (rows: Row[]): CountRow[] => rows.map(row => ({ key: String(row.key ?? ""), count: num(row.count) }));
 
 /** Who the actor may report on: `null` is everyone, otherwise the explicit employee ids (a manager's own branch). */
-export async function reportEmployeeScope(db: PostgresDatabase, actor: Pick<ApiActor, "roleName" | "employeeId">): Promise<number[] | null> {
+export async function reportEmployeeScope(db: PostgresDatabase, actor: Pick<ApiActor, "id" | "roleName" | "employeeId" | "hrDataScope">): Promise<number[] | null> {
+  const branchHr = await branchHrEmployeeIds(db, actor);
+  if (branchHr) return branchHr;
   if (isCompanyWideRole(actor.roleName)) return null;
   if (actor.roleName === "Employee") return actor.employeeId ? [actor.employeeId] : [];
   if (actor.roleName === "Department Manager" && actor.employeeId) {

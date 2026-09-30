@@ -1,12 +1,14 @@
 import { EMPLOYEE_MANAGER_SQL, effectiveHrSql } from "../../employees/hr-assignment";
 import { MANAGED_DEPARTMENTS_CTE } from "../../organization/department-scope";
+import { branchHrEmployeeIds, type ScopeActor } from "../../employees/hr-data-scope";
 import { type PostgresDatabase } from "../../../db/postgres";
 import { withDatabase } from "../route-helpers";
 import { requireActor } from "../api-security";
 import { CONTRACT_EXPIRY_WARNING_DAYS } from "../../employees/contract-policy";
 
 type Row=Record<string,unknown>;
-async function employeeScope(db:PostgresDatabase,actor:{roleName:string;employeeId:number|null}){
+async function employeeScope(db:PostgresDatabase,actor:ScopeActor){
+  const branchHr=await branchHrEmployeeIds(db,actor);if(branchHr)return branchHr;
   if(["Super Admin","HR Manager"].includes(actor.roleName))return null;
   if(actor.roleName==="Employee")return actor.employeeId?[actor.employeeId]:[];
   if(actor.roleName==="Department Manager"&&actor.employeeId){const rows=(await db.prepare(`${MANAGED_DEPARTMENTS_CTE} SELECT e.id FROM employees e WHERE e.department_id IN (SELECT id FROM managed) AND e.employment_status!='deleted'`).bind(actor.employeeId).all()).results;return [...new Set([actor.employeeId,...rows.map(row=>Number(row.id))])];}

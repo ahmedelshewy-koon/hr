@@ -1,12 +1,14 @@
 import { sql } from "drizzle-orm";
 import {
   doublePrecision,
+  foreignKey,
   index,
   integer,
   pgTable,
   serial,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -26,6 +28,9 @@ export const departments = pgTable("departments", {
   managerEmployeeId: integer("manager_employee_id"),
   parentId: integer("parent_id"),
   unitType: text("unit_type").notNull().default("department"),
+  companyId: integer("company_id").references(() => companies.id),
+  organizationKind: text("organization_kind"),
+  branchScope: text("branch_scope").notNull().default("all"),
   status: text("status").notNull().default("active"),
   ...timestamps,
 });
@@ -51,6 +56,8 @@ export const employees = pgTable(
     personalPhone: text("personal_phone"),
     workPhone: text("work_phone"),
     nationality: text("nationality"),
+    religion: text("religion"),
+    passportNumber: text("passport_number"),
     gender: text("gender"),
     birthDate: text("birth_date"),
     identificationNumber: text("identification_number"),
@@ -58,6 +65,15 @@ export const employees = pgTable(
     departmentId: integer("department_id"),
     jobTitleId: integer("job_title_id"),
     managerId: integer("manager_id"),
+    companyId: integer("company_id"),
+    branchId: integer("branch_id").references(() => branches.id),
+    sectionId: integer("section_id").references(() => departments.id),
+    teamId: integer("team_id").references(() => departments.id),
+    positionId: integer("position_id").references(() => positions.id),
+    gradeId: integer("grade_id").references(() => jobGrades.id),
+    workLocationId: integer("work_location_id").references(() => workLocations.id),
+    assignmentEffectiveDate: text("assignment_effective_date"),
+    hrUserId: integer("hr_user_id"),
     organizationalLevel: integer("organizational_level").notNull().default(1),
     startDate: text("start_date").notNull(),
     endDate: text("end_date"),
@@ -87,9 +103,69 @@ export const employees = pgTable(
       t.employmentStatus,
     ),
     index("idx_employees_manager").on(t.managerId),
+    index("idx_employees_company").on(t.companyId),
+    index("idx_employees_hr_user").on(t.hrUserId),
+    foreignKey({columns:[t.companyId],foreignColumns:[companies.id],name:"employees_company_id_fkey"}),
+    foreignKey({columns:[t.hrUserId],foreignColumns:[users.id],name:"employees_hr_user_id_fkey"}),
     index("idx_employees_contract_end").on(t.employmentStatus, t.endDate),
   ],
 );
+
+export const companies = pgTable("companies", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  nameAr: text("name_ar"),
+  nameEn: text("name_en"),
+  code: text("code").unique(),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+}, t => [uniqueIndex("idx_companies_name").on(sql`lower(btrim(${t.name}))`)]);
+
+// Organizational master data. No backfill or reinterpretation of legacy assignments.
+export const branches = pgTable("branches", {
+  id: serial("id").primaryKey(), nameAr: text("name_ar").notNull(), nameEn: text("name_en").notNull(),
+  code: text("code").notNull().unique(), country: text("country"), city: text("city"),
+  status: text("status").notNull().default("active"), ...timestamps,
+});
+export const companyBranches = pgTable("company_branches", {
+  id: serial("id").primaryKey(), companyId: integer("company_id").notNull().references(() => companies.id),
+  branchId: integer("branch_id").notNull().references(() => branches.id),
+}, t => [unique("company_branches_pair").on(t.companyId,t.branchId)]);
+export const organizationBranchScopes = pgTable("organization_branch_scopes", {
+  id: serial("id").primaryKey(), departmentId: integer("department_id").notNull().references(() => departments.id),
+  branchId: integer("branch_id").notNull().references(() => branches.id),
+}, t => [unique("organization_branch_scopes_pair").on(t.departmentId,t.branchId)]);
+export const jobGrades = pgTable("job_grades", {
+  sortOrder: integer("sort_order").notNull().default(0),
+  id: serial("id").primaryKey(), nameAr: text("name_ar").notNull(), nameEn: text("name_en").notNull(),
+  code: text("code").notNull().unique(), status: text("status").notNull().default("active"), ...timestamps,
+});
+export const positions = pgTable("positions", {
+  id: serial("id").primaryKey(), nameAr: text("name_ar").notNull(), nameEn: text("name_en").notNull(),
+  code: text("code").notNull().unique(), companyId: integer("company_id").notNull().references(() => companies.id),
+  jobTitleId: integer("job_title_id").references(() => jobTitles.id),
+  departmentId: integer("department_id").references(() => departments.id),
+  sectionId: integer("section_id").references(() => departments.id), teamId: integer("team_id").references(() => departments.id),
+  gradeId: integer("grade_id").references(() => jobGrades.id),
+  isCeo: integer("is_ceo").notNull().default(0), status: text("status").notNull().default("active"), ...timestamps,
+}, t => [uniqueIndex("positions_company_ceo").on(t.companyId).where(sql`${t.isCeo}=1 AND ${t.status}='active'`)]);
+export const workLocations = pgTable("work_locations", {
+  id: serial("id").primaryKey(), nameAr: text("name_ar").notNull(), nameEn: text("name_en").notNull(),
+  code: text("code").notNull().unique(), branchId: integer("branch_id").references(() => branches.id),
+  status: text("status").notNull().default("active"), ...timestamps,
+});
+export const hrResponsibilityRules = pgTable("hr_responsibility_rules", {
+  id: serial("id").primaryKey(), companyId: integer("company_id").references(() => companies.id),
+  branchId: integer("branch_id").notNull().references(() => branches.id),
+  hrUserId: integer("hr_user_id").notNull().references(() => hrResponsibles.userId),
+  status: text("status").notNull().default("active"), ...timestamps,
+}, t => [uniqueIndex("hr_rules_active_scope").on(sql`coalesce(${t.companyId},0)`,t.branchId).where(sql`${t.status}='active'`)]);
+
+export const hrResponsibles = pgTable("hr_responsibles", {
+  userId: integer("user_id").primaryKey(),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+}, t => [foreignKey({columns:[t.userId],foreignColumns:[users.id],name:"hr_responsibles_user_id_fkey"})]);
 
 export const roles = pgTable(
   "roles",
@@ -230,6 +306,94 @@ export const attendanceLogs = pgTable(
   },
   (t) => [
     index("idx_attendance_logs_employee_event").on(t.employeeId, t.eventAt),
+  ],
+);
+
+export const attendanceDevices = pgTable(
+  "attendance_devices",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    model: text("model").notNull(),
+    ipAddress: text("ip_address").notNull(),
+    port: integer("port").notNull().default(4370),
+    timezone: text("timezone").notNull().default("Africa/Cairo"),
+    syncIntervalSeconds: integer("sync_interval_seconds").notNull().default(300),
+    enabled: integer("enabled").notNull().default(1),
+    status: text("status").notNull().default("offline"),
+    deviceTime: timestamp("device_time", { withTimezone: true, mode: "string" }),
+    userCount: integer("user_count").notNull().default(0),
+    logCount: integer("log_count").notNull().default(0),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+    lastError: text("last_error"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("idx_attendance_devices_ip_port").on(t.ipAddress, t.port)],
+);
+
+export const attendanceDeviceUsers = pgTable(
+  "attendance_device_users",
+  {
+    id: serial("id").primaryKey(),
+    deviceId: integer("device_id").notNull(),
+    deviceUserId: text("device_user_id").notNull(),
+    deviceUid: integer("device_uid"),
+    employeeId: integer("employee_id"),
+    displayName: text("display_name").notNull(),
+    privilege: integer("privilege").notNull().default(0),
+    cardNumber: text("card_number"),
+    enabled: integer("enabled").notNull().default(1),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("idx_attendance_device_users_identity").on(t.deviceId, t.deviceUserId),
+    index("idx_attendance_device_users_employee").on(t.employeeId),
+  ],
+);
+
+export const attendanceDevicePunches = pgTable(
+  "attendance_device_punches",
+  {
+    id: serial("id").primaryKey(),
+    deviceId: integer("device_id").notNull(),
+    deviceUserId: text("device_user_id").notNull(),
+    employeeId: integer("employee_id"),
+    punchSerial: integer("punch_serial"),
+    punchedAt: timestamp("punched_at", { withTimezone: true, mode: "string" }).notNull(),
+    punchType: integer("punch_type").notNull().default(0),
+    verifyType: integer("verify_type").notNull().default(0),
+    attendanceLogId: integer("attendance_log_id"),
+    rawData: text("raw_data").notNull().default("{}"),
+    importedAt: timestamp("imported_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("idx_attendance_device_punches_dedupe").on(t.deviceId, t.deviceUserId, t.punchedAt, t.punchType, t.verifyType),
+    index("idx_attendance_device_punches_employee_time").on(t.employeeId, t.punchedAt),
+  ],
+);
+
+export const attendanceDeviceSyncs = pgTable(
+  "attendance_device_syncs",
+  {
+    id: serial("id").primaryKey(),
+    deviceId: integer("device_id").notNull(),
+    status: text("status").notNull().default("queued"),
+    trigger: text("trigger").notNull().default("manual"),
+    requestedByUserId: integer("requested_by_user_id"),
+    requestedAt: timestamp("requested_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+    usersFound: integer("users_found").notNull().default(0),
+    punchesFound: integer("punches_found").notNull().default(0),
+    punchesImported: integer("punches_imported").notNull().default(0),
+    unmatchedUsers: integer("unmatched_users").notNull().default(0),
+    error: text("error"),
+  },
+  (t) => [
+    index("idx_attendance_device_syncs_status_requested").on(t.status, t.requestedAt),
+    uniqueIndex("idx_attendance_device_syncs_active").on(t.deviceId).where(sql`${t.status} IN ('queued','running')`),
   ],
 );
 
@@ -383,29 +547,6 @@ export const employeeLeaveTypes = pgTable("employee_leave_types", {
   ],
 );
 
-export const leavePolicies = pgTable(
-  "leave_policies",
-  {
-    id: serial("id").primaryKey(),
-    leaveTypeId: integer("leave_type_id").notNull(),
-    country: text("country").notNull(),
-    annualEntitlement: doublePrecision("annual_entitlement").notNull(),
-    minServiceMonths: integer("min_service_months").default(0),
-    carryForward: integer("carry_forward").notNull().default(0),
-    maxCarryForward: doublePrecision("max_carry_forward").default(0),
-    expiryDays: integer("expiry_days"),
-    status: text("status").notNull().default("active"),
-    ...timestamps,
-  },
-  (t) => [
-    index("idx_leave_policies_type_country_status").on(
-      t.leaveTypeId,
-      t.country,
-      t.status,
-    ),
-  ],
-);
-
 export const leaveBalances = pgTable(
   "leave_balances",
   {
@@ -524,11 +665,11 @@ export const documentVersions = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("idx_document_versions_document_version").on(
+    unique("document_versions_document_version_unique").on(
       t.documentId,
       t.version,
     ),
-    uniqueIndex("idx_document_versions_object_key").on(t.objectKey),
+    unique("document_versions_object_key_unique").on(t.objectKey),
   ],
 );
 
@@ -555,7 +696,9 @@ export const notifications = pgTable(
       t.readAt,
       t.createdAt,
     ),
-    uniqueIndex("idx_notifications_dedupe").on(t.userId, t.dedupeKey),
+    uniqueIndex("idx_notifications_dedupe")
+      .on(t.userId, t.dedupeKey)
+      .where(sql`${t.dedupeKey} IS NOT NULL`),
   ],
 );
 
@@ -576,7 +719,7 @@ export const leaveRollovers = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("idx_leave_rollovers_once").on(
+    unique("leave_rollovers_once_unique").on(
       t.employeeId,
       t.leaveTypeId,
       t.fromYear,
@@ -655,7 +798,7 @@ export const performanceReviews = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_performance_reviews_cycle_employee").on(
+    unique("performance_reviews_unique").on(
       t.cycleId,
       t.employeeId,
     ),
@@ -712,7 +855,7 @@ export const jobOpenings = pgTable(
     description: text("description"),
     requirements: text("requirements"),
     status: text("status").notNull().default("draft"),
-    createdDate: text("created_date").notNull(),
+    createdDate: text("created_date").notNull().default(sql`CURRENT_DATE`),
     closingDate: text("closing_date"),
     requirementsVersion: integer("requirements_version").notNull().default(1),
     publishedAt: timestamp("published_at", {
@@ -799,7 +942,6 @@ export const candidates = pgTable(
     ...timestamps,
   },
   (t) => [
-    index("idx_candidates_email").on(t.email),
     index("idx_candidates_job_stage").on(t.jobId, t.stage),
   ],
 );
@@ -818,8 +960,8 @@ export const recruitmentStages = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_recruitment_stages_job_key").on(t.jobId, t.stageKey),
-    uniqueIndex("idx_recruitment_stages_job_order").on(t.jobId, t.sortOrder),
+    unique("recruitment_stage_job_key").on(t.jobId, t.stageKey),
+    unique("recruitment_stage_job_order").on(t.jobId, t.sortOrder),
   ],
 );
 export const candidateApplications = pgTable(
@@ -856,7 +998,7 @@ export const candidateApplications = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_candidate_applications_candidate_job").on(
+    unique("candidate_application_unique").on(
       t.candidateId,
       t.jobId,
     ),
@@ -911,7 +1053,7 @@ export const candidateDocuments = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_candidate_documents_object_key").on(t.objectKey),
+    unique("candidate_documents_object_key_key").on(t.objectKey),
     index("idx_candidate_documents_candidate").on(
       t.candidateId,
       t.documentType,
@@ -938,7 +1080,7 @@ export const candidateCvParsedData = pgTable(
     }),
     ...timestamps,
   },
-  (t) => [uniqueIndex("idx_candidate_cv_parsed_document").on(t.documentId)],
+  (t) => [unique("candidate_cv_parsed_data_document_id_key").on(t.documentId)],
 );
 export const candidateMatchResults = pgTable(
   "candidate_match_results",
@@ -983,7 +1125,7 @@ export const candidateRequirementScores = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_candidate_requirement_score_unique").on(
+    unique("candidate_requirement_score_unique").on(
       t.matchResultId,
       t.requirementId,
     ),
@@ -1032,7 +1174,7 @@ export const interviewTemplateStages = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_template_stage_order").on(
+    unique("interview_template_stage_order").on(
       t.templateId,
       t.sortOrder,
     ),
@@ -1092,7 +1234,7 @@ export const interviewTemplateStageQuestions = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_template_stage_question_unique").on(
+    unique("template_stage_question_unique").on(
       t.templateStageId,
       t.questionId,
     ),
@@ -1127,7 +1269,7 @@ export const interviewPlans = pgTable(
     createdByUserId: integer("created_by_user_id").notNull(),
     ...timestamps,
   },
-  (t) => [uniqueIndex("idx_interview_plans_job_active").on(t.jobId, t.status)],
+  (t) => [unique("interview_plans_job_status").on(t.jobId, t.status)],
 );
 export const interviewPlanStages = pgTable(
   "interview_plan_stages",
@@ -1151,7 +1293,7 @@ export const interviewPlanStages = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_plan_stage_order").on(t.planId, t.sortOrder),
+    unique("interview_plan_stage_order").on(t.planId, t.sortOrder),
   ],
 );
 export const interviewStageInterviewers = pgTable(
@@ -1177,7 +1319,7 @@ export const interviewStageQuestions = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_stage_question_unique").on(
+    unique("interview_stage_question_unique").on(
       t.planStageId,
       t.questionId,
     ),
@@ -1249,7 +1391,7 @@ export const interviewParticipants = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_participant_unique").on(
+    unique("interview_participant_unique").on(
       t.interviewId,
       t.employeeId,
     ),
@@ -1275,7 +1417,7 @@ export const interviewEvaluations = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_evaluation_interviewer").on(
+    unique("interview_evaluation_interviewer_unique").on(
       t.interviewId,
       t.interviewerEmployeeId,
     ),
@@ -1293,7 +1435,7 @@ export const interviewEvaluationScores = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_interview_evaluation_score_unique").on(
+    unique("interview_evaluation_score_unique").on(
       t.evaluationId,
       t.criterionId,
     ),
@@ -1319,7 +1461,9 @@ export const jobOffers = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_job_offers_application").on(t.applicationId),
+    uniqueIndex("idx_job_offers_application")
+      .on(t.applicationId)
+      .where(sql`${t.applicationId} IS NOT NULL`),
     index("idx_job_offers_status_approval").on(t.status, t.approvalStatus),
   ],
 );
@@ -1418,7 +1562,7 @@ export const assets = pgTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_assets_code").on(t.assetCode),
+    unique("assets_asset_code_key").on(t.assetCode),
     index("idx_assets_status_category").on(t.status, t.category),
   ],
 );
@@ -1466,10 +1610,30 @@ export const trainingCourses = pgTable(
     status: text("status").notNull().default("draft"),
     mandatory: integer("mandatory").notNull().default(0),
     validityMonths: integer("validity_months"),
+    durationHours: doublePrecision("duration_hours"),
+    instructorEmployeeId: integer("instructor_employee_id"),
+    instructorName: text("instructor_name"),
     createdByUserId: integer("created_by_user_id").notNull(),
     ...timestamps,
   },
   (t) => [index("idx_training_courses_status_dates").on(t.status, t.endDate)],
+);
+export const trainingMaterials = pgTable(
+  "training_materials",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id").notNull(),
+    title: text("title").notNull(),
+    kind: text("kind").notNull(),
+    url: text("url"),
+    objectKey: text("object_key"),
+    fileName: text("file_name"),
+    contentType: text("content_type"),
+    sizeBytes: integer("size_bytes"),
+    createdByUserId: integer("created_by_user_id").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("idx_training_materials_course").on(t.courseId)],
 );
 export const trainingEnrollments = pgTable(
   "training_enrollments",
@@ -1483,14 +1647,24 @@ export const trainingEnrollments = pgTable(
     score: doublePrecision("score"),
     certificateDocumentId: integer("certificate_document_id"),
     certificateExpiry: text("certificate_expiry"),
+    evaluationJson: text("evaluation_json"),
+    certificateNumber: text("certificate_number"),
+    certificateJson: text("certificate_json"),
+    certificateIssuedAt: timestamp("certificate_issued_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
     assignedByUserId: integer("assigned_by_user_id").notNull(),
     completedByUserId: integer("completed_by_user_id"),
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("idx_training_enrollments_course_employee").on(
+    unique("training_enrollments_unique").on(
       t.courseId,
       t.employeeId,
+    ),
+    uniqueIndex("idx_training_enrollments_certificate_number").on(
+      t.certificateNumber,
     ),
     index("idx_training_enrollments_employee_status").on(
       t.employeeId,

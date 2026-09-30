@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "سند — خدمات الموظفين",
+  "short_name": "سند",
+  "description": "الحضور والإجازات والطلبات وكشوف المرتب",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0b1f4d",
+  "icons": [
+    { "src": "/sanad-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/sanad-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/sanad-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/sanad-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

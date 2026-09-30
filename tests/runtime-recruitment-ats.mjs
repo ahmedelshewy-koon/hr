@@ -18,7 +18,7 @@ const [superRole] = await sql`select id from roles where name='Super Admin'`;
 const [employeeRole] = await sql`select id from roles where name='Employee'`;
 assert.ok(superRole?.id && employeeRole?.id, "system roles");
 const adminEmail = `ats.runtime.admin.${stamp}@sanad.local`;
-const [admin] = await sql`
+await sql`
   insert into users(email,role_id,password_hash,status,must_change_password,session_version,created_at,updated_at)
   values(${adminEmail},${superRole.id},${passwordHash()},'active',0,1,current_timestamp,current_timestamp)
   returning id,email`;

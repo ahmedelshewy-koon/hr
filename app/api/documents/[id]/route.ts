@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { createDatabase } from "../../../../db/postgres";
+import { createDatabase, type PostgresDatabase } from "../../../../db/postgres";
+import { withDatabase } from "../../route-helpers";
 import { apiFailure, canAccessEmployee, enforceRateLimit, enforceWriteOrigin, requireActor } from "../../api-security";
 import { normalizeFilename, safeDocumentObjectKey, validateDocumentFile } from "../../../documents/document-policy";
 
@@ -7,16 +8,18 @@ type Row=Record<string,unknown>;
 type R2ObjectLike={body:ReadableStream;httpMetadata?:{contentType?:string};size?:number};
 type R2BucketLike={get(key:string):Promise<R2ObjectLike|null>;put(key:string,value:ArrayBuffer|Uint8Array,options?:{httpMetadata?:{contentType?:string};customMetadata?:Record<string,string>}):Promise<unknown>;delete(key:string):Promise<void>};
 const bucket=()=>((env as unknown as {FILES?:R2BucketLike}).FILES);
-async function contextRow(db:ReturnType<typeof createDatabase>,id:number){return db.prepare("SELECT d.*,c.employee_can_view,c.employee_can_upload,c.manager_can_view,c.allowed_mime_types,c.max_size_bytes,c.requires_expiry FROM documents d JOIN document_categories c ON c.code=d.category WHERE d.id=?").bind(id).first<Row>();}
-async function allowed(db:ReturnType<typeof createDatabase>,actor:{roleName:string;employeeId:number|null},row:Row,write=false){if(!(await canAccessEmployee(db,actor as never,Number(row.employee_id))))return false;if(["Super Admin","HR Manager"].includes(actor.roleName))return true;if(Number(actor.employeeId)===Number(row.employee_id))return Boolean(Number(row[write?"employee_can_upload":"employee_can_view"]));return actor.roleName==="Department Manager"&&!write&&Boolean(Number(row.manager_can_view));}
+async function contextRow(db:PostgresDatabase,id:number){return db.prepare("SELECT d.*,c.employee_can_view,c.employee_can_upload,c.manager_can_view,c.allowed_mime_types,c.max_size_bytes,c.requires_expiry FROM documents d JOIN document_categories c ON c.code=d.category WHERE d.id=?").bind(id).first<Row>();}
+async function allowed(db:PostgresDatabase,actor:{roleName:string;employeeId:number|null},row:Row,write=false){if(!(await canAccessEmployee(db,actor as never,Number(row.employee_id))))return false;if(["Super Admin","HR Manager"].includes(actor.roleName))return true;if(Number(actor.employeeId)===Number(row.employee_id))return Boolean(Number(row[write?"employee_can_upload":"employee_can_view"]));return actor.roleName==="Department Manager"&&!write&&Boolean(Number(row.manager_can_view));}
 const disposition=(name:string,inline:boolean)=>`${inline?"inline":"attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`;
 
-export async function GET(request:Request,context:{params:Promise<{id:string}>}){const db=createDatabase();try{
+export async function GET(request:Request,context:{params:Promise<{id:string}>}){
+  return withDatabase("Unable to retrieve document", async db => {
   const actor=await requireActor(request,db),id=Number((await context.params).id),row=await contextRow(db,id);if(!row||row.status==="archived")throw new Response("Document not found",{status:404});if(!(await allowed(db,actor,row)))throw new Response("Document access denied",{status:403});
   await enforceRateLimit(db,request,"document-download",120,3600,actor.id);const storage=bucket();if(!storage)throw new Response("Document storage is not configured",{status:503});const object=await storage.get(String(row.object_key));if(!object)throw new Response("Stored file not found",{status:404});
   await db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'document_downloaded','documents','document',?,?,CURRENT_TIMESTAMP)").bind(actor.id,String(id),request.headers.get("cf-connecting-ip")).run();
   const inline=new URL(request.url).searchParams.get("download")!=="1";return new Response(object.body,{headers:{"content-type":String(row.content_type),"content-length":String(row.size_bytes),"content-disposition":disposition(String(row.name),inline),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; sandbox"}});
-}catch(error){return apiFailure(error,"Unable to retrieve document");}finally{await db.close();}}
+});
+}
 
 export async function PUT(request:Request,context:{params:Promise<{id:string}>}){const db=createDatabase();let newKey:string|undefined;try{
   enforceWriteOrigin(request);const actor=await requireActor(request,db),id=Number((await context.params).id);await enforceRateLimit(db,request,"document-replace",10,3600,actor.id);const row=await contextRow(db,id);if(!row||row.status==="archived")throw new Response("Document not found",{status:404});if(!(await allowed(db,actor,row,true)))throw new Response("Document replacement denied",{status:403});
@@ -26,4 +29,6 @@ export async function PUT(request:Request,context:{params:Promise<{id:string}>})
   return Response.json({ok:true,id});
 }catch(error){if(newKey)await bucket()?.delete(newKey).catch(()=>{});return apiFailure(error,"Unable to replace document");}finally{await db.close();}}
 
-export async function DELETE(request:Request,context:{params:Promise<{id:string}>}){const db=createDatabase();try{enforceWriteOrigin(request);const actor=await requireActor(request,db),id=Number((await context.params).id),row=await contextRow(db,id);if(!row)throw new Response("Document not found",{status:404});if(!["Super Admin","HR Manager"].includes(actor.roleName))throw new Response("Only HR can archive documents",{status:403});const changed=await db.prepare("UPDATE documents SET status='archived',archived_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status!='archived' RETURNING id").bind(id).first();if(!changed)throw new Response("Document is already archived",{status:409});await db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'document_archived','documents','document',?,?,CURRENT_TIMESTAMP)").bind(actor.id,String(id),request.headers.get("cf-connecting-ip")).run();return Response.json({ok:true});}catch(error){return apiFailure(error,"Unable to archive document");}finally{await db.close();}}
+export async function DELETE(request:Request,context:{params:Promise<{id:string}>}){
+  return withDatabase("Unable to archive document", async db => {enforceWriteOrigin(request);const actor=await requireActor(request,db),id=Number((await context.params).id),row=await contextRow(db,id);if(!row)throw new Response("Document not found",{status:404});if(!["Super Admin","HR Manager"].includes(actor.roleName))throw new Response("Only HR can archive documents",{status:403});const changed=await db.prepare("UPDATE documents SET status='archived',archived_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status!='archived' RETURNING id").bind(id).first();if(!changed)throw new Response("Document is already archived",{status:409});await db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'document_archived','documents','document',?,?,CURRENT_TIMESTAMP)").bind(actor.id,String(id),request.headers.get("cf-connecting-ip")).run();return Response.json({ok:true});});
+}

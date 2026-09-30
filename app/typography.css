@@ -13,19 +13,18 @@
 html,body,.app,.app[data-lang="ar"],.app[data-lang="en"],button,input,select,textarea{font-family:var(--font-enterprise)}
 
 h1,.page-heading h1,.approvals-head h1,.attendance-page-head h1,.learning-heading h1,
-.lifecycle-heading h1,.lifecycle-subheading h1,.performance-heading h1,.performance-subheading h1,
-.talent-heading h1,.portal-welcome h1,.login-copy h1{
+.lifecycle-heading h1,.lifecycle-subheading h1,
+.portal-welcome h1,.login-copy h1{
   font-size:var(--type-page)!important;
   font-weight:var(--weight-semibold)!important;
   line-height:var(--leading-heading)!important;
 }
 h2{font-size:var(--type-section);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
 h3,h4,h5,h6{font-size:var(--type-component);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
-.department-card h3,.setting-card h3,.report-card h2,.portal-next h3,
+.department-card h3,.setting-card h3,.portal-next h3,
 [class*="empty"] h2,[class*="empty"] h3{font-size:var(--type-component)!important;font-weight:var(--weight-semibold)!important}
 
-button,.primary,.outline,.ghost,.danger-action,.text-button,.select-button,.setting-button,
-.performance-open,.talent-actions button,.talent-mini-list button{
+button,.primary,.outline,.ghost,.danger-action,.text-button,.select-button,.setting-button{
   font-size:var(--type-body)!important;
 }
 button{font-weight:var(--weight-medium)}
@@ -50,7 +49,7 @@ table td b,table td strong,table td span,table td small,
 .sidebar nav button.active{font-weight:var(--weight-semibold)}
 .status,.badge,[class*="-badge"],[class*="-status"]{font-size:var(--type-label)!important;line-height:var(--leading-heading)}
 
-.stat-value,.approval-metrics b,.attendance-metrics b,.performance-kpi b,.learning-kpi b,
+.stat-value,.approval-metrics b,.attendance-metrics b,.learning-kpi b,
 .lifecycle-kpi b,.final-score b,.attendance-rate-ring strong,.operational-metrics b,
 .action-items button strong{
   font-size:var(--type-kpi)!important;

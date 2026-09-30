@@ -3,7 +3,7 @@ import type { PostgresDatabase } from "../db/postgres";
 
 const COOKIE_NAME = "koon_portal_session";
 const DEFAULT_SESSION_SECONDS = 60 * 60 * 8;
-const PASSWORD_ITERATIONS = 210_000;
+export { hashPassword } from './password-hash';
 
 export type PortalSession = { userId: number; email: string; sessionVersion: number; exp: number };
 
@@ -40,13 +40,6 @@ async function hmac(value: string) {
 }
 
 export function portalLoginEmail() { return runtimeValue("KOON_LOGIN_EMAIL").toLowerCase(); }
-
-export async function hashPassword(password: string) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passwordKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", hash:"SHA-256", salt, iterations:PASSWORD_ITERATIONS }, passwordKey, 256);
-  return `pbkdf2-sha256$${PASSWORD_ITERATIONS}$${toBase64Url(salt)}$${toBase64Url(new Uint8Array(bits))}`;
-}
 
 export async function verifyPassword(password: string, encodedHash: string) {
   try {
@@ -92,7 +85,29 @@ export async function requirePortalSession(request: Request, d1?: PostgresDataba
   return session;
 }
 
-export async function ensureAuthSchema(d1: PostgresDatabase) {
+let authSchemaReady: Promise<void> | null = null;
+
+/**
+ * Applies the idempotent auth bootstrap migrations, at most once per isolate.
+ *
+ * Every authenticated request funnels through here, and the statements below are
+ * nine DDL/backfill round trips. They describe database-wide state rather than
+ * per-connection state, so running them once per isolate preserves the guarantee
+ * while taking them off the hot path. A failed attempt is not cached, so a
+ * transient error is retried by the next request rather than disabling the
+ * bootstrap for the lifetime of the isolate.
+ */
+export function ensureAuthSchema(d1: PostgresDatabase) {
+  if (!authSchemaReady) {
+    authSchemaReady = applyAuthSchema(d1).catch(error => {
+      authSchemaReady = null;
+      throw error;
+    });
+  }
+  return authSchemaReady;
+}
+
+async function applyAuthSchema(d1: PostgresDatabase) {
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT").run();
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1").run();
   await d1.prepare("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0").run();

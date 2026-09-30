@@ -162,6 +162,62 @@
       "when": 1787659200000,
       "tag": "0022_recruitment_candidate_stage_compat",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789560000000,
+      "tag": "0023_zkteco_mb2000",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789831190040,
+      "tag": "0024_drop_leave_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789837611230,
+      "tag": "0025_training_program_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789837935650,
+      "tag": "0026_training_evaluation_certificates",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790006400000,
+      "tag": "0027_optional_job_requirements",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790294400000,
+      "tag": "0028_employee_personal_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790380800000,
+      "tag": "0029_employee_company_hr",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790422744917,
+      "tag": "0030_organizational_assignments",
+      "breakpoints": true
     }
   ]
 }

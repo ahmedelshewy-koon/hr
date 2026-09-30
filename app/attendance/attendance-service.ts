@@ -1,6 +1,9 @@
+import { requireEmployeeHr, assertEmployeeHr, assertEmployeeManager } from "../employees/hr-assignment.ts";
 import type { PostgresDatabase, TransactionDatabase } from "../../db/postgres";
-import { calculateDailyAttendance, isScheduledWorkDay } from "./attendance-calculation";
-import { CORRECTION_TYPES, correctionFields, decideCorrectionTransition, type CorrectionDecision, type CorrectionType } from "./attendance-workflow";
+import { calculateDailyAttendance, isScheduledWorkDay } from "./attendance-calculation.ts";
+import { CORRECTION_TYPES, correctionFields, decideCorrectionTransition, type CorrectionDecision, type CorrectionType } from "./attendance-workflow.ts";
+import { isHolidayDate } from "../leave/holiday-calendar.ts";
+import { loadCalendarHolidays } from "../leave/holiday-store.ts";
 
 type DB=PostgresDatabase|TransactionDatabase;
 type Actor={id:number;employeeId:number|null;roleName:string};
@@ -19,13 +22,15 @@ async function attendanceContext(db:DB,employeeId:number,attendanceDate:string,o
   const employee=await db.prepare("SELECT id,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,country FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();
   if(!employee)throw new Response("Employee not found",{status:404});
   const record=await db.prepare("SELECT * FROM daily_attendance WHERE employee_id=? AND work_date=?").bind(employeeId,attendanceDate).first<Row>();
-  const holiday=await db.prepare("SELECT id FROM holidays WHERE status NOT IN ('deleted','archived') AND country IN (?,'Both','KSA & Egypt') AND (holiday_date=? OR (recurrence_type='annual' AND substring(holiday_date,6,5)=substring(?,6,5))) LIMIT 1").bind(employee.country,attendanceDate,attendanceDate).first<Row>();
+  const holiday=isHolidayDate(await loadCalendarHolidays(db,String(employee.country)),attendanceDate,String(employee.country));
   // Read-only integration with the existing leave engine: no balances or leave rows are changed here.
   const leave=await db.prepare("SELECT id FROM requests WHERE employee_id=? AND leave_type_id IS NOT NULL AND status='hr_approved' AND from_date<=? AND to_date>=? LIMIT 1").bind(employeeId,attendanceDate,attendanceDate).first<Row>();
   const actualIn=overrides.actual_in!==undefined?overrides.actual_in:record?.actual_in;
   const actualOut=overrides.actual_out!==undefined?overrides.actual_out:record?.actual_out;
-  const attendanceType=String(overrides.attendance_type??record?.attendance_type??"office");
-  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:Boolean(holiday),isApprovedLeave:Boolean(leave),dayComplete:attendanceDate<new Date().toISOString().slice(0,10)});
+  // "holiday" and "leave" are results of an earlier calculation, not a working mode to carry into the next one.
+  const storedType=record?.attendance_type==="holiday"||record?.attendance_type==="leave"?null:record?.attendance_type;
+  const attendanceType=String(overrides.attendance_type??storedType??"office");
+  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:holiday,isApprovedLeave:Boolean(leave),dayComplete:typeof overrides.day_complete==="boolean"?overrides.day_complete:attendanceDate<new Date().toISOString().slice(0,10)});
   return {employee,record,calculation,actualIn,actualOut,attendanceType};
 }
 
@@ -55,6 +60,7 @@ export async function submitAttendanceCorrection(input:{db:PostgresDatabase;requ
   const original={actual_in:context.record?.actual_in??null,actual_out:context.record?.actual_out??null,worked_minutes:context.record?.worked_minutes??0,late_minutes:context.record?.late_minutes??0,early_minutes:context.record?.early_minutes??0,status:context.record?.status??null};
   return db.transaction(async tx=>{
     await tx.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(employeeId,Number(attendanceDate.replaceAll("-",""))).run();
+    await requireEmployeeHr(tx,employeeId);
     const duplicate=await tx.prepare("SELECT id FROM attendance_corrections WHERE employee_id=? AND attendance_date=? AND correction_type=? AND status IN ('pending_manager','pending_hr') LIMIT 1").bind(employeeId,attendanceDate,type).first<Row>();
     if(duplicate)throw new Response("An active correction already exists for this issue and date",{status:409});
     const result=await tx.prepare("INSERT INTO attendance_corrections (employee_id,daily_attendance_id,attendance_date,correction_type,original_values,requested_values,reason,notes,status,current_stage,requested_by_user_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?, 'pending_manager','manager',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(employeeId,context.record?.id??null,attendanceDate,type,JSON.stringify(original),JSON.stringify(requested),reason,clean(input.notes)||null,actor.id).first<Row>();
@@ -71,6 +77,9 @@ export async function processAttendanceCorrection(input:{db:PostgresDatabase;req
   return input.db.transaction(async tx=>{
     await tx.prepare("SELECT pg_advisory_xact_lock(?)").bind(input.correctionId).run();
     const before=await tx.prepare("SELECT * FROM attendance_corrections WHERE id=? FOR UPDATE").bind(input.correctionId).first<Row>();if(!before)throw new Response("Correction not found",{status:404});
+    if(before.current_stage==="manager"){if(input.actor.roleName!=="Department Manager")throw new Response("Only the direct manager can process this request",{status:403});await assertEmployeeManager(tx,Number(before.employee_id),input.actor.employeeId);}
+    if(before.current_stage==="hr")await assertEmployeeHr(tx,Number(before.employee_id),input.actor.id);
+    if(before.current_stage==="manager"&&input.decision==="approve")await requireEmployeeHr(tx,Number(before.employee_id));
     let transition:ReturnType<typeof decideCorrectionTransition>;
     try{transition=decideCorrectionTransition({status:String(before.status),stage:String(before.current_stage),decision:input.decision});}
     catch(cause){throw new Response(cause instanceof Error?cause.message:"This correction has already been processed",{status:409});}
@@ -106,3 +115,55 @@ export async function manualAttendanceCorrection(input:{db:PostgresDatabase;requ
 }
 
 export async function recalculateAttendance(db:DB,employeeId:number,attendanceDate:string,overrides:Row={}){return persistCalculation(db,employeeId,attendanceDate,overrides);}
+
+const todayIso=()=>new Date().toISOString().slice(0,10);
+const ACTIVE_EMPLOYEE_STATUSES="'active','probation','notice_period'";
+const nextDay=(date:string)=>{const next=new Date(`${date}T00:00:00Z`);next.setUTCDate(next.getUTCDate()+1);return next.toISOString().slice(0,10);};
+
+/**
+ * Re-runs the daily calculation after an approved leave is granted or withdrawn so its days show as leave
+ * (never absence) and cancelled days fall back to normal. Every scheduled working day of the leave gets a
+ * record straight away, past or future; rest days are left to the nightly scan like any other day.
+ */
+export async function refreshLeaveAttendance(db:DB,employeeId:number,fromDate:string,toDate:string){
+  const today=todayIso();
+  const employee=await db.prepare("SELECT work_days FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();
+  if(!employee)throw new Response("Employee not found",{status:404});
+  const existing=new Set((await db.prepare("SELECT work_date FROM daily_attendance WHERE employee_id=? AND work_date>=? AND work_date<=?").bind(employeeId,fromDate,toDate).all<Row>()).results.map(row=>String(row.work_date)));
+  const workDays=String(employee.work_days||"0,1,2,3,4");
+  for(let date=fromDate;date<=toDate;date=nextDay(date))if(date<=today||existing.has(date)||isScheduledWorkDay(date,workDays))await persistCalculation(db,employeeId,date);
+}
+
+export type HolidayFootprint={holidayDate:string;recurrenceType?:string|null;country:string};
+
+/**
+ * Re-runs the daily calculation for every day a holiday change touches (the old and the new dates), so a day that
+ * became a holiday stops counting as absence and a day that stopped being one is counted normally again.
+ * Explicit dates up to today are created for the covered employees; annual holidays and later dates only correct
+ * records that already exist.
+ */
+export async function refreshHolidayAttendance(db:DB,footprints:HolidayFootprint[]){
+  const today=todayIso(),dates=new Set<string>(),monthDays=new Set<string>(),countries=new Set<string>();
+  for(const footprint of footprints){
+    if(footprint.recurrenceType==="annual")monthDays.add(footprint.holidayDate.slice(5));else dates.add(footprint.holidayDate);
+    countries.add(footprint.country);
+  }
+  const allCountries=["Both","KSA & Egypt"].some(value=>countries.has(value));
+  const employees=(await db.prepare(`SELECT id,country,start_date FROM employees WHERE employment_status IN (${ACTIVE_EMPLOYEE_STATUSES})`).all<Row>()).results.filter(employee=>allCountries||countries.has(String(employee.country)));
+  const covered=new Set(employees.map(employee=>Number(employee.id))),targets=new Map<string,[number,string]>();
+  const add=(employeeId:number,date:string)=>targets.set(`${employeeId}|${date}`,[employeeId,date]);
+  for(const date of dates){
+    const existing=new Set((await db.prepare("SELECT employee_id FROM daily_attendance WHERE work_date=?").bind(date).all<Row>()).results.map(row=>Number(row.employee_id)));
+    for(const employee of employees){
+      const employeeId=Number(employee.id);
+      if(existing.has(employeeId)||(date<=today&&String(employee.start_date||"")<=date))add(employeeId,date);
+    }
+  }
+  if(monthDays.size){
+    const values=[...monthDays];
+    const rows=(await db.prepare(`SELECT employee_id,work_date FROM daily_attendance WHERE substring(work_date,6,5) IN (${values.map(()=>"?").join(",")})`).bind(...values).all<Row>()).results;
+    for(const row of rows)if(covered.has(Number(row.employee_id)))add(Number(row.employee_id),String(row.work_date));
+  }
+  for(const [employeeId,date] of targets.values())await persistCalculation(db,employeeId,date);
+  return {recalculated:targets.size};
+}

@@ -24,7 +24,6 @@ This starter does not use `wrangler.jsonc`.
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
 - `vite.config.ts` simulates declared bindings for local development
 - `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
 - `drizzle.config.ts` supports local migration generation when needed
 
 ## Workspace Auth Headers
@@ -66,10 +65,8 @@ Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
 optional or required ChatGPT sign-in:
 
 - Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
+- Use `chatGPTSignInPath(returnTo)` for browser links or actions that send
   anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
 - Pass a same-origin relative `returnTo` path for the destination after sign-in
   or sign-out. The helper validates and safely encodes it.
 - Mark protected pages with `export const dynamic = "force-dynamic"` because

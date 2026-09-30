@@ -8,7 +8,6 @@ export type Input=Record<string,unknown>;
 export const text=(value:unknown,max=4000)=>String(value??"").trim().slice(0,max);
 export const number=(value:unknown)=>Number(value)||0;
 export const required=(value:unknown,name:string)=>{const result=text(value);if(!result)throw new Response(`${name} is required`,{status:400});return result;};
-export const today=()=>new Date().toISOString().slice(0,10);
 export async function body(request:Request){try{return await request.json() as Input;}catch{throw new Response("Invalid JSON body",{status:400});}}
 export async function audit(db:Db,actor:ApiActor,action:string,module:string,type:string,id:number|string,summary:unknown){await db.prepare("INSERT INTO audit_logs(user_id,action,module,record_type,record_id,new_value,created_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(actor.id,action,module,type,String(id),JSON.stringify(summary)).run();}
 export async function employeeUser(db:Db,employeeId:number){return db.prepare("SELECT id FROM users WHERE employee_id=? AND status='active' ORDER BY id LIMIT 1").bind(employeeId).first<{id:number}>();}

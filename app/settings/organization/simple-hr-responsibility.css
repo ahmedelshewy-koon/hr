@@ -1,0 +1,14 @@
+.simple-hr{max-width:950px;margin:28px auto;padding:28px;border:1px solid var(--line);border-radius:18px;background:#fff}
+.simple-hr h3{margin:0 0 22px;color:#10224a;font-size:1.2rem}
+.simple-hr form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:end}
+.simple-hr form .settings-field{margin:0}
+.simple-hr form button{grid-column:1/-1;justify-self:start;min-width:130px}
+.simple-hr-credential{margin-top:20px;padding:16px;border:1px solid #93c5fd;border-radius:12px;background:#eff6ff}
+.simple-hr-credential p{margin:8px 0 0}
+.simple-hr-credential code{display:inline-block;user-select:all;overflow-wrap:anywhere}
+.simple-hr-rules{margin-top:32px}
+.simple-hr-rules h4{margin:0 0 12px}
+.simple-hr-list{display:grid;gap:8px}
+.simple-hr-list button{display:flex;justify-content:space-between;gap:16px;text-align:start;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#10224a;cursor:pointer}
+.simple-hr-list button:hover{background:#eff6ff}
+@media(max-width:760px){.simple-hr{padding:18px;margin:16px auto}.simple-hr form{grid-template-columns:1fr}.simple-hr-list button{flex-direction:column;gap:4px}}

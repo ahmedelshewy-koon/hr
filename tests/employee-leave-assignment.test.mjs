@@ -27,3 +27,13 @@ test("employee profile controls and portal filter use the same assignments",()=>
   assert.match(portal,/assignedTypeIds\.has\(Number\(row\.id\)\)/);
   assert.match(request,/assignedTypeIds\.has\(Number\(row\.id\)\)/);
 });
+
+test("the balance list applies the profile's assignment rule to every role and skips deleted employees",()=>{
+  const api=read("app/api/hr/route.ts");
+  const list=api.split("\n").find(line=>line.includes("FROM leave_balances lb JOIN employees e ON e.id=lb.employee_id"));
+  assert.ok(list,"balance list query is present");
+  assert.match(list,/WHERE e\.employment_status!='deleted' AND \$\{employeeScope\} AND EXISTS \(SELECT 1 FROM employee_leave_types elt WHERE elt\.employee_id=lb\.employee_id AND elt\.leave_type_id=lb\.leave_type_id\)/);
+  assert.doesNotMatch(list,/role_name==="Employee"\?"AND EXISTS/,"the assignment gate must not depend on the viewer's role");
+  const profile=read("app/api/employees/[id]/route.ts");
+  assert.match(profile,/FROM leave_balances lb JOIN employee_leave_types elt ON elt\.employee_id=lb\.employee_id AND elt\.leave_type_id=lb\.leave_type_id/);
+});

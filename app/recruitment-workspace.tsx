@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeApiMessage } from "./api-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
   Search,
   Settings2,
   Sparkles,
+  Trash2,
   Upload,
   UserRoundSearch,
   Users,
@@ -37,8 +39,10 @@ import {
   ScheduleDrawer,
 } from "./recruitment/recruitment-forms";
 import "./recruitment-workspace.css";
+import "./recruitment-layout.css";
+import { InterviewTemplateEditor } from "./recruitment/interview-template-editor";
+import type { Row } from "./ui-types";
 
-type Row = Record<string, any>;
 type View = "overview" | "jobs" | "candidates" | "interviews" | "setup";
 type Route = { view: View; id?: number; applicationId?: number };
 const t = (rtl: boolean, en: string, ar: string) => (rtl ? ar : en),
@@ -69,7 +73,7 @@ const get = async (query = "") => {
       cache: "no-store",
     }),
     body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || "Unable to load recruitment");
+  if (!response.ok) throw new Error(localizeApiMessage(body.error || "Unable to load recruitment"));
   return body as Row;
 };
 const post = async (payload: Row) => {
@@ -79,7 +83,7 @@ const post = async (payload: Row) => {
       body: JSON.stringify(payload),
     }),
     body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || "Recruitment action failed");
+  if (!response.ok) throw new Error(localizeApiMessage(body.error || "Recruitment action failed"));
   return body as Row;
 };
 function Status({ value, rtl }: { value: unknown; rtl: boolean }) {
@@ -206,8 +210,8 @@ function Overview({
       ["new_candidates", "New candidates", "المرشحون الجدد", FileSearch],
       ["shortlisted", "Shortlisted", "القائمة المختصرة", ClipboardCheck],
       ["today", "Interviews today", "مقابلات اليوم", CalendarClock],
-      ["pending_evaluations", "Pending feedback", "تقييمات معلقة", CircleDot],
-      ["pending_offers", "Pending offers", "عروض معلقة", ClipboardCheck],
+      ["pending_evaluations", "Pending feedback", "تقييمات قيد الانتظار", CircleDot],
+      ["pending_offers", "Pending offers", "عروض قيد الانتظار", ClipboardCheck],
       [
         "decisions_required",
         "Decisions required",
@@ -248,7 +252,7 @@ function Overview({
               <ChevronRight />
             </button>
           </header>
-          {data.jobs?.length ? (
+          {data.jobs?.some((job: Row) => job.status === "open") ? (
             <div className="ats-table">
               <div className="row head">
                 <span>{t(rtl, "Job", "الوظيفة")}</span>
@@ -347,7 +351,7 @@ function Overview({
           ) : (
             <div className="ats-clear">
               <ClipboardCheck />
-              <b>{t(rtl, "Queues are clear", "لا توجد قوائم معلقة")}</b>
+              <b>{t(rtl, "Queues are clear", "لا توجد قوائم قيد الانتظار")}</b>
               <span>
                 {t(
                   rtl,
@@ -457,7 +461,7 @@ function JobsView({
             <span>{t(rtl, "Job", "الوظيفة")}</span>
             <span>{t(rtl, "Department", "القسم")}</span>
             <span>{t(rtl, "Hiring manager", "مدير التوظيف")}</span>
-            <span>{t(rtl, "Recruiter", "مسؤول التوظيف")}</span>
+            <span>{t(rtl, "Recruiter", "أخصائي التوظيف")}</span>
             <span>{t(rtl, "Applicants", "المتقدمون")}</span>
             <span>{t(rtl, "Status", "الحالة")}</span>
             <span>{t(rtl, "Closing", "الإغلاق")}</span>
@@ -525,36 +529,47 @@ function JobDetail({
       ["activity", "Activity", "النشاط"],
     ];
   const [editingRequirements, setEditingRequirements] = useState(false),
-    [requirementDraft, setRequirementDraft] = useState<Row[]>([]);
-  useEffect(() => {
-    if (editingRequirements) return;
-    setRequirementDraft(
-      (data.requirements || []).map((item: Row, index: number) => ({
-        category: item.category,
-        name: item.name,
-        description: item.description || "",
-        priority: item.priority,
-        weight: Number(item.weight),
-        minimumValue: item.minimum_value || "",
-        notes: item.notes || "",
-        sortOrder: (index + 1) * 10,
-      })),
-    );
-  }, [data.requirements, editingRequirements]);
-  const requirementTotal = requirementDraft.reduce(
-      (sum, item) => sum + Number(item.weight || 0),
-      0,
-    ),
-    saveRequirements = async () => {
+    [editedRequirements, setRequirementDraft] = useState<Row[]>([]);
+  const savedRequirements: Row[] = (data.requirements || []).map(
+    (item: Row, index: number) => ({
+      category: item.category,
+      name: item.name,
+      description: item.description || "",
+      priority: item.priority,
+      weight: Number(item.weight),
+      minimumValue: item.minimum_value || "",
+      notes: item.notes || "",
+      sortOrder: (index + 1) * 10,
+    }),
+  );
+  // Outside edit mode the draft mirrors the saved requirements; starting an edit takes a copy to work on.
+  const requirementDraft = editingRequirements
+      ? editedRequirements
+      : savedRequirements,
+    toggleRequirementEditing = () => {
+      if (!editingRequirements) setRequirementDraft(savedRequirements);
+      setEditingRequirements(!editingRequirements);
+    };
+  const [actionError, setActionError] = useState("");
+  const saveRequirements = async () => {
+    setActionError("");
+    try {
       await run({
         action: "update_job_requirements",
         jobId: job.id,
-        requirements: requirementDraft,
+        requirements: requirementDraft.map((item) => ({
+          ...item,
+          weight: 100 / requirementDraft.length,
+        })),
       });
       setEditingRequirements(false);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    }
     };
   return (
     <>
+      {actionError && <div className="form-error" role="alert">{actionError}</div>}
       <header className="ats-detail-head">
         <button className="ats-back" onClick={back}>
           {rtl ? <ArrowRight /> : <ArrowLeft />}
@@ -608,7 +623,7 @@ function JobDetail({
                 </dd>
               </div>
               <div>
-                <dt>{t(rtl, "Recruiter", "مسؤول التوظيف")}</dt>
+                <dt>{t(rtl, "Recruiter", "أخصائي التوظيف")}</dt>
                 <dd>{rtl ? job.recruiter_name_ar : job.recruiter_name}</dd>
               </div>
               <div>
@@ -630,29 +645,22 @@ function JobDetail({
               <h2>
                 {t(
                   rtl,
-                  "Weighted job requirements",
-                  "متطلبات الوظيفة الموزونة",
+                  "Job requirements",
+                  "متطلبات الوظيفة",
                 )}
               </h2>
               <p>
                 {t(
                   rtl,
-                  "The matching score is the sum of these requirement scores × weights.",
-                  "درجة المطابقة هي مجموع درجة كل متطلب مضروبة في وزنه.",
+                  "Specify the requirements, categories, and priorities for this job.",
+                  "حدد متطلبات الوظيفة وفئة كل متطلب وأولويته.",
                 )}
               </p>
             </div>
             <div className="ats-requirement-actions">
-              <strong
-                className={
-                  Math.abs(requirementTotal - 100) < 0.001 ? "valid" : "invalid"
-                }
-              >
-                {num(requirementTotal, rtl)}%
-              </strong>
               <button
                 className="outline"
-                onClick={() => setEditingRequirements((value) => !value)}
+                onClick={toggleRequirementEditing}
               >
                 <Pencil />
                 {editingRequirements
@@ -747,39 +755,6 @@ function JobDetail({
                         </option>
                       </select>
                     </label>
-                    <label className="ats-field">
-                      <span>{t(rtl, "Weight %", "الوزن %")}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.weight}
-                        onChange={(event) =>
-                          setRequirementDraft(
-                            requirementDraft.map((row, itemIndex) =>
-                              itemIndex === index
-                                ? { ...row, weight: Number(event.target.value) }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="ats-field wide">
-                      <span>{t(rtl, "Description", "الوصف")}</span>
-                      <textarea
-                        value={item.description}
-                        onChange={(event) =>
-                          setRequirementDraft(
-                            requirementDraft.map((row, itemIndex) =>
-                              itemIndex === index
-                                ? { ...row, description: event.target.value }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
                   </div>
                 </article>
               ))}
@@ -806,8 +781,7 @@ function JobDetail({
                 <button
                   className="primary"
                   disabled={
-                    Math.abs(requirementTotal - 100) > 0.001 ||
-                    requirementDraft.some((item) => !item.name)
+                    requirementDraft.some((item) => !String(item.name || "").trim())
                   }
                   onClick={() => void saveRequirements()}
                 >
@@ -820,14 +794,12 @@ function JobDetail({
             <div>
               {data.requirements?.map((item: Row) => (
                 <article key={item.id}>
-                  <span className="ats-weight">{num(item.weight, rtl)}%</span>
                   <div>
                     <b>{item.name}</b>
                     <small>
                       {localizedDisplayValue(item.category, rtl)} ·{" "}
                       {localizedDisplayValue(item.priority, rtl)}
                     </small>
-                    <p>{item.description || item.notes || "—"}</p>
                   </div>
                   <Status value={item.priority} rtl={rtl} />
                 </article>
@@ -1008,7 +980,10 @@ function CandidatesView({
           {num(rows.length, rtl)} {t(rtl, "applications", "طلبات")}
         </span>
       </div>
-      {mode === "table" ? (
+      {!rows.length ? (
+        query.trim() ? <div className="ats-clear"><Search /><b>{t(rtl, "No matching candidates", "لا يوجد مرشحون مطابقون للبحث")}</b><button className="outline" onClick={() => setQuery("")}>{t(rtl, "Clear search", "مسح البحث")}</button></div>
+        : <Empty rtl={rtl} kind="candidates" action={addCandidate} label={t(rtl, "Add candidate", "إضافة مرشح")} />
+      ) : mode === "table" ? (
         <div className="ats-table ats-candidate-table">
           <div className="row head">
             <span>{t(rtl, "Candidate", "المرشح")}</span>
@@ -1135,25 +1110,33 @@ function CandidateDetail({
     match = data.match,
     offer = data.offers?.[0];
   const [correcting, setCorrecting] = useState(false),
-    [correction, setCorrection] = useState<Row>({});
-  useEffect(() => {
-    if (correcting) return;
-    setCorrection({
-      name: candidate.name || "",
-      email: candidate.email || "",
-      phone: candidate.phone || "",
-      location: candidate.location || "",
-      currentJobTitle: candidate.current_job_title || "",
-      currentCompany: candidate.current_company || "",
-      totalExperience: candidate.total_experience || "",
-      skills: parseList(candidate.skills_json).join(", "),
-      education: parseList(candidate.education_json).join(", "),
-      languages: parseList(candidate.languages_json).join(", "),
-      certifications: parseList(candidate.certifications_json).join(", "),
-      projects: parseList(candidate.projects_json).join(", "),
-      notes: candidate.notes || "",
-    });
-  }, [candidate.id, candidate.profile_version, correcting]);
+    [correction, setCorrection] = useState<Row>({}),
+    [actionError, setActionError] = useState("");
+  const perform = async (action: () => Promise<unknown>) => {
+    setActionError("");
+    try { await action(); }
+    catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)); }
+  };
+  // The form is only shown while correcting, so it is filled from the candidate when correction starts.
+  const toggleCorrection = () => {
+    if (!correcting)
+      setCorrection({
+        name: candidate.name || "",
+        email: candidate.email || "",
+        phone: candidate.phone || "",
+        location: candidate.location || "",
+        currentJobTitle: candidate.current_job_title || "",
+        currentCompany: candidate.current_company || "",
+        totalExperience: candidate.total_experience || "",
+        skills: parseList(candidate.skills_json).join(", "),
+        education: parseList(candidate.education_json).join(", "),
+        languages: parseList(candidate.languages_json).join(", "),
+        certifications: parseList(candidate.certifications_json).join(", "),
+        projects: parseList(candidate.projects_json).join(", "),
+        notes: candidate.notes || "",
+      });
+    setCorrecting(!correcting);
+  };
   const saveCorrection = async () => {
     const commaList = (value: unknown) =>
       String(value || "")
@@ -1192,11 +1175,11 @@ function CandidateDetail({
   const move = (direction: number) => {
     const target = stages[currentIndex + direction];
     if (target)
-      void run({
+      void perform(() => run({
         action: "move_application",
         applicationId: application.id,
         stageId: target.id,
-      });
+      }));
   };
   const upload = async () => {
     if (!file) return;
@@ -1211,7 +1194,7 @@ function CandidateDetail({
           body: form,
         }),
         body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Upload failed");
+      if (!response.ok) throw new Error(localizeApiMessage(body.error || "Upload failed"));
       setFile(null);
       await run({ action: "run_match", applicationId: application.id });
     } finally {
@@ -1244,6 +1227,7 @@ function CandidateDetail({
   ];
   return (
     <>
+      {actionError && <div className="form-error" role="alert">{actionError}</div>}
       <header className="ats-detail-head candidate">
         <button className="ats-back" onClick={back}>
           {rtl ? <ArrowRight /> : <ArrowLeft />}
@@ -1277,11 +1261,11 @@ function CandidateDetail({
           <button
             className="outline"
             onClick={() =>
-              void run({
+              void perform(() => run({
                 action: "set_application_status",
                 applicationId: application.id,
                 status: "on_hold",
-              })
+              }))
             }
           >
             {t(rtl, "Hold", "تعليق")}
@@ -1404,14 +1388,14 @@ function CandidateDetail({
                   <Status value={offer.status} rtl={rtl} />
                   {data.permissions?.canAdmin &&
                     offer.approval_status === "pending" && (
-                      <button onClick={() => void offerAction("approve_offer")}>
+                      <button onClick={() => void perform(() => offerAction("approve_offer"))}>
                         {t(rtl, "Approve", "اعتماد")}
                       </button>
                     )}
                   {offer.approval_status === "approved" &&
                     offer.status === "draft" && (
                       <button
-                        onClick={() => void offerAction("decide_offer", "sent")}
+                        onClick={() => void perform(() => offerAction("decide_offer", "sent"))}
                       >
                         {t(rtl, "Send", "إرسال")}
                       </button>
@@ -1419,7 +1403,7 @@ function CandidateDetail({
                   {offer.status === "sent" && (
                     <button
                       onClick={() =>
-                        void offerAction("decide_offer", "accepted")
+                        void perform(() => offerAction("decide_offer", "accepted"))
                       }
                     >
                       {t(rtl, "Record acceptance", "تسجيل القبول")}
@@ -1428,7 +1412,7 @@ function CandidateDetail({
                   {offer.status === "accepted" && (
                     <button
                       className="primary"
-                      onClick={() => void offerAction("convert_hire")}
+                      onClick={() => void perform(() => offerAction("convert_hire"))}
                     >
                       {t(rtl, "Hire & start onboarding", "تعيين وبدء التهيئة")}
                     </button>
@@ -1487,7 +1471,7 @@ function CandidateDetail({
             </div>
             <button
               className="outline"
-              onClick={() => setCorrecting((value) => !value)}
+              onClick={toggleCorrection}
             >
               <Pencil />
               {correcting
@@ -1515,7 +1499,7 @@ function CandidateDetail({
             <button
               className="primary"
               disabled={!file || uploading}
-              onClick={() => void upload()}
+              onClick={() => void perform(upload)}
             >
               {uploading
                 ? t(rtl, "Uploading and parsing…", "جارٍ الرفع والتحليل…")
@@ -1560,7 +1544,7 @@ function CandidateDetail({
                     {t(
                       rtl,
                       "Saving creates a new candidate profile version and makes the current match stale.",
-                      "ينشئ الحفظ إصداراً جديداً للملف ويجعل المطابقة الحالية بحاجة لإعادة التحليل.",
+                      "ينشئ الحفظ إصدارًا جديدًا للملف ويجعل المطابقة الحالية بحاجة لإعادة التحليل.",
                     )}
                   </p>
                 </div>
@@ -1627,7 +1611,7 @@ function CandidateDetail({
                 <button
                   className="primary"
                   disabled={!correction.name || !correction.email}
-                  onClick={() => void saveCorrection()}
+                  onClick={() => void perform(saveCorrection)}
                 >
                   <Check />
                   {t(rtl, "Save verified data", "حفظ البيانات المتحققة")}
@@ -1747,11 +1731,11 @@ function CandidateDetail({
                           t(rtl, "Cancellation reason", "سبب الإلغاء"),
                         );
                         if (reason)
-                          void run({
+                          void perform(() => run({
                             action: "cancel_interview",
                             interviewId: item.id,
                             reason,
-                          });
+                          }));
                       }}
                     >
                       {t(rtl, "Cancel", "إلغاء")}
@@ -1793,8 +1777,15 @@ function MatchCard({
 }: {
   rtl: boolean;
   match?: Row;
-  run: () => Promise<any>;
+  run: () => Promise<unknown>;
 }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const analyze = async () => {
+    setBusy(true); setError("");
+    try { await run(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
   return (
     <section className="ats-panel ats-match-card">
       <header>
@@ -1822,7 +1813,8 @@ function MatchCard({
           )}
         </div>
       )}
-      <button className="outline wide" onClick={() => void run()}>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <button className="outline wide" disabled={busy} onClick={() => void analyze()}>
         <Sparkles />
         {match
           ? t(rtl, "Run match again", "إعادة المطابقة")
@@ -1838,7 +1830,7 @@ function MatchAnalysis({
 }: {
   rtl: boolean;
   data: Row;
-  run: () => Promise<any>;
+  run: () => Promise<unknown>;
 }) {
   const match = data.match;
   return (
@@ -2356,109 +2348,33 @@ function SetupView({
 }) {
   const [tab, setTab] = useState("templates"),
     [form, setForm] = useState<Row>({ questionType: "behavioral" }),
-    [templateForm, setTemplateForm] = useState<Row>({ scopeType: "company" }),
+    [templateEdit, setTemplateEdit] = useState<Row | null>(null),
+    [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const add = async () => {
     try {
       setError("");
-      await run({ action: "create_question", ...form });
+      setSaving(true);
+      await run({ ...form, action: form.questionId ? "update_question" : "create_question" });
       setForm({ questionType: "behavioral" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-    }
+    } finally { setSaving(false); }
   };
-  const addTemplate = async () => {
-    try {
-      setError("");
-      const criteria = (
-        firstEn: string,
-        firstAr: string,
-        secondEn: string,
-        secondAr: string,
-      ) => [
-        { nameEn: firstEn, nameAr: firstAr, weight: 50, required: true },
-        { nameEn: secondEn, nameAr: secondAr, weight: 50, required: true },
-      ];
-      await run({
-        action: "create_template",
-        ...templateForm,
-        departmentId: Number(templateForm.departmentId) || null,
-        jobId: Number(templateForm.jobId) || null,
-        stages: [
-          {
-            stageKey: "hr_interview",
-            nameEn: "HR Interview",
-            nameAr: "مقابلة الموارد البشرية",
-            durationMinutes: 45,
-            aggregationWeight: 25,
-            passingGuidance:
-              "Verify motivation, communication, availability, and job fundamentals.",
-            interviewers: [{ roleKey: "recruiter", required: true }],
-            questionIds: (data.questions || [])
-              .filter((item: Row) =>
-                ["behavioral", "communication"].includes(item.question_type),
-              )
-              .slice(0, 4)
-              .map((item: Row) => item.id),
-            criteria: criteria(
-              "Communication",
-              "التواصل",
-              "Relevant experience",
-              "الخبرة ذات الصلة",
-            ),
-          },
-          {
-            stageKey: "technical_interview",
-            nameEn: "Technical Interview",
-            nameAr: "المقابلة الفنية",
-            durationMinutes: 60,
-            aggregationWeight: 45,
-            passingGuidance:
-              "Assess practical depth using role-relevant evidence and structured questions.",
-            interviewers: [{ roleKey: "hiring_manager", required: true }],
-            questionIds: (data.questions || [])
-              .filter((item: Row) =>
-                ["technical", "role_specific", "verification"].includes(
-                  item.question_type,
-                ),
-              )
-              .slice(0, 5)
-              .map((item: Row) => item.id),
-            criteria: criteria(
-              "Technical knowledge",
-              "المعرفة الفنية",
-              "Problem solving",
-              "حل المشكلات",
-            ),
-          },
-          {
-            stageKey: "management_interview",
-            nameEn: "Management Interview",
-            nameAr: "مقابلة الإدارة",
-            durationMinutes: 45,
-            aggregationWeight: 30,
-            passingGuidance:
-              "Assess leadership, role alignment, and the evidence gathered across earlier stages.",
-            interviewers: [{ roleKey: "department_manager", required: true }],
-            questionIds: (data.questions || [])
-              .filter((item: Row) =>
-                ["leadership", "situational"].includes(item.question_type),
-              )
-              .slice(0, 4)
-              .map((item: Row) => item.id),
-            criteria: criteria(
-              "Leadership",
-              "القيادة",
-              "Role fit",
-              "الملاءمة للدور",
-            ),
-          },
-        ],
-      });
-      setTemplateForm({ scopeType: "company" });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
+  const removeTemplate = async (template: Row) => {
+    if (!window.confirm(t(rtl, `Delete “${template.name}”? This cannot be undone.`, `هل تريد حذف قالب «${template.name}»؟ لا يمكن التراجع عن هذا الإجراء.`))) return;
+    try { setError(""); await run({ action: "delete_template", templateId: template.id }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+  };
+  const removeQuestion = async (item: Row) => {
+    if (!window.confirm(t(rtl, "Delete this question from the bank? This cannot be undone.", "هل تريد حذف هذا السؤال من البنك؟ لا يمكن التراجع عن هذا الإجراء."))) return;
+    try { setError(""); await run({ action: "delete_question", questionId: item.id }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+  };
+  const removeStage = async (stage: Row) => {
+    if (!window.confirm(t(rtl, "Delete this scorecard stage? This cannot be undone.", "هل تريد حذف بطاقة التقييم هذه؟ لا يمكن التراجع عن هذا الإجراء."))) return;
+    try { setError(""); await run({ action: "delete_template_stage", templateStageId: stage.id }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   };
   return (
     <section className="ats-panel ats-setup">
@@ -2489,109 +2405,13 @@ function SetupView({
           </button>
         ))}
       </nav>
+      {error && <div className="form-error ats-setup-error">{error}</div>}
       {tab === "templates" && (
         <div className="ats-template-workspace">
           <section className="ats-question-form ats-template-form">
-            <h3>{t(rtl, "Create interview template", "إنشاء قالب مقابلات")}</h3>
-            <label>
-              <span>{t(rtl, "Template name", "اسم القالب")}</span>
-              <input
-                value={templateForm.name || ""}
-                onChange={(event) =>
-                  setTemplateForm({ ...templateForm, name: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              <span>{t(rtl, "Scope", "النطاق")}</span>
-              <select
-                value={templateForm.scopeType}
-                onChange={(event) =>
-                  setTemplateForm({
-                    ...templateForm,
-                    scopeType: event.target.value,
-                  })
-                }
-              >
-                {["company", "department", "job_family", "job"].map((scope) => (
-                  <option value={scope} key={scope}>
-                    {localizedDisplayValue(scope, rtl)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {templateForm.scopeType === "department" && (
-              <label>
-                <span>{t(rtl, "Department", "القسم")}</span>
-                <select
-                  value={templateForm.departmentId || ""}
-                  onChange={(event) =>
-                    setTemplateForm({
-                      ...templateForm,
-                      departmentId: event.target.value,
-                    })
-                  }
-                >
-                  <option value="">—</option>
-                  {data.departments?.map((item: Row) => (
-                    <option value={item.id} key={item.id}>
-                      {person(rtl, item)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {templateForm.scopeType === "job_family" && (
-              <label>
-                <span>{t(rtl, "Job family", "العائلة الوظيفية")}</span>
-                <input
-                  value={templateForm.jobFamily || ""}
-                  onChange={(event) =>
-                    setTemplateForm({
-                      ...templateForm,
-                      jobFamily: event.target.value,
-                    })
-                  }
-                />
-              </label>
-            )}
-            {templateForm.scopeType === "job" && (
-              <label>
-                <span>{t(rtl, "Job", "الوظيفة")}</span>
-                <select
-                  value={templateForm.jobId || ""}
-                  onChange={(event) =>
-                    setTemplateForm({
-                      ...templateForm,
-                      jobId: event.target.value,
-                    })
-                  }
-                >
-                  <option value="">—</option>
-                  {data.jobs?.map((item: Row) => (
-                    <option value={item.id} key={item.id}>
-                      {item.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <p>
-              {t(
-                rtl,
-                "Creates a reusable three-stage structured plan with dynamic interviewer roles and independent scorecards. Each job receives its own editable copy.",
-                "ينشئ خطة منظمة من ثلاث مراحل بأدوار محاورين ديناميكية وبطاقات تقييم مستقلة، وتحصل كل وظيفة على نسخة منفصلة.",
-              )}
-            </p>
-            {error && <div className="form-error">{error}</div>}
-            <button
-              className="primary"
-              disabled={!templateForm.name}
-              onClick={() => void addTemplate()}
-            >
-              <Plus />
-              {t(rtl, "Create template", "إنشاء القالب")}
-            </button>
+            <h3>{t(rtl, "Interview templates", "قوالب المقابلات")}</h3>
+            <p>{t(rtl, "Customize stages, interviewers, questions and scorecards.", "خصص المراحل والمحاورين والأسئلة وبطاقات التقييم.")}</p>
+            <button className="primary" onClick={() => setTemplateEdit({})}><Plus />{t(rtl, "Create template", "إنشاء قالب")}</button>
           </section>
           <div className="ats-template-list">
             {data.templates?.map((template: Row) => (
@@ -2601,7 +2421,10 @@ function SetupView({
                     <Settings2 />
                   </span>
                   <div>
-                    <h3>{template.name}</h3>
+                    <div className="ats-card-title-row">
+                      <h3>{template.name}</h3>
+                      <Status value={template.status} rtl={rtl} />
+                    </div>
                     <p>
                       {localizedDisplayValue(template.scope_type, rtl)} ·{" "}
                       {rtl
@@ -2609,7 +2432,10 @@ function SetupView({
                         : template.department_name}
                     </p>
                   </div>
-                  <Status value={template.status} rtl={rtl} />
+                  <div className="ats-card-actions">
+                    <button className="ats-icon-button" onClick={() => setTemplateEdit(template)} aria-label={t(rtl, "Edit template", "تعديل القالب")} title={t(rtl, "Edit", "تعديل")}><Pencil size={16} /></button>
+                    <button className="ats-icon-button danger" onClick={() => void removeTemplate(template)} aria-label={t(rtl, "Delete template", "حذف القالب")} title={t(rtl, "Delete", "حذف")}><Trash2 size={16} /></button>
+                  </div>
                 </header>
                 <div>
                   {data.templateStages
@@ -2634,7 +2460,7 @@ function SetupView({
       {tab === "questions" && (
         <div className="ats-setup-grid">
           <section className="ats-question-form">
-            <h3>{t(rtl, "Add question", "إضافة سؤال")}</h3>
+            <h3>{form.questionId ? t(rtl, "Edit question", "تعديل السؤال") : t(rtl, "Add question", "إضافة سؤال")}</h3>
             <label>
               <span>{t(rtl, "Question", "السؤال")}</span>
               <textarea
@@ -2686,14 +2512,14 @@ function SetupView({
                 }
               />
             </label>
-            {error && <div className="form-error">{error}</div>}
+            {form.questionId && <><label><span>{t(rtl, "Status", "الحالة")}</span><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option value="active">{t(rtl, "Active", "نشط")}</option><option value="inactive">{t(rtl, "Inactive", "غير نشط")}</option></select></label><button className="outline" disabled={saving} onClick={() => { setForm({ questionType: "behavioral" }); setError(""); }}>{t(rtl, "Cancel editing", "إلغاء التعديل")}</button></>}
             <button
               className="primary"
-              disabled={!form.question}
+              disabled={saving || !String(form.question || "").trim()}
               onClick={() => void add()}
             >
               <Plus />
-              {t(rtl, "Add to bank", "إضافة إلى البنك")}
+              {form.questionId ? t(rtl, "Save changes", "حفظ التعديلات") : t(rtl, "Add to bank", "إضافة إلى البنك")}
             </button>
           </section>
           <div className="ats-question-bank">
@@ -2713,6 +2539,10 @@ function SetupView({
                   {item.what_good_looks_like && (
                     <p>{item.what_good_looks_like}</p>
                   )}
+                </div>
+                <div className="ats-card-actions">
+                  <button className="ats-icon-button" onClick={() => { setError(""); setForm({ questionId: item.id, question: item.question, questionType: item.question_type, whatGoodLooksLike: item.what_good_looks_like || "", evaluationGuidance: item.evaluation_guidance || "", status: item.status }); }} aria-label={t(rtl, "Edit question", "تعديل السؤال")} title={t(rtl, "Edit", "تعديل")}><Pencil size={16} /></button>
+                  <button className="ats-icon-button danger" onClick={() => void removeQuestion(item)} aria-label={t(rtl, "Delete question", "حذف السؤال")} title={t(rtl, "Delete", "حذف")}><Trash2 size={16} /></button>
                 </div>
               </article>
             ))}
@@ -2734,6 +2564,10 @@ function SetupView({
                     {num(stage.aggregation_weight, rtl)}%
                   </p>
                 </div>
+                <div className="ats-card-actions">
+                  <button className="ats-icon-button" onClick={() => { setTemplateEdit(data.templates.find((x: Row) => x.id === stage.template_id)); }} aria-label={t(rtl, "Edit scorecard", "تعديل بطاقة التقييم")} title={t(rtl, "Edit scorecard", "تعديل بطاقة التقييم")}><Pencil size={16} /></button>
+                  <button className="ats-icon-button danger" onClick={() => void removeStage(stage)} aria-label={t(rtl, "Delete scorecard", "حذف بطاقة التقييم")} title={t(rtl, "Delete", "حذف")}><Trash2 size={16} /></button>
+                </div>
               </header>
               <div>
                 {data.templateCriteria
@@ -2752,6 +2586,7 @@ function SetupView({
           ))}
         </div>
       )}
+      {templateEdit && <InterviewTemplateEditor rtl={rtl} data={data} template={templateEdit} run={run} close={() => setTemplateEdit(null)} />}
     </section>
   );
 }
@@ -2826,9 +2661,9 @@ export function RecruitmentWorkspace({
         : `?view=${route.view}`,
     [route],
   );
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
       const next = await get(query);
       setData(next);
@@ -2854,12 +2689,16 @@ export function RecruitmentWorkspace({
     }
   }, [query, route.id, route.view]);
   useEffect(() => {
+    // load() shows the loading state (which swaps the view for the spinner) before it fetches, and it must do
+    // so whenever the route changes. Only a data-fetching library or moving the flag into every navigation
+    // handler would avoid setting it here, and neither keeps the current behavior.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-route-change; see comment above
     void load();
   }, [load]);
   const run = async (payload: Row) => {
     const result = await post(payload);
     notify(t(rtl, "Recruitment action saved", "تم حفظ إجراء التوظيف"));
-    await load();
+    await load(true);
     return result;
   };
   const navigate = (view: View) => setRoute({ view }),
@@ -2884,7 +2723,7 @@ export function RecruitmentWorkspace({
     ) as string[][];
   const merged = { ...shared, ...data, jobs: data?.jobs || shared.jobs };
   return (
-    <section className="ats-page">
+    <section className="ats-page" dir={rtl ? "rtl" : "ltr"}>
       <header className="ats-heading">
         <div>
           <span>{t(rtl, "RECRUITMENT OPERATIONS", "عمليات التوظيف")}</span>
@@ -2903,7 +2742,7 @@ export function RecruitmentWorkspace({
               : t(
                   rtl,
                   "Jobs, candidates, interviews, evidence, and human hiring decisions.",
-                  "الوظائف والمرشحون والمقابلات والأدلة وقرارات التوظيف البشرية.",
+                  "تابع الوظائف والمرشحين ونظّم المقابلات من مكان واحد.",
                 )}
           </p>
         </div>
@@ -2922,6 +2761,7 @@ export function RecruitmentWorkspace({
           {tabs.map(([id, en, ar]) => (
             <button
               className={route.view === id ? "active" : ""}
+              aria-current={route.view === id ? "page" : undefined}
               key={id}
               onClick={() => navigate(id as View)}
             >

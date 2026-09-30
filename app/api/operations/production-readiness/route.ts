@@ -1,12 +1,11 @@
-import { createDatabase } from "../../../../db/postgres";
-import { apiFailure, enforceRateLimit, requireActor, requirePermission } from "../../api-security";
+import { withDatabase } from "../../route-helpers";
+import { enforceRateLimit, requireActor, requirePermission } from "../../api-security";
 
 const REQUIRED_TABLES = [
   "roles", "permissions", "users", "employees", "departments", "job_titles",
   "requests", "approvals", "attendance_logs", "daily_attendance", "holidays",
-  "leave_types", "leave_policies", "leave_balances", "documents", "audit_logs",
-  "performance_rating_scales", "performance_cycles", "performance_reviews",
-  "performance_goals", "performance_comments", "job_openings", "job_requirements",
+  "leave_types", "leave_balances", "documents", "audit_logs",
+  "job_openings", "job_requirements",
   "candidates", "candidate_applications", "candidate_documents", "candidate_match_results",
   "recruitment_stages", "interview_templates", "interview_plans", "interview_plan_stages",
   "interviews", "interview_participants", "interview_evaluations", "job_offers", "lifecycle_templates", "lifecycle_template_tasks",
@@ -18,8 +17,7 @@ const MIGRATION_0014_TIMESTAMP = 1787405400000;
 const MIGRATION_0014_TAG = "0014_complete_hrms";
 
 export async function GET(request: Request) {
-  const db = createDatabase();
-  try {
+  return withDatabase("Unable to verify production readiness", async db => {
     const actor = await requireActor(request, db);
     if (actor.roleName !== "Super Admin") {
       throw new Response("Only Super Admin can run production readiness checks", { status: 403 });
@@ -86,9 +84,5 @@ export async function GET(request: Request) {
         ready: Number(constraints?.unvalidated_foreign_key_count || 0) === 0,
       },
     }, { headers: { "cache-control": "no-store" } });
-  } catch (error) {
-    return apiFailure(error, "Unable to verify production readiness");
-  } finally {
-    await db.close();
-  }
+  });
 }

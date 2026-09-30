@@ -79,20 +79,28 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /save_department_structure/);
   assert.match(app, /delete_department/);
   assert.match(app, /rtl\?"حذف القسم":"Delete department"/);
-  assert.match(api, /manager_id=CASE WHEN id=\?::integer THEN NULL ELSE \?::integer END/);
+  assert.doesNotMatch(api, /manager_id=CASE WHEN id=\?::integer THEN NULL ELSE \?::integer END/);
+  assert.match(api, /saveEmployeeProfile/);
+  const profileService = await readFile(new URL('../app/employees/profile-update.ts', import.meta.url), 'utf8');
+  assert.match(profileService, /validateEmployeeWrite/);
+  assert.match(profileService, /persistAssignment/);
+  assert.match(profileService, /INSERT INTO audit_logs/);
   assert.match(app, /org-team-level-input/);
   assert.match(app, /organizational_level/);
   assert.doesNotMatch(app, /Layla Alotaibi|Youssef Nassar|Commercial Director/);
 });
 
 test("provides personal account login, password change, and logout controls", async () => {
-  const [app, authRoute, portalAuth] = await Promise.all([
+  const [app, profileMenu, authRoute, portalAuth] = await Promise.all([
     readFile(new URL("../app/hr-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/profile-menu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/auth/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/portal-auth.ts", import.meta.url), "utf8"),
   ]);
   assert.match(app, /function LoginPage/);
-  assert.match(app, /profile-logout/);
+  assert.match(profileMenu, /profile-pop-logout/);
+  assert.match(profileMenu, /onClick=\{onLogout\}/);
+  assert.match(app, /onLogout=/);
   assert.match(app, /method:"DELETE"/);
   assert.match(authRoute, /verifyPassword/);
   assert.match(authRoute, /failed_login_attempts/);
@@ -120,11 +128,17 @@ test("creates employee login accounts only from access management with the reque
 });
 
 test("enforces four-role server-side data scope", async () => {
-  const api = await readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8");
+  const [api, departmentScope] = await Promise.all([
+    readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/organization/department-scope.ts", import.meta.url), "utf8"),
+  ]);
   assert.match(api, /SYSTEM_ROLES = \["Super Admin","HR Manager","Department Manager","Employee"\]/);
-  assert.match(api, /WITH RECURSIVE managed/);
+  // The recursive department CTE is shared rather than inlined, so assert both that
+  // this route scopes through it and that the shared definition is still recursive.
+  assert.match(api, /MANAGED_DEPARTMENTS_CTE/);
+  assert.match(departmentScope, /WITH RECURSIVE managed/);
   assert.match(api, /canAccessEmployee/);
   assert.match(api, /You cannot approve your own request/);
-  assert.match(api, /Only the employee's department manager/);
+  assert.match(api, /assertEmployeeManager/);
   assert.doesNotMatch(api, /const roleNames = \["Super Admin","Admin","HR Manager","HR","Direct Manager","Employee"\]/);
 });

@@ -227,7 +227,7 @@
   font-size: var(--type-label);
   color: var(--muted);
 }
-.ats-panel header > button {
+.ats-panel header > button:not(.primary):not(.outline) {
   border: 0;
   background: transparent;
   color: var(--blue);
@@ -524,6 +524,9 @@
   height: 2px;
   background: var(--blue);
 }
+.ats-setup-error {
+  margin: 14px 16px 0;
+}
 .ats-detail-head {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -669,9 +672,9 @@
   font-size: 24px;
   color: var(--success);
 }
-.ats-requirements > div > article {
+.ats-requirements > div > article:not(.ats-repeat-card) {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
@@ -1432,10 +1435,11 @@
 }
 .ats-question-bank article {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
+  align-items: start;
 }
 .ats-question-bank article > span {
   width: 32px;
@@ -1454,6 +1458,9 @@
   color: var(--muted);
 }
 .ats-template-list {
+  align-content: start;
+  align-items: start;
+  min-width: 0;
   padding: 12px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1479,6 +1486,48 @@
   color: var(--blue);
   border-radius: 8px;
 }
+.ats-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ats-icon-button {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+}
+.ats-icon-button:hover {
+  background: var(--neutral-bg);
+  color: var(--navy);
+}
+.ats-icon-button.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.ats-icon-button.danger:hover {
+  color: #b91c1c;
+  border-color: #fca5a5;
+  background: #feecec;
+}
+.ats-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ats-card-title-row h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ats-template-list h3 {
   margin: 0;
   color: var(--navy);
@@ -1494,6 +1543,9 @@
   margin-top: 12px;
 }
 .ats-template-list article > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background: var(--neutral-bg);
   border-radius: 8px;
   padding: 6px 8px;
@@ -1583,6 +1635,8 @@
   color: var(--muted);
 }
 .ats-drawer-body {
+  align-content: start;
+  min-height: 0;
   overflow: auto;
   padding: 18px 20px;
   display: grid;
@@ -1627,10 +1681,12 @@
 }
 .ats-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 .ats-field {
+  min-width: 0;
+  align-content: start;
   display: grid;
   gap: 5px;
   color: #344054;
@@ -1806,3 +1862,35 @@
     flex-direction: column;
   }
 }
+
+.ats-template-editor { width: min(960px, 96vw); max-width: 96vw; }
+.ats-template-edit-form { overflow-y: auto; padding: 24px 28px 36px; min-height: 0; }
+.ats-template-edit-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.ats-template-edit-form fieldset > p { margin: 0 0 22px; color: var(--muted); line-height: var(--leading-relaxed); }
+.ats-template-edit-form .ats-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.ats-template-edit-form .ats-field { min-width: 0; gap: 8px; }
+.ats-template-edit-form .ats-field textarea { line-height: var(--leading-relaxed); }
+.ats-template-stage-editor { border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin: 28px 0 0; background: #f8fafc; }
+.ats-template-stage-editor > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.ats-template-stage-editor > header h3 { margin: 0; color: var(--navy); font-size: var(--type-section); }
+.ats-template-stage-editor > header .ats-editor-actions { margin-top: 0; }
+.ats-stage-toggles { display: flex; flex-wrap: wrap; gap: 14px 32px; margin-top: 22px; }
+.ats-stage-toggles label,
+.ats-criterion-actions label,
+.ats-template-assignment > label { display: inline-flex; align-items: center; gap: 8px; color: #344054; font-size: var(--type-label); font-weight: var(--weight-semibold); }
+.ats-stage-subsection { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.ats-stage-subsection > h4 { margin: 0 0 16px; color: var(--navy); font-size: var(--type-component); font-weight: var(--weight-bold); }
+.ats-template-assignment { display: flex; align-items: end; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+.ats-template-assignment .ats-field { flex: 1; min-width: 180px; }
+.ats-template-assignment > label { min-height: 40px; }
+.ats-template-criterion { background: #fff; padding: 20px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 16px; }
+.ats-criterion-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
+.ats-template-editor .ats-editor-actions { flex-wrap: wrap; margin-top: 12px; }
+.ats-template-edit-form fieldset > button.outline { margin-top: 24px; }
+.ats-template-edit-form .form-error { margin-top: 20px; }
+.ats-template-edit-form fieldset > .ats-editor-actions { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
+.ats-template-editor .ats-check-list { max-height: 340px; padding: 6px 16px; background: #fff; border-radius: 12px; }
+.ats-template-editor .ats-check-list label { display: flex; align-items: flex-start; gap: 12px; padding: 14px 2px; line-height: 1.6; }
+.ats-template-editor .ats-check-list label:first-child { border-top: 0; }
+.ats-template-editor .ats-check-list input { margin-top: 4px; flex-shrink: 0; }
+@media (max-width: 600px) { .ats-template-edit-form .ats-form-grid { grid-template-columns: 1fr; } .ats-template-edit-form { padding: 14px; } .ats-template-stage-editor { padding: 16px; } .ats-template-assignment, .ats-template-criterion { padding: 14px; } }

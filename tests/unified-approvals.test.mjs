@@ -30,15 +30,15 @@ test("routes decisions to existing domain actions",()=>{
   assert.throws(()=>routeApprovalAction("payroll"),/Unsupported/);
 });
 
-test("aggregation endpoint is focused, recursively scoped, and excludes sensitive employee fields",async()=>{
+test("aggregation endpoint is focused, assigned-approver scoped, and excludes sensitive employee fields",async()=>{
   const [aggregation,endpoint,ui]=await Promise.all([readFile(new URL("../app/approvals/approval-aggregation.ts",import.meta.url),"utf8"),readFile(new URL("../app/api/approvals/route.ts",import.meta.url),"utf8"),readFile(new URL("../app/approvals-center.tsx",import.meta.url),"utf8")]);
-  assert.match(aggregation,/WITH RECURSIVE managed/);assert.match(aggregation,/e\.department_id IN/);assert.match(endpoint,/Approval center access is restricted|aggregateApprovals/);
+  assert.match(aggregation,/EMPLOYEE_MANAGER_SQL/);assert.match(aggregation,/effectiveHrSql/);assert.match(endpoint,/Approval center access is restricted|aggregateApprovals/);
   assert.doesNotMatch(aggregation,/e\.salary|bank_account|identification_number/);assert.match(ui,/\/api\/approvals/);assert.match(ui,/attendance_correction_action/);assert.match(ui,/request_action/);
 });
 
 test("existing domain endpoints re-check scope, stage, self approval, and stale transitions",async()=>{
   const route=await readFile(new URL("../app/api/hr/route.ts",import.meta.url),"utf8");
   assert.match(route,/You cannot approve your own request/);assert.match(route,/You cannot approve your own attendance correction/);
-  assert.match(route,/canAccessEmployee\(d1,user,Number\(before\.employee_id\)\)/);assert.match(route,/canAccessEmployee\(d1,user,Number\(correction\.employee_id\)\)/);
+  assert.match(route,/assertEmployeeManager\(d1,Number\(before\.employee_id\),user\.employee_id\)/);assert.match(route,/assertEmployeeManager\(d1,Number\(correction\.employee_id\),user\.employee_id\)/);
   assert.match(route,/SELECT pg_advisory_xact_lock\(\?\)/);assert.match(route,/WHERE id=\? AND status=\? AND current_stage=\? RETURNING id/);
 });

@@ -1,3 +1,4 @@
+import { apiFailure } from "../api-security";
 import { ensureAuthSchema, requirePortalSession } from "../../portal-auth";
 import { aggregateApprovals } from "../../approvals/approval-aggregation";
 import { createDatabase } from "../../../db/postgres";
@@ -11,6 +12,6 @@ export async function GET(request:Request){
     const permission=await db.prepare("SELECT allowed FROM permissions WHERE role_id=(SELECT role_id FROM users WHERE id=?) AND module='request_approvals' AND action='view'").bind(user.id).first<{allowed:number}>();
     if(user.role_name!=="Super Admin"&&!permission?.allowed)throw new Response("Permission denied",{status:403});
     return Response.json(await aggregateApprovals(db,user));
-  }catch(error){if(error instanceof Response)return Response.json({error:await error.text()},{status:error.status});console.error(error);return Response.json({error:"Unable to load approvals"},{status:500});}
+  }catch(error){return apiFailure(error,"Unable to load approvals");}
   finally{await db.close();}
 }

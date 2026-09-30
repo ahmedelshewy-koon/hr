@@ -16,7 +16,6 @@ The Worker exports a Cloudflare `scheduled` handler. Configure a daily cron afte
 
 ## Explicit administrative services
 
-- `POST /api/operations/leave-rollover` with `{ "fromYear": 2026 }` is HR-only, rate-limited, audited, and idempotent per employee/type/year.
 - `POST /api/operations/audit-retention` is Super Admin-only, rate-limited, enforces at least 90 days, preserves critical audit actions, and records its own result.
 
 Neither operation runs on page load.

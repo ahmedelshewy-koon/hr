@@ -1,0 +1,14 @@
+[
+  {
+    "employee_code": "E001",
+    "name_ar": "نواف المطيرى",
+    "department": "Asas Company",
+    "pending_requests": 0
+  },
+  {
+    "employee_code": "EMP1786006205511",
+    "name_ar": "مريم -",
+    "department": null,
+    "pending_requests": 0
+  }
+]

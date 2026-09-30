@@ -1,0 +1,5 @@
+.holiday-menu{position:fixed;z-index:60;padding:6px;display:grid;gap:2px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 12px 32px rgba(15,23,42,.16)}
+.holiday-menu button{min-height:40px;padding:8px 12px;display:flex;align-items:center;gap:8px;border:0;border-radius:8px;background:transparent;color:#0b1f4d;font-size:var(--type-label);text-align:start;cursor:pointer}
+.holiday-menu button:hover,.holiday-menu button:focus-visible{background:#f1f5f9}
+.holiday-menu svg{color:#2563eb;flex:none}
+.official-name .holiday-moved{margin-top:4px;padding:2px 8px;display:inline-block;border-radius:12px;background:#fef3c7;color:#b45309;font-size:var(--type-label);font-style:normal}

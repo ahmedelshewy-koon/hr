@@ -1,3 +1,4 @@
+import { MANAGED_DEPARTMENTS_CTE } from "../organization/department-scope";
 import type { ApiActor } from "../api/api-security";
 import type { PostgresDatabase, TransactionDatabase } from "../../db/postgres";
 
@@ -10,10 +11,7 @@ async function jobScopeRow(db: Db, actor: ApiActor, jobId: number) {
   if (!actor.employeeId) return null;
   return db
     .prepare(
-      `WITH RECURSIVE managed AS (
-      SELECT id FROM departments WHERE manager_employee_id=? AND status!='deleted'
-      UNION ALL SELECT d.id FROM departments d JOIN managed m ON d.parent_id=m.id WHERE d.status!='deleted'
-    ) SELECT j.id,CASE WHEN j.recruiter_employee_id=? OR j.hiring_manager_employee_id=? OR j.department_id IN (SELECT id FROM managed) THEN 1 ELSE 0 END AS can_manage
+      `${MANAGED_DEPARTMENTS_CTE} SELECT j.id,CASE WHEN j.recruiter_employee_id=? OR j.hiring_manager_employee_id=? OR j.department_id IN (SELECT id FROM managed) THEN 1 ELSE 0 END AS can_manage
     FROM job_openings j WHERE j.id=? AND (
       j.recruiter_employee_id=? OR j.hiring_manager_employee_id=? OR j.department_id IN (SELECT id FROM managed)
       OR EXISTS (SELECT 1 FROM interviews i JOIN interview_participants p ON p.interview_id=i.id JOIN candidate_applications a ON a.id=i.application_id WHERE a.job_id=j.id AND p.employee_id=?)
@@ -130,7 +128,7 @@ export function jobScopeSql(actor: ApiActor, alias = "j") {
   if (isRecruitmentAdmin(actor)) return { sql: "1=1", args: [] as unknown[] };
   if (!actor.employeeId) return { sql: "1=0", args: [] as unknown[] };
   return {
-    sql: `(${alias}.recruiter_employee_id=? OR ${alias}.hiring_manager_employee_id=? OR ${alias}.department_id IN (WITH RECURSIVE managed AS (SELECT id FROM departments WHERE manager_employee_id=? AND status!='deleted' UNION ALL SELECT d.id FROM departments d JOIN managed m ON d.parent_id=m.id WHERE d.status!='deleted') SELECT id FROM managed))`,
+    sql: `(${alias}.recruiter_employee_id=? OR ${alias}.hiring_manager_employee_id=? OR ${alias}.department_id IN (${MANAGED_DEPARTMENTS_CTE} SELECT id FROM managed))`,
     args: [actor.employeeId, actor.employeeId, actor.employeeId],
   };
 }

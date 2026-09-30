@@ -1,9 +1,6 @@
-export type LeaveHoliday = {
-  holidayDate: string;
-  country: string;
-  recurrenceType?: string | null;
-  status?: string | null;
-};
+import { isHolidayDate, type CalendarHoliday } from "./holiday-calendar.ts";
+
+export type LeaveHoliday = CalendarHoliday;
 
 export type LeaveDuration = {
   chargeableDays: number;
@@ -28,14 +25,6 @@ export function parseWorkDays(value: string | null | undefined) {
   return new Set(parsed.length ? parsed : [0, 1, 2, 3, 4]);
 }
 
-function appliesOnDate(holiday: LeaveHoliday, date: string, country: string) {
-  if (holiday.status && holiday.status !== "active") return false;
-  if (holiday.country !== country && holiday.country !== "Both" && holiday.country !== "KSA & Egypt") return false;
-  return holiday.recurrenceType === "annual"
-    ? holiday.holidayDate.slice(5) === date.slice(5)
-    : holiday.holidayDate === date;
-}
-
 export function calculateLeaveDuration(input: {
   fromDate: string;
   toDate: string;
@@ -56,7 +45,7 @@ export function calculateLeaveDuration(input: {
     const date = cursor.toISOString().slice(0, 10);
     if (!workDays.has(cursor.getUTCDay())) {
       result.excludedWeekends.push(date);
-    } else if (holidays.some(holiday => appliesOnDate(holiday, date, input.country))) {
+    } else if (isHolidayDate(holidays, date, input.country)) {
       result.excludedHolidays.push(date);
     } else {
       result.chargeableDates.push(date);

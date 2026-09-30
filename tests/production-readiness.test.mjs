@@ -9,14 +9,9 @@ test("marks the Arabic login surface with Arabic language and RTL direction", as
 
 test("types nullable PostgreSQL parameters used by employee and user updates", async () => {
   const source = await readFile(new URL("../app/api/hr/route.ts", import.meta.url), "utf8");
-  assert.match(source, /CASE WHEN \?::integer IS NULL THEN 1/);
+  assert.match(source, /validateEmployeeWrite/);
+  assert.doesNotMatch(source, /CASE WHEN \? IS NULL/);
   assert.match(source, /CASE WHEN \?::text IS NULL THEN must_change_password/);
-});
-
-test("uses a PostgreSQL-supported advisory lock signature for leave rollover", async () => {
-  const source = await readFile(new URL("../app/leave/leave-rollover.ts", import.meta.url), "utf8");
-  assert.match(source, /pg_advisory_xact_lock\(hashtextextended\(\?::text,0\)\)/);
-  assert.doesNotMatch(source, /pg_advisory_xact_lock\(\?,\?,\?\)/);
 });
 
 test("returns conflict semantics for finalized attendance corrections", async () => {

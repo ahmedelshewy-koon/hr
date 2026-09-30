@@ -12,7 +12,9 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint app db worker tests vite.config.ts drizzle.config.ts next.config.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "attendance:sync": "node --experimental-strip-types scripts/zkteco-sync.mjs --once",
+    "attendance:agent": "node --experimental-strip-types scripts/zkteco-sync.mjs --watch"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -21,7 +23,8 @@
     "postgres": "^3.4.9",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "unpdf": "^1.8.1"
+    "unpdf": "^1.8.1",
+    "zkteco-js": "1.7.2"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

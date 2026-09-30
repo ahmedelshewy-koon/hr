@@ -36,6 +36,14 @@ const eslintConfig = defineConfig([
       },
     },
   },
+  {
+    rules: {
+      // Toggle rows are written <label><input/><span><b>Text</b><small>…</small></span></label>,
+      // which puts the label text three levels below the <label>. The rule's default depth of 2
+      // stops one level short and reports these as unlabeled even though the text is there.
+      "jsx-a11y/label-has-associated-control": ["error", { depth: 3 }],
+    },
+  },
 ]);
 
 export default eslintConfig;

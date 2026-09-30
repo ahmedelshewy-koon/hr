@@ -1,14 +1,16 @@
 import { env } from "cloudflare:workers";
-import { createDatabase } from "../../../db/postgres";
+import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
+import { withDatabase } from "../route-helpers";
 import { apiFailure, canAccessEmployee, enforceRateLimit, enforceWriteOrigin, requireActor } from "../api-security";
 import { categoryApplies, documentState, normalizeFilename, safeDocumentObjectKey, validateDocumentFile } from "../../documents/document-policy";
 
 type Row=Record<string,unknown>;
 type R2BucketLike={put(key:string,value:ArrayBuffer|Uint8Array,options?:{httpMetadata?:{contentType?:string};customMetadata?:Record<string,string>}):Promise<unknown>;delete(key:string):Promise<void>};
 const bucket=()=>((env as unknown as {FILES?:R2BucketLike}).FILES);
-const audit=(db:ReturnType<typeof createDatabase>,request:Request,userId:number,action:string,id:string,next?:unknown)=>db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,new_value,ip_address,created_at) VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(userId,action,"documents","document",id,next===undefined?null:JSON.stringify(next),request.headers.get("cf-connecting-ip")).run();
+const audit=(db:PostgresDatabase,request:Request,userId:number,action:string,id:string,next?:unknown)=>db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,new_value,ip_address,created_at) VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)").bind(userId,action,"documents","document",id,next===undefined?null:JSON.stringify(next),request.headers.get("cf-connecting-ip")).run();
 
-export async function GET(request:Request){const db=createDatabase();try{
+export async function GET(request:Request){
+  return withDatabase("Unable to load documents", async db => {
   const actor=await requireActor(request,db),url=new URL(request.url),employeeId=Number(url.searchParams.get("employeeId")||actor.employeeId);if(!employeeId)throw new Response("Employee is required",{status:400});
   if(!(await canAccessEmployee(db,actor,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
   const employee=await db.prepare("SELECT id,country,employment_type FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();if(!employee)throw new Response("Employee not found",{status:404});
@@ -23,7 +25,8 @@ export async function GET(request:Request){const db=createDatabase();try{
   const activeCategories=new Set(rows.filter(row=>row.status!=="archived").map(row=>String(row.category)));
   const missing=applicable.filter(category=>Number(category.required_document)&&!activeCategories.has(String(category.code))).map(category=>({code:category.code,name_en:category.name_en,name_ar:category.name_ar}));
   return Response.json({documents,versions,categories:applicable.map(category=>({...category,canUpload:privileged||(self&&Boolean(category.employee_can_upload)),canView:visibleCodes.includes(String(category.code))})),missing,permissions:{canManage:privileged,canUpload:privileged||self}},{headers:{"cache-control":"no-store"}});
-}catch(error){return apiFailure(error,"Unable to load documents");}finally{await db.close();}}
+});
+}
 
 export async function POST(request:Request){const db=createDatabase();let objectKey:string|undefined;try{
   enforceWriteOrigin(request);const actor=await requireActor(request,db);await enforceRateLimit(db,request,"document-upload",20,3600,actor.id);

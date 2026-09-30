@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { availableLeaveBalance, calculateLeaveDuration, completedServiceMonths } from "../app/leave/leave-calculation.ts";
 import { decideLeaveTransition } from "../app/leave/leave-workflow.ts";
+import { LEAVE_REPORT_CATEGORY, leaveRequiresReport } from "../app/leave/leave-report-policy.ts";
 
 test("calculates one working leave day",()=>{
   const result=calculateLeaveDuration({fromDate:"2026-08-23",toDate:"2026-08-23",workDays:"0,1,2,3,4",country:"Egypt"});
@@ -55,6 +56,26 @@ test("leave persistence uses transactions, locks, guarded balance updates, scope
   assert.match(service,/leave_balance_reserved/);
   assert.match(service,/leave_balance_consumed/);
   assert.match(service,/leave_balance_released/);
-  assert.match(route,/canAccessEmployee\(d1,user,Number\(before\.employee_id\)\)/);
+  assert.match(route,/assertEmployeeManager\(d1,Number\(before\.employee_id\),user\.employee_id\)/);
   assert.match(route,/You cannot approve your own request/);
+});
+
+test("sick leave requires a medical report while annual leave does not",()=>{
+  assert.equal(leaveRequiresReport({code:"SICK",attachment_required:0}),true);
+  assert.equal(leaveRequiresReport({code:"ANNUAL_KSA",attachment_required:0}),false);
+  assert.equal(leaveRequiresReport({code:"UNPAID",attachment_required:1}),true);
+  assert.equal(leaveRequiresReport(undefined),false);
+  assert.equal(LEAVE_REPORT_CATEGORY,"medical_certificate");
+});
+
+test("leave submission links the uploaded report and the portal exposes annual and sick quick actions",async()=>{
+  const read=file=>readFile(new URL(file,import.meta.url),"utf8");
+  const [service,route,drawer,portal]=await Promise.all([read("../app/leave/leave-service.ts"),read("../app/api/hr/route.ts"),read("../app/employee-request-drawer.tsx"),read("../app/employee-portal-workspace.tsx")]);
+  assert.match(service,/leaveRequiresReport\(leaveType\)&&!report/);
+  assert.match(service,/employee_id=\? AND category=\? AND status='active'/);
+  assert.match(route,/attachmentDocumentId:Number\(details\.attachmentDocumentId\)\|\|null/);
+  assert.match(drawer,/fetch\("\/api\/documents",\{method:"POST"/);
+  assert.match(drawer,/attachmentRequired&&!file/);
+  assert.match(portal,/openRequest\("leave-kind:annual"\)/);
+  assert.match(portal,/openRequest\("leave-kind:sick"\)/);
 });

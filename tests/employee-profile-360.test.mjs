@@ -25,7 +25,7 @@ test("manager field policy excludes private and account administration fields",(
 
 test("focused profile API is employee-scoped and contains no payroll or protected field projections",async()=>{
   const route=await readFile(new URL("../app/api/employees/[id]/route.ts",import.meta.url),"utf8");
-  assert.match(route,/WHERE e\.id=\?/);assert.match(route,/WITH RECURSIVE managed/);assert.match(route,/Employee is outside your access scope/);
+  assert.match(route,/WHERE e\.id=\?/);assert.match(route,/MANAGED_DEPARTMENTS_CTE/);assert.match(route,/Employee is outside your access scope/);
   assert.doesNotMatch(route,/e\.salary|salary_structures|payroll_|loans_advances|bank_account|bank_iban|identification_number|password_hash|session_version|auth_user_id/);
   assert.match(route,/must_change_password/);assert.match(route,/u\.last_login_at/);
 });
@@ -37,9 +37,9 @@ test("summaries read authoritative attendance, leave, requests and real alert so
   assert.doesNotMatch(route,/INSERT INTO|UPDATE daily_attendance|UPDATE leave_balances/);
 });
 
-test("activity is employee-scoped and audit JSON is never returned",async()=>{
+test("audit JSON is never returned by the employee profile route",async()=>{
   const route=await readFile(new URL("../app/api/employees/[id]/route.ts",import.meta.url),"utf8");
-  assert.match(route,/record_type='employee' AND record_id=\?/);assert.doesNotMatch(route,/previous_value|new_value/);
+  assert.doesNotMatch(route,/previous_value|new_value/);
 });
 
 test("employee list opens the canonical profile workspace and edit reuses the existing drawer",async()=>{
@@ -47,7 +47,12 @@ test("employee list opens the canonical profile workspace and edit reuses the ex
   assert.match(app,/EmployeeProfile360/);assert.match(app,/selected\.edit\?<EmployeeDetailsDrawer/);assert.match(app,/onEdit=\{\(\)=>setSelected/);
 });
 
-test("attendance and request histories provide explicit localized filters",async()=>{
+test("request history provides explicit localized filters and the profile has no attendance tab",async()=>{
   const profile=await readFile(new URL("../app/employee-profile-360.tsx",import.meta.url),"utf8");
-  assert.match(profile,/function AttendanceTab/);assert.match(profile,/function RequestsTab/);assert.match(profile,/"تطبيق":"Apply"/);assert.match(profile,/"إعادة ضبط":"Reset"/);
+  assert.doesNotMatch(profile,/function AttendanceTab/);assert.doesNotMatch(profile,/id:"attendance"/);assert.match(profile,/function RequestsTab/);assert.match(profile,/"تطبيق":"Apply"/);assert.match(profile,/"إعادة ضبط":"Reset"/);
+});
+
+test("employee profile does not display team or grade facts",async()=>{
+  const profile=await readFile(new URL("../app/employee-profile-360.tsx",import.meta.url),"utf8");
+  assert.doesNotMatch(profile,/\['team','الفريق','Team'\]|\['grade','الدرجة','Grade'\]/);
 });

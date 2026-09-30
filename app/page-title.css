@@ -11,12 +11,6 @@
 .lifecycle-heading>div>p,
 .lifecycle-subheading>div>span,
 .lifecycle-subheading>div>p,
-.performance-heading>div>span,
-.performance-heading>div>p,
-.performance-subheading>div>span,
-.performance-subheading>div>p,
-.talent-heading>div>span,
-.talent-heading>div>p,
 .portal-welcome>div>span,
 .portal-welcome>div>p{
   display:none!important;
@@ -28,8 +22,6 @@
 .attendance-page-head,
 .learning-heading,
 .lifecycle-heading,
-.performance-heading,
-.talent-heading,
 .portal-welcome{
   min-height:48px;
   padding:2px 4px;
@@ -49,9 +41,6 @@
 .learning-heading h1,
 .lifecycle-heading h1,
 .lifecycle-subheading h1,
-.performance-heading h1,
-.performance-subheading h1,
-.talent-heading h1,
 .portal-welcome h1{
   margin:0!important;
   color:var(--text)!important;
@@ -69,8 +58,6 @@
   .attendance-page-head,
   .learning-heading,
   .lifecycle-heading,
-  .performance-heading,
-  .talent-heading,
   .portal-welcome{
     min-height:48px;
     padding:2px 4px;

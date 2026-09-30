@@ -365,6 +365,9 @@
 .org-team-level,.org-team-level-input{width:56px;height:38px;display:grid;place-items:center;border:1px solid #e2e8f0;border-radius:12px;background:#f1f5f9;color:#2563eb;font-size:var(--type-body);font-weight:var(--weight-bold);text-align:center;outline:0}
 .org-team-level.manager{border-color:#2563eb;background:#eaf2ff}
 .org-team-level-input{background:#fff;border-color:#2563eb}
+select.org-team-level-input{appearance:none;cursor:pointer;padding:0;text-align-last:center}
+.org-tree-level-tag{display:inline-block;width:fit-content;justify-self:start;margin-bottom:4px;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#2563eb;font-size:var(--type-label);font-weight:var(--weight-bold);line-height:1.4;white-space:nowrap}
+.org-tree-level-tag.manager{background:#eaf2ff}
 .org-team-person{min-width:0}
 .org-team-person b{display:block;color:#0b1f4d;font-size:var(--type-body);line-height:var(--leading-heading);word-break:break-word}
 .org-team-person small{display:block;margin-top:2px;color:#64748b;font-size:var(--type-label)}

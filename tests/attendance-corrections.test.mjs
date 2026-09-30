@@ -63,6 +63,6 @@ test("persistence is transactional, guarded, scoped, audited, and never updates 
   const [service,route]=await Promise.all([readFile(new URL("../app/attendance/attendance-service.ts",import.meta.url),"utf8"),readFile(new URL("../app/api/hr/route.ts",import.meta.url),"utf8")]);
   assert.match(service,/\.transaction\(async tx/);assert.match(service,/pg_advisory_xact_lock/);assert.match(service,/WHERE id=\? AND status=\? AND current_stage=\?/);
   assert.match(service,/correction_requested/);assert.match(service,/manual_correction/);assert.match(service,/attendance_recalculated/);
-  assert.doesNotMatch(service,/UPDATE attendance_logs/);assert.match(route,/canAccessEmployee\(d1,user,Number\(correction\.employee_id\)\)/);
+  assert.doesNotMatch(service,/UPDATE attendance_logs/);assert.match(route,/assertEmployeeManager\(d1,Number\(correction\.employee_id\),user\.employee_id\)/);
   assert.match(route,/You cannot approve your own attendance correction/);assert.match(route,/Duplicate \$\{eventType\} is not allowed/);assert.match(route,/There is no check-in recorded for today/);
 });

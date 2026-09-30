@@ -1,17 +1,26 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
+import { allowsLocalPortalLogin } from "../../local-platform-access";
 import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPassword, portalLoginEmail, portalSessionCookie, readPortalSession, verifyBootstrapPassword, verifyPassword } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
+import { PAGE_MODULES, filterAvailablePages } from "../../page-availability";
+import { readPageAvailability } from "../../page-availability-store";
 
 type LoginUser = { id:number; email:string; password_hash:string|null; password_changed_at?:string|null; status:string; session_version:number; failed_login_attempts:number; locked_until:string|null; must_change_password:number; role_name:string; employee_id:number|null; employee_status:string|null };
 
-const PAGE_MODULES:Record<string,string[]>={dashboard:["dashboard"],portal:["employee_portal"],approvals:["request_approvals"],employees:["employees"],leave:["leave_management"],attendance:["attendance"],performance:["performance"],recruitment:["recruitment"],lifecycle:["onboarding","offboarding"],assets:["assets"],learning:["learning"],org:["organization_chart"],users:["users"],reports:["reports"],payroll:["payroll"],settings:["system_settings"]};
-async function allowedPagesForUser(d1:PostgresDatabase,userId:number,roleName:string){if(roleName==="Super Admin")return Object.keys(PAGE_MODULES);const rows=(await d1.prepare("SELECT p.module FROM users u JOIN permissions p ON p.role_id=u.role_id WHERE u.id=? AND p.action='view' AND p.allowed=1").bind(userId).all()).results as {module:string}[];const modules=new Set(rows.map(row=>row.module));return Object.entries(PAGE_MODULES).filter(([,required])=>required.some(module=>modules.has(module))).map(([page])=>page);}
+async function allowedPagesForUser(d1:PostgresDatabase,userId:number,roleName:string){
+  const availability=await readPageAvailability(d1);
+  if(roleName==="Super Admin")return filterAvailablePages(Object.keys(PAGE_MODULES),roleName,availability);
+  const rows=(await d1.prepare("SELECT p.module FROM users u JOIN permissions p ON p.role_id=u.role_id WHERE u.id=? AND p.action='view' AND p.allowed=1").bind(userId).all()).results as {module:string}[];
+  const modules=new Set(rows.map(row=>row.module));
+  const granted=Object.entries(PAGE_MODULES).filter(([,required])=>required.some(module=>modules.has(module))).map(([page])=>page);
+  return filterAvailablePages(granted,roleName,availability);
+}
 
 async function requirePlatformAccess(request: Request) {
   const user = await getChatGPTUser();
   const hostname = new URL(request.url).hostname;
-  if (!user && hostname !== "localhost" && hostname !== "127.0.0.1") throw new Response("Authentication required", { status:401 });
+  if (!user && !allowsLocalPortalLogin(hostname, process.env.NODE_ENV)) throw new Response("Authentication required", { status:401 });
 }
 
 function isSecure(request: Request) { return new URL(request.url).protocol === "https:"; }
@@ -19,7 +28,9 @@ const noStore = { "cache-control":"no-store" };
 
 async function bootstrapAdmin(d1: PostgresDatabase, email:string, password:string) {
   if (email !== portalLoginEmail() || !(await verifyBootstrapPassword(password))) return null;
-  await d1.prepare("INSERT INTO roles (name,description,is_system,created_at,updated_at) VALUES ('Super Admin','Full system administrator',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(name) DO NOTHING").run();
+  // Set the display labels inline. They used to be backfilled by the next request's
+  // ensureAuthSchema pass, which no longer runs once the bootstrap is cached per isolate.
+  await d1.prepare("INSERT INTO roles (name,name_en,name_ar,description,is_system,created_at,updated_at) VALUES ('Super Admin','Super Admin','مدير النظام','Full system administrator',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(name) DO NOTHING").run();
   const role = await d1.prepare("SELECT id FROM roles WHERE name='Super Admin'").first<{id:number}>();
   let user = await d1.prepare("SELECT id,email,password_hash,status,session_version,failed_login_attempts,locked_until,must_change_password,'Super Admin' AS role_name,employee_id,NULL AS employee_status FROM users WHERE lower(email)=lower(?)").bind(email).first<LoginUser>();
   const passwordHash = await hashPassword(password);
@@ -69,7 +80,7 @@ export async function POST(request: Request) {
     let user = await d1.prepare("SELECT u.id,u.email,u.password_hash,u.password_changed_at,u.status,u.session_version,u.failed_login_attempts,u.locked_until,u.must_change_password,r.name AS role_name,u.employee_id,e.employment_status AS employee_status FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id WHERE lower(u.email)=lower(?)").bind(email).first<LoginUser>();
     if (!user?.password_hash) user=await bootstrapAdmin(d1,email,password);
     user=await recoverConfiguredAdmin(d1,user,email,password);
-    if (user?.locked_until && new Date(user.locked_until).getTime()>Date.now()) return Response.json({ error:"تم إيقاف المحاولات مؤقتاً. حاول مرة أخرى بعد 15 دقيقة" }, { status:429,headers:noStore });
+    if (user?.locked_until && new Date(user.locked_until).getTime()>Date.now()) return Response.json({ error:"تم إيقاف المحاولات مؤقتًا. حاول مرة أخرى بعد ١٥ دقيقة" }, { status:429,headers:noStore });
     const valid=Boolean(user&&user.status==="active"&&(!user.employee_id||["active","probation","notice_period"].includes(String(user.employee_status)))&&user.password_hash&&await verifyPassword(password,user.password_hash));
     if (!valid) {
       if (user) {
@@ -99,8 +110,8 @@ export async function PATCH(request: Request) {
     await enforceRateLimit(d1,request,"password-change",5,3600,session.userId);
     const body=await request.json() as {currentPassword?:unknown;newPassword?:unknown};
     const currentPassword=typeof body.currentPassword==="string"?body.currentPassword:"";const newPassword=typeof body.newPassword==="string"?body.newPassword:"";
-    if(newPassword.length<4||newPassword.length>200)return Response.json({error:"كلمة المرور الجديدة يجب أن تكون 4 خانات على الأقل"},{status:400,headers:noStore});
-    if(newPassword===currentPassword)return Response.json({error:"كلمة المرور الجديدة يجب أن تختلف عن كلمة المرور الحالية"},{status:400,headers:noStore});
+    if(newPassword.length<4||newPassword.length>200)return Response.json({error:"يجب ألا تقل كلمة المرور الجديدة عن ٤ خانات"},{status:400,headers:noStore});
+    if(newPassword===currentPassword)return Response.json({error:"يجب أن تختلف كلمة المرور الجديدة عن الحالية"},{status:400,headers:noStore});
     const user=await d1.prepare("SELECT id,email,password_hash,session_version FROM users WHERE id=? AND status='active'").bind(session.userId).first<{id:number;email:string;password_hash:string|null;session_version:number}>();
     if(!user?.password_hash||!(await verifyPassword(currentPassword,user.password_hash)))return Response.json({error:"كلمة المرور الحالية غير صحيحة"},{status:401,headers:noStore});
     const passwordHash=await hashPassword(newPassword);const nextVersion=Number(user.session_version)+1;

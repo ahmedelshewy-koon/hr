@@ -425,6 +425,8 @@ function extractLines(text: string, pattern: RegExp, limit = 20) {
 }
 export function parseCvText(raw: string) {
   const text = raw
+      // PostgreSQL text columns cannot store NUL, and extracted CV bytes often carry it.
+      // eslint-disable-next-line no-control-regex -- stripping NUL is the intent here
       .replace(/\u0000/g, "")
       .replace(/[ \t]+/g, " ")
       .replace(/\n{3,}/g, "\n\n")

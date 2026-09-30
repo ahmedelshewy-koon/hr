@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarClock, FilePlus2, Plus, Trash2, X } from "lucide-react";
+import { CalendarClock, FilePlus2, X } from "lucide-react";
+import { useRecruitmentDialog } from "./use-recruitment-dialog";
+import type { Row } from "../ui-types";
 
-type Row = Record<string, any>;
 type Run = (payload: Row) => Promise<Row>;
 const t = (rtl: boolean, en: string, ar: string) => (rtl ? ar : en);
 const value = (rtl: boolean, row: Row) =>
@@ -32,6 +33,7 @@ function Drawer({
   close: () => void;
   children: React.ReactNode;
 }) {
+  const dialogRef = useRecruitmentDialog(close);
   return (
     <div className="ats-modal-layer">
       <button
@@ -39,7 +41,7 @@ function Drawer({
         onClick={close}
         aria-label={t(rtl, "Close", "إغلاق")}
       />
-      <aside className="ats-drawer" role="dialog" aria-modal="true">
+      <aside ref={dialogRef} className="ats-drawer" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <header>
           <div>
             <span>{t(rtl, "RECRUITMENT", "التوظيف")}</span>
@@ -91,38 +93,8 @@ export function JobDrawer({
       status: "open",
       templateId: data.templates?.[0]?.id || "",
     }),
-    [requirements, setRequirements] = useState<Row[]>([
-      {
-        category: "work_experience",
-        name: t(rtl, "Relevant experience", "الخبرة ذات الصلة"),
-        priority: "required",
-        weight: 35,
-        minimumValue: "3",
-      },
-      {
-        category: "technical_skills",
-        name: t(rtl, "Core technical skills", "المهارات الفنية الأساسية"),
-        priority: "required",
-        weight: 40,
-      },
-      {
-        category: "education",
-        name: t(rtl, "Education", "التعليم"),
-        priority: "preferred",
-        weight: 25,
-      },
-    ]),
-    [questions, setQuestions] = useState<Row[]>([]),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
-  const total = requirements.reduce(
-      (sum, item) => sum + (Number(item.weight) || 0),
-      0,
-    ),
-    setRequirement = (index: number, key: string, next: any) =>
-      setRequirements((items) =>
-        items.map((item, i) => (i === index ? { ...item, [key]: next } : item)),
-      );
   const save = async () => {
     try {
       setSaving(true);
@@ -135,18 +107,8 @@ export function JobDrawer({
         recruiterEmployeeId: Number(form.recruiterEmployeeId) || null,
         templateId: Number(form.templateId) || null,
         openingsCount: Number(form.openingsCount) || 1,
-        requirements,
-        screeningQuestions: questions.map((question) => ({
-          ...question,
-          options: String(question.optionsText || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
-          knockoutRule:
-            question.importance === "knockout" && question.acceptableAnswer
-              ? { operator: "equals", value: question.acceptableAnswer }
-              : null,
-        })),
+        requirements: [],
+        screeningQuestions: [],
       });
       close();
     } catch (cause) {
@@ -161,8 +123,8 @@ export function JobDrawer({
       title={t(rtl, "Create job", "إنشاء وظيفة")}
       subtitle={t(
         rtl,
-        "Define the role, weighted requirements, screening, and interview plan.",
-        "عرّف الوظيفة والمتطلبات الموزونة وأسئلة الفرز وخطة المقابلات.",
+        "Enter the basic information for the new job.",
+        "أدخل المعلومات الأساسية للوظيفة الجديدة.",
       )}
       close={close}
     >
@@ -239,7 +201,7 @@ export function JobDrawer({
                 ))}
               </select>
             </Field>
-            <Field label={t(rtl, "Recruiter / HR owner", "مسؤول التوظيف")}>
+            <Field label={t(rtl, "Recruiter / HR owner", "أخصائي التوظيف")}>
               <select
                 value={form.recruiterEmployeeId || ""}
                 onChange={(e) =>
@@ -291,348 +253,6 @@ export function JobDrawer({
             </Field>
           </div>
         </section>
-        <section className="ats-form-section">
-          <h3>{t(rtl, "Job description", "الوصف الوظيفي")}</h3>
-          <div className="ats-form-grid">
-            <Field label={t(rtl, "Summary", "الملخص")} wide>
-              <textarea
-                value={form.summary || ""}
-                onChange={(e) => setForm({ ...form, summary: e.target.value })}
-              />
-            </Field>
-            <Field label={t(rtl, "Responsibilities", "المسؤوليات")} wide>
-              <textarea
-                value={form.responsibilities || ""}
-                onChange={(e) =>
-                  setForm({ ...form, responsibilities: e.target.value })
-                }
-              />
-            </Field>
-            <Field label={t(rtl, "Full description", "الوصف الكامل")} wide>
-              <textarea
-                value={form.description || ""}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-              />
-            </Field>
-          </div>
-        </section>
-        <section className="ats-form-section">
-          <div className="ats-section-title">
-            <div>
-              <h3>{t(rtl, "Structured requirements", "المتطلبات المنظمة")}</h3>
-              <p>
-                {t(
-                  rtl,
-                  "Publishing and matching require exactly 100%.",
-                  "يتطلب النشر والمطابقة مجموع أوزان يساوي 100٪.",
-                )}
-              </p>
-            </div>
-            <strong className={total === 100 ? "valid" : "invalid"}>
-              {total}%
-            </strong>
-          </div>
-          <div className="ats-repeat-list">
-            {requirements.map((item, index) => (
-              <div className="ats-repeat-card" key={index}>
-                <button
-                  className="ats-remove"
-                  onClick={() =>
-                    setRequirements((rows) =>
-                      rows.filter((_, i) => i !== index),
-                    )
-                  }
-                  aria-label={t(rtl, "Remove requirement", "حذف المتطلب")}
-                >
-                  <Trash2 />
-                </button>
-                <div className="ats-form-grid">
-                  <Field label={t(rtl, "Category", "الفئة")}>
-                    <select
-                      value={item.category}
-                      onChange={(e) =>
-                        setRequirement(index, "category", e.target.value)
-                      }
-                    >
-                      {[
-                        ["work_experience", "Work experience", "خبرة العمل"],
-                        [
-                          "technical_skills",
-                          "Technical skills",
-                          "المهارات الفنية",
-                        ],
-                        [
-                          "domain_experience",
-                          "Domain experience",
-                          "خبرة المجال",
-                        ],
-                        ["education", "Education", "التعليم"],
-                        ["certifications", "Certifications", "الشهادات"],
-                        ["language", "Language", "اللغة"],
-                        ["location", "Location", "الموقع"],
-                        ["availability", "Availability", "التوفر"],
-                        ["other", "Other", "أخرى"],
-                      ].map(([v, en, ar]) => (
-                        <option value={v} key={v}>
-                          {t(rtl, en, ar)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label={t(rtl, "Requirement name", "اسم المتطلب")}>
-                    <input
-                      value={item.name || ""}
-                      onChange={(e) =>
-                        setRequirement(index, "name", e.target.value)
-                      }
-                    />
-                  </Field>
-                  <Field
-                    label={t(rtl, "Required / preferred", "إلزامي / مفضل")}
-                  >
-                    <select
-                      value={item.priority}
-                      onChange={(e) =>
-                        setRequirement(index, "priority", e.target.value)
-                      }
-                    >
-                      <option value="required">
-                        {t(rtl, "Required", "إلزامي")}
-                      </option>
-                      <option value="preferred">
-                        {t(rtl, "Preferred", "مفضل")}
-                      </option>
-                    </select>
-                  </Field>
-                  <Field label={t(rtl, "Weight %", "الوزن ٪")}>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={item.weight}
-                      onChange={(e) =>
-                        setRequirement(index, "weight", Number(e.target.value))
-                      }
-                    />
-                  </Field>
-                  <Field label={t(rtl, "Minimum value", "الحد الأدنى")}>
-                    <input
-                      value={item.minimumValue || ""}
-                      onChange={(e) =>
-                        setRequirement(index, "minimumValue", e.target.value)
-                      }
-                    />
-                  </Field>
-                  <Field label={t(rtl, "Description", "الوصف")} wide>
-                    <input
-                      value={item.description || ""}
-                      onChange={(e) =>
-                        setRequirement(index, "description", e.target.value)
-                      }
-                    />
-                  </Field>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button
-            className="outline"
-            onClick={() =>
-              setRequirements((rows) => [
-                ...rows,
-                {
-                  category: "other",
-                  name: "",
-                  priority: "required",
-                  weight: 0,
-                },
-              ])
-            }
-          >
-            <Plus />
-            {t(rtl, "Add requirement", "إضافة متطلب")}
-          </button>
-        </section>
-        <section className="ats-form-section">
-          <div className="ats-section-title">
-            <div>
-              <h3>{t(rtl, "Screening questions", "أسئلة الفرز الأولي")}</h3>
-              <p>
-                {t(
-                  rtl,
-                  "Knockout answers are flagged for HR; they never auto-reject.",
-                  "تُعلّم إجابات الاستبعاد لمراجعة الموارد البشرية ولا ترفض تلقائيًا.",
-                )}
-              </p>
-            </div>
-          </div>
-          {questions.map((item, index) => (
-            <div className="ats-repeat-card" key={index}>
-              <button
-                className="ats-remove"
-                onClick={() =>
-                  setQuestions((rows) => rows.filter((_, i) => i !== index))
-                }
-              >
-                <Trash2 />
-              </button>
-              <div className="ats-form-grid">
-                <Field label={t(rtl, "Question", "السؤال")} wide>
-                  <input
-                    value={item.question || ""}
-                    onChange={(e) =>
-                      setQuestions((rows) =>
-                        rows.map((r, i) =>
-                          i === index ? { ...r, question: e.target.value } : r,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Field label={t(rtl, "Answer type", "نوع الإجابة")}>
-                  <select
-                    value={item.answerType || "yes_no"}
-                    onChange={(e) =>
-                      setQuestions((rows) =>
-                        rows.map((r, i) =>
-                          i === index
-                            ? { ...r, answerType: e.target.value }
-                            : r,
-                        ),
-                      )
-                    }
-                  >
-                    <option value="yes_no">
-                      {t(rtl, "Yes / No", "نعم / لا")}
-                    </option>
-                    <option value="single_choice">
-                      {t(rtl, "Single choice", "اختيار واحد")}
-                    </option>
-                    <option value="multiple_choice">
-                      {t(rtl, "Multiple choice", "اختيارات متعددة")}
-                    </option>
-                    <option value="number">{t(rtl, "Number", "رقم")}</option>
-                    <option value="text">{t(rtl, "Text", "نص")}</option>
-                    <option value="date">{t(rtl, "Date", "تاريخ")}</option>
-                  </select>
-                </Field>
-                <Field label={t(rtl, "Importance", "الأهمية")}>
-                  <select
-                    value={item.importance || "informational"}
-                    onChange={(e) =>
-                      setQuestions((rows) =>
-                        rows.map((r, i) =>
-                          i === index
-                            ? { ...r, importance: e.target.value }
-                            : r,
-                        ),
-                      )
-                    }
-                  >
-                    <option value="informational">
-                      {t(rtl, "Informational", "معلوماتي")}
-                    </option>
-                    <option value="important">
-                      {t(rtl, "Important", "مهم")}
-                    </option>
-                    <option value="knockout">
-                      {t(
-                        rtl,
-                        "Knockout / review flag",
-                        "استبعاد / علامة مراجعة",
-                      )}
-                    </option>
-                  </select>
-                </Field>
-                {["single_choice", "multiple_choice"].includes(
-                  item.answerType,
-                ) && (
-                  <Field
-                    label={t(
-                      rtl,
-                      "Choices (comma separated)",
-                      "الاختيارات (مفصولة بفواصل)",
-                    )}
-                    wide
-                  >
-                    <input
-                      value={item.optionsText || ""}
-                      onChange={(e) =>
-                        setQuestions((rows) =>
-                          rows.map((row, itemIndex) =>
-                            itemIndex === index
-                              ? { ...row, optionsText: e.target.value }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
-                  </Field>
-                )}
-                {item.importance === "knockout" && (
-                  <Field
-                    label={t(
-                      rtl,
-                      "Required answer to avoid HR flag",
-                      "الإجابة المطلوبة لتجنب علامة المراجعة",
-                    )}
-                    wide
-                  >
-                    {item.answerType === "yes_no" ? (
-                      <select
-                        value={item.acceptableAnswer || "Yes"}
-                        onChange={(e) =>
-                          setQuestions((rows) =>
-                            rows.map((row, itemIndex) =>
-                              itemIndex === index
-                                ? { ...row, acceptableAnswer: e.target.value }
-                                : row,
-                            ),
-                          )
-                        }
-                      >
-                        <option value="Yes">{t(rtl, "Yes", "نعم")}</option>
-                        <option value="No">{t(rtl, "No", "لا")}</option>
-                      </select>
-                    ) : (
-                      <input
-                        value={item.acceptableAnswer || ""}
-                        onChange={(e) =>
-                          setQuestions((rows) =>
-                            rows.map((row, itemIndex) =>
-                              itemIndex === index
-                                ? { ...row, acceptableAnswer: e.target.value }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    )}
-                  </Field>
-                )}
-              </div>
-            </div>
-          ))}
-          <button
-            className="outline"
-            onClick={() =>
-              setQuestions((rows) => [
-                ...rows,
-                {
-                  question: "",
-                  answerType: "yes_no",
-                  importance: "informational",
-                  acceptableAnswer: "Yes",
-                },
-              ])
-            }
-          >
-            <Plus />
-            {t(rtl, "Add question", "إضافة سؤال")}
-          </button>
-        </section>
         {error && (
           <div className="form-error" role="alert">
             {error}
@@ -645,13 +265,7 @@ export function JobDrawer({
         </button>
         <button
           className="primary"
-          disabled={
-            saving ||
-            !form.title ||
-            !form.templateId ||
-            total !== 100 ||
-            requirements.some((r) => !r.name)
-          }
+          disabled={saving || !String(form.title || "").trim() || !form.templateId}
           onClick={() => void save()}
         >
           {saving
@@ -685,16 +299,19 @@ export function CandidateDrawer({
     }),
     [saving, setSaving] = useState(false),
     [error, setError] = useState(""),
-    [questions, setQuestions] = useState<Row[]>(data.screeningQuestions || []),
-    [answers, setAnswers] = useState<Row>({});
+    [questions, setQuestions] = useState<Row[]>(
+      form.jobId ? data.screeningQuestions || [] : [],
+    ),
+    [answers, setAnswers] = useState<Row>({}),
+    [questionsJobId, setQuestionsJobId] = useState(form.jobId);
+  // Clearing the job clears its screening questions in the same render instead of in an effect.
+  if (questionsJobId !== form.jobId) {
+    setQuestionsJobId(form.jobId);
+    if (!form.jobId) setQuestions([]);
+  }
   useEffect(() => {
+    if (!form.jobId) return;
     let active = true;
-    if (!form.jobId) {
-      setQuestions([]);
-      return () => {
-        active = false;
-      };
-    }
     void fetch(`/api/recruitment?view=job&id=${form.jobId}`, {
       cache: "no-store",
     })
@@ -875,7 +492,7 @@ export function CandidateDrawer({
               {t(
                 rtl,
                 "Knockout answers are flagged for HR review and never auto-rejected.",
-                "تُعلّم الإجابات الإلزامية لمراجعة الموارد البشرية ولا يُرفض المرشح تلقائياً.",
+                "تُعلّم الإجابات الإلزامية لمراجعة الموارد البشرية ولا يُرفض المرشح تلقائيًا.",
               )}
             </p>
             {questions.map((question) => {
@@ -1179,7 +796,9 @@ export function DecisionDrawer({
   close: () => void;
   run: Run;
 }) {
-  const [form, setForm] = useState<Row>(
+  // Lazy initializer: the default offer dates are read once, on mount, rather than
+  // recomputed on every render.
+  const [form, setForm] = useState<Row>(() =>
       kind === "reject"
         ? { communicationStatus: "not_sent" }
         : {

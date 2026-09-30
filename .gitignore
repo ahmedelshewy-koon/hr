@@ -53,3 +53,12 @@ yarn-error.log*
 /qa.err.log
 /qa.out.log
 *.tsbuildinfo
+
+# scratch and generated QA output (contents kept locally)
+/tmp/
+/output/
+
+# local runtime logs and tool config
+/*.log
+/tests/*.log
+/.claude/

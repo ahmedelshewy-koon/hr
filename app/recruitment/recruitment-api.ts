@@ -505,7 +505,7 @@ async function loadJob(
       .prepare(
         "SELECT a.*,u.email AS actor_email FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id WHERE a.module='recruitment' AND ((a.record_type='job_opening' AND a.record_id=?) OR a.new_value LIKE ?) ORDER BY a.created_at DESC LIMIT 100",
       )
-      .bind(String(jobId), `%\"jobId\":${jobId}%`)
+      .bind(String(jobId), `%"jobId":${jobId}%`)
       .all(),
     options(db, actor),
   ]);
@@ -883,7 +883,7 @@ async function loadSetup(
       .all(),
     db
       .prepare(
-        "SELECT q.*,d.name_en AS department_name,d.name_ar AS department_name_ar,j.title AS job_title FROM interview_questions q LEFT JOIN departments d ON d.id=q.department_id LEFT JOIN job_openings j ON j.id=q.job_id ORDER BY q.created_at DESC LIMIT 500",
+        "SELECT q.*,d.name_en AS department_name,d.name_ar AS department_name_ar,j.title AS job_title FROM interview_questions q LEFT JOIN departments d ON d.id=q.department_id LEFT JOIN job_openings j ON j.id=q.job_id WHERE q.status<>'superseded' ORDER BY q.created_at DESC LIMIT 500",
       )
       .all(),
     options(db, actor),
@@ -1134,7 +1134,7 @@ async function createJob(
 ) {
   await requireModule(db, actor, "recruitment", "create");
   const requirements = requirementInput(input.requirements);
-  validateRequirementWeights(requirements);
+  if (requirements.length) validateRequirementWeights(requirements);
   validateFairRequirements(requirements);
   const questions = screeningInput(input.screeningQuestions),
     requestedStatus = text(input.status) || "draft";
@@ -1227,7 +1227,7 @@ async function updateJobRequirements(
   const jobId = number(input.jobId);
   await requireJobAccess(db, actor, jobId, true);
   const requirements = requirementInput(input.requirements);
-  validateRequirementWeights(requirements);
+  if (requirements.length) validateRequirementWeights(requirements);
   validateFairRequirements(requirements);
   const result = await db.transaction(async (tx) => {
     const job = await tx
@@ -2492,6 +2492,47 @@ async function createQuestion(
   return Response.json({ ok: true, id: row!.id }, { status: 201 });
 }
 
+async function updateQuestion(
+  db: PostgresDatabase,
+  actor: Awaited<ReturnType<typeof requireActor>>,
+  input: JsonRecord,
+) {
+  if (!isRecruitmentAdmin(actor)) throw new Response("Question bank management is restricted to HR administrators", { status: 403 });
+  const status = text(input.status) || "active";
+  if (!["active", "inactive"].includes(status)) throw new Response("Invalid question status", { status: 400 });
+  if (!["technical", "behavioral", "situational", "leadership", "communication", "culture_fit", "role_specific", "verification"].includes(text(input.questionType)))
+    throw new Response("Invalid question type", { status: 400 });
+  const questionId = await db.transaction(async tx => {
+    const old = await tx.prepare("SELECT * FROM interview_questions WHERE id=? FOR UPDATE").bind(number(input.questionId)).first();
+    if (!old) throw new Response("Interview question not found", { status: 404 });
+    // Keep questions referenced by existing job plans and evaluations unchanged.
+    const row = await tx.prepare("INSERT INTO interview_questions(question,what_good_looks_like,evaluation_guidance,question_type,department_id,job_id,job_family,skill,competency,seniority,interview_stage,interviewer_role,score_min,score_max,status,created_by_user_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id")
+      .bind(required(input.question, "question"), text(input.whatGoodLooksLike) || null, text(input.evaluationGuidance) || null, required(input.questionType, "question type"), old.department_id, old.job_id, old.job_family, old.skill, old.competency, old.seniority, old.interview_stage, old.interviewer_role, old.score_min, old.score_max, status, actor.id).first<{id: number}>();
+    await tx.prepare("UPDATE interview_template_stage_questions SET question_id=?,updated_at=CURRENT_TIMESTAMP WHERE question_id=?").bind(row!.id, old.id).run();
+    await tx.prepare("UPDATE interview_questions SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(old.id).run();
+    return row!.id;
+  });
+  await audit(db, actor, "interview_question_updated", "recruitment", "interview_question", questionId, { previousId: input.questionId });
+  return Response.json({ ok: true, id: questionId });
+}
+
+async function deleteQuestion(
+  db: PostgresDatabase,
+  actor: Awaited<ReturnType<typeof requireActor>>,
+  input: JsonRecord,
+) {
+  if (!isRecruitmentAdmin(actor))
+    throw new Response("Question bank management is restricted to HR administrators", { status: 403 });
+  const questionId = number(input.questionId);
+  const question = await db.prepare("SELECT question FROM interview_questions WHERE id=?").bind(questionId).first<{ question: string }>();
+  if (!question) throw new Response("Interview question not found", { status: 404 });
+  const inUse = await db.prepare("SELECT 1 FROM interview_stage_questions WHERE question_id=? LIMIT 1").bind(questionId).first();
+  if (inUse) throw new Response("This question is assigned to an active interview plan and cannot be deleted. Mark it inactive instead.", { status: 409 });
+  await db.prepare("DELETE FROM interview_questions WHERE id=?").bind(questionId).run();
+  await audit(db, actor, "interview_question_deleted", "recruitment", "interview_question", questionId, { question: question.question });
+  return Response.json({ ok: true });
+}
+
 async function createTemplate(
   db: PostgresDatabase,
   actor: Awaited<ReturnType<typeof requireActor>>,
@@ -2502,7 +2543,24 @@ async function createTemplate(
       "Interview template management is restricted to HR administrators",
       { status: 403 },
     );
+  const editing = input.action === "update_template";
+  const status = text(input.status) || "active";
+  const scope = text(input.scopeType) || "company";
+  if (!["active", "inactive"].includes(status) || !["company", "department", "job_family", "job"].includes(scope))
+    throw new Response("Invalid template settings", { status: 400 });
+  if ((scope === "department" && !number(input.departmentId)) || (scope === "job" && !number(input.jobId)) || (scope === "job_family" && !text(input.jobFamily)))
+    throw new Response("Complete the template scope", { status: 400 });
   const stages = asRows(input.stages);
+  for (const stage of stages) {
+    if (![Number(stage.aggregationWeight), ...asRows(stage.criteria).map(item => Number(item.weight))].every(weight => Number.isFinite(weight) && weight > 0 && weight <= 100))
+      throw new Response("Weights must be greater than zero and at most 100", { status: 400 });
+    if (!Number.isInteger(Number(stage.durationMinutes)) || Number(stage.durationMinutes) < 15)
+      throw new Response("Interview duration must be at least 15 minutes", { status: 400 });
+    for (const interviewer of asRows(stage.interviewers)) {
+      if (!number(interviewer.employeeId) && !["recruiter", "hiring_manager", "department_manager"].includes(text(interviewer.roleKey)))
+        throw new Response("Select an interviewer or a valid role", { status: 400 });
+    }
+  }
   if (!stages.length)
     throw new Response("At least one interview stage is required", {
       status: 400,
@@ -2515,7 +2573,7 @@ async function createTemplate(
       asRows(stage.criteria).map((item) => ({ weight: Number(item.weight) })),
     );
   const templateId = await db.transaction(async (tx) => {
-    const template = await tx
+    const template = editing ? await tx.prepare("SELECT id FROM interview_templates WHERE id=? FOR UPDATE").bind(number(input.templateId)).first<{id: number}>() : await tx
       .prepare(
         "INSERT INTO interview_templates(name,scope_type,department_id,job_family,job_id,description,status,created_by_user_id,created_at,updated_at) VALUES (?,?,?,?,?,?,'active',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id",
       )
@@ -2529,6 +2587,10 @@ async function createTemplate(
         actor.id,
       )
       .first<{ id: number }>();
+    if (!template) throw new Response("Interview template not found", { status: 404 });
+    await tx.prepare("UPDATE interview_templates SET name=?,scope_type=?,department_id=?,job_family=?,job_id=?,description=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+      .bind(required(input.name, "template name"), scope, scope === "department" ? number(input.departmentId) : null, scope === "job_family" ? text(input.jobFamily) : null, scope === "job" ? number(input.jobId) : null, text(input.description) || null, status, template.id).run();
+    if (editing) await tx.prepare("DELETE FROM interview_template_stages WHERE template_id=?").bind(template.id).run();
     for (let index = 0; index < stages.length; index++) {
       const source = stages[index],
         stage = await tx
@@ -2592,13 +2654,46 @@ async function createTemplate(
   await audit(
     db,
     actor,
-    "interview_template_created",
+    editing ? "interview_template_updated" : "interview_template_created",
     "recruitment",
     "interview_template",
     templateId,
     { name: input.name, stages: stages.length },
   );
-  return Response.json({ ok: true, id: templateId }, { status: 201 });
+  return Response.json({ ok: true, id: templateId }, { status: editing ? 200 : 201 });
+}
+
+async function deleteTemplate(
+  db: PostgresDatabase,
+  actor: Awaited<ReturnType<typeof requireActor>>,
+  input: JsonRecord,
+) {
+  if (!isRecruitmentAdmin(actor))
+    throw new Response("Interview template management is restricted to HR administrators", { status: 403 });
+  const templateId = number(input.templateId);
+  const template = await db.prepare("SELECT name FROM interview_templates WHERE id=?").bind(templateId).first<{ name: string }>();
+  if (!template) throw new Response("Interview template not found", { status: 404 });
+  await db.prepare("DELETE FROM interview_templates WHERE id=?").bind(templateId).run();
+  await audit(db, actor, "interview_template_deleted", "recruitment", "interview_template", templateId, { name: template.name });
+  return Response.json({ ok: true });
+}
+
+async function deleteTemplateStage(
+  db: PostgresDatabase,
+  actor: Awaited<ReturnType<typeof requireActor>>,
+  input: JsonRecord,
+) {
+  if (!isRecruitmentAdmin(actor))
+    throw new Response("Interview template management is restricted to HR administrators", { status: 403 });
+  const stageId = number(input.templateStageId);
+  const stage = await db.prepare("SELECT template_id, name_en FROM interview_template_stages WHERE id=?").bind(stageId).first<{ template_id: number; name_en: string }>();
+  if (!stage) throw new Response("Interview stage not found", { status: 404 });
+  const remaining = await db.prepare("SELECT COUNT(*)::int AS count FROM interview_template_stages WHERE template_id=?").bind(stage.template_id).first<{ count: number }>();
+  if ((remaining?.count ?? 0) <= 1)
+    throw new Response("A template must keep at least one stage. Delete the whole template instead.", { status: 409 });
+  await db.prepare("DELETE FROM interview_template_stages WHERE id=?").bind(stageId).run();
+  await audit(db, actor, "interview_template_stage_deleted", "recruitment", "interview_template_stage", stageId, { name: stage.name_en, templateId: stage.template_id });
+  return Response.json({ ok: true });
 }
 
 async function createOffer(
@@ -2752,6 +2847,7 @@ async function convertHire(
       if (offer.converted_employee_id)
         throw new Response("Candidate already converted", { status: 409 });
       const employee = await createEmployeeRecord(tx, {
+          companyId:input.companyId,branchId:input.branchId,positionId:input.positionId,sectionId:input.sectionId,teamId:input.teamId,gradeId:input.gradeId,workLocationId:input.workLocationId,hrUserId:input.hrUserId,
           nameEn: String(offer.name),
           nameAr: text(input.nameAr) || String(offer.name),
           workEmail: String(offer.email),
@@ -2928,10 +3024,15 @@ export async function handleRecruitmentPost(request: Request) {
       return await saveEvaluation(db, actor, input, false);
     if (action === "submit_evaluation")
       return await saveEvaluation(db, actor, input, true);
+    if (action === "update_question") return await updateQuestion(db, actor, input);
     if (action === "create_question")
       return await createQuestion(db, actor, input);
-    if (action === "create_template")
+    if (action === "delete_question") return await deleteQuestion(db, actor, input);
+    if (action === "create_template" || action === "update_template")
       return await createTemplate(db, actor, input);
+    if (action === "delete_template") return await deleteTemplate(db, actor, input);
+    if (action === "delete_template_stage")
+      return await deleteTemplateStage(db, actor, input);
     if (action === "create_offer") return await createOffer(db, actor, input);
     if (action === "approve_offer") return await approveOffer(db, actor, input);
     if (action === "decide_offer") return await decideOffer(db, actor, input);

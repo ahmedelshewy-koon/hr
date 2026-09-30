@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { categoryApplies, documentState, normalizeFilename, safeDocumentObjectKey, validateDocumentFile } from "../app/documents/document-policy.ts";
-import { carryForwardAmount } from "../app/leave/leave-rollover.ts";
 import { completedBusinessDate } from "../app/attendance/scheduled-scan-policy.ts";
 
 const source=path=>readFile(new URL(path,import.meta.url),"utf8");
@@ -34,13 +33,6 @@ test("required document rules apply only to matching employee context",()=>{
   assert.equal(categoryApplies({country:"Saudi Arabia",employment_type:null},{country:"Egypt",employment_type:"full_time"}),false);
 });
 
-test("carry forward respects enablement, availability, maximum, and non-negative values",()=>{
-  assert.equal(carryForwardAmount({enabled:true,available:12,maximum:5}),5);
-  assert.equal(carryForwardAmount({enabled:true,available:3,maximum:5}),3);
-  assert.equal(carryForwardAmount({enabled:false,available:12,maximum:5}),0);
-  assert.equal(carryForwardAmount({enabled:true,available:-2,maximum:5}),0);
-});
-
 test("scheduled scan resolves the last completed business date in configured timezone",()=>{
   assert.equal(completedBusinessDate("Africa/Cairo",new Date("2026-08-21T23:30:00Z")),"2026-08-21");
 });
@@ -61,14 +53,18 @@ test("notifications are user-scoped, readable, deduplicated, and navigable",asyn
 test("focused dashboard and reports use authoritative domain tables without protected exports",async()=>{
   const dashboard=await source("../app/api/dashboard/route.ts"),reports=await source("../app/api/reports/route.ts"),ui=await source("../app/hr-app.tsx");
   assert.match(dashboard,/daily_attendance/);assert.match(dashboard,/attendance_exceptions/);assert.match(dashboard,/document_categories/);assert.match(dashboard,/requests/);
-  assert.match(reports,/LIMIT 10000/);assert.match(reports,/WITH RECURSIVE managed/);assert.doesNotMatch(reports,/password_hash|bank_iban|bank_account_number|object_key/);
-  assert.match(ui,/fetch\("\/api\/dashboard"/);assert.match(ui,/ReportsPage/);
+  assert.match(reports,/LIMIT 10000/);assert.match(reports,/MANAGED_DEPARTMENTS_CTE/);assert.doesNotMatch(reports,/password_hash|bank_iban|bank_account_number|object_key/);
+  // The only component that fetched /api/dashboard (OperationalDashboard) was unreachable
+  // dead code and has been removed; the endpoint itself stays covered by the assertions
+  // above and by tests/runtime-complete-hrms.mjs. See REFACTOR_REPORT.md — the focused
+  // dashboard currently has no browser consumer and needs a product decision.
+  assert.match(ui,/<ReportsWorkspace /);
 });
 
 test("write APIs enforce origin checks and rate limits",async()=>{
   const auth=await source("../app/api/auth/route.ts"),hr=await source("../app/api/hr/route.ts"),security=await source("../app/api/api-security.ts");
   assert.match(auth,/enforceWriteOrigin\(request\)/);assert.match(auth,/enforceRateLimit/);assert.match(hr,/enforceWriteOrigin\(request\)/);assert.match(hr,/enforceRateLimit/);
-  assert.match(security,/origin!==expected/);assert.match(security,/security_rate_limits/);
+  assert.match(security,/origin\s*!==\s*expected/);assert.match(security,/security_rate_limits/);
 });
 
 test("profile histories expose bounded page based load-more and document alerts",async()=>{

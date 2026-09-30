@@ -1,0 +1,234 @@
+/* Glass shell: sidebar + top bar. Loaded after typography.css so it can restyle the
+   shell without touching the layout rules in globals.css. */
+
+/* Soft colour behind the page gives the frosted panel something to blur. The glow
+   sits on the sidebar's side of the screen (right in RTL). */
+.app{
+  --glass-side:0%;
+  --app-pad:16px;
+  background:
+    radial-gradient(640px 560px at var(--glass-side) 0%,rgba(59,130,246,.24),transparent 70%),
+    radial-gradient(560px 520px at var(--glass-side) 100%,rgba(139,92,246,.17),transparent 70%),
+    radial-gradient(520px 420px at calc(100% - var(--glass-side)) 8%,rgba(56,189,248,.13),transparent 70%),
+    var(--bg);
+  background-attachment:fixed;
+}
+.app[dir="rtl"]{--glass-side:100%}
+
+.sidebar{
+  padding:14px 12px 12px;
+  color:#52627e;
+  background:linear-gradient(180deg,rgba(255,255,255,.66),rgba(255,255,255,.4));
+  -webkit-backdrop-filter:blur(28px) saturate(175%);
+  backdrop-filter:blur(28px) saturate(175%);
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:26px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 0 rgba(255,255,255,.3),
+    0 24px 56px -16px rgba(15,35,90,.22),
+    0 2px 10px rgba(15,35,90,.05);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .sidebar{background:rgba(255,255,255,.94)}
+}
+
+/* Wider than the 248px in globals.css so the larger nav labels do not wrap. Phones and
+   tablets keep their own widths. */
+@media(min-width:1051px){
+  .sidebar{width:264px}
+  .main{margin-inline-start:288px}
+}
+
+/* Brand: sanad-logo-glass.png has a transparent background, so the logo sits directly on the glass. */
+.sidebar .brand{position:relative;display:flex;align-items:center;justify-content:center;height:64px;margin:2px 0 12px;padding:0 40px;background:transparent;border-radius:18px}
+/* Specific enough to beat the phone-drawer rules that re-apply the old cropped fit. */
+.sidebar .brand .brand-logo{width:148px;height:auto;max-height:100%;object-fit:contain;object-position:center;transform:none;padding:0}
+.sidebar .brand .sidebar-collapse{position:absolute;left:0;right:auto;top:50%;transform:translateY(-50%);margin:0;flex-shrink:0;width:32px;height:32px;background:rgba(255,255,255,.7)}
+.sidebar .brand .brand-logo{min-width:0;max-width:100%;flex-shrink:1}
+.brand .mobile-close{position:absolute;right:0;left:auto;top:50%;transform:translateY(-50%);margin:0;background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.8)}
+
+/* Navigation */
+.sidebar nav{
+  gap:16px;
+  padding:4px 2px 12px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:#8296b8 rgba(148,163,184,.12);
+}
+.sidebar nav::-webkit-scrollbar{width:6px}
+.sidebar nav::-webkit-scrollbar-track{background:rgba(148,163,184,.12);border-radius:999px}
+.sidebar nav::-webkit-scrollbar-thumb{background:#8296b8;border-radius:999px}
+.sidebar nav::-webkit-scrollbar-thumb:hover{background:#526b94}
+
+.sidebar nav button{
+  position:relative;
+  /* Items keep at least 44px (the nav scrolls on short screens) and stretch up to 54px
+     when the sidebar has room. `flex:none` on the old rule let them shrink instead. */
+  flex:1 0 44px;
+  height:auto;
+  max-height:54px;
+  padding-inline:16px;
+  gap:14px;
+  color:#566683;
+  font-size:calc(var(--type-nav) + 2px)!important;
+  border:1px solid transparent;
+  border-radius:15px;
+  transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.sidebar nav button svg{width:22px;height:22px;stroke-width:1.6;color:#7c8ca8;transition:color .18s ease}
+.sidebar nav button:hover{
+  background:rgba(255,255,255,.55);
+  border-color:rgba(255,255,255,.7);
+  color:#17376f;
+}
+.sidebar nav button:hover svg{color:#2563eb}
+.sidebar nav button:focus-visible{outline:2px solid rgba(37,99,235,.45);outline-offset:-1px}
+
+.sidebar nav button.active{
+  color:#1450d6;
+  background:linear-gradient(135deg,rgba(255,255,255,.88),rgba(219,234,254,.72));
+  border-color:rgba(255,255,255,.95);
+  box-shadow:0 6px 16px -6px rgba(37,99,235,.35),0 1px 2px rgba(37,99,235,.08),inset 0 1px 0 #fff;
+}
+.sidebar nav button.active svg{color:#2563eb}
+.sidebar nav button.active::after{display:none}
+.app[dir="rtl"] .sidebar nav button.active{box-shadow:0 6px 16px -6px rgba(37,99,235,.35),0 1px 2px rgba(37,99,235,.08),inset 0 1px 0 #fff}
+
+/* Section break between nav groups: extra air plus a hairline that fades out. */
+.sidebar nav button.nav-group-start{margin-top:8px}
+.sidebar nav button.nav-group-start::before{
+  content:"";
+  position:absolute;
+  inset-inline:14px;
+  top:-12px;
+  height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(100,116,139,.24),transparent);
+}
+
+.sidebar nav button .nav-approval-badge{
+  flex:none;
+  min-width:20px;
+  height:20px;
+  padding:0 6px;
+  font-size:11px;
+  font-weight:var(--weight-semibold);
+  box-shadow:0 3px 8px rgba(229,72,77,.32);
+}
+
+/* Top bar: pinned, flush with the top and outer edge, and frosted so scrolled content
+   never shows through it. The blur sits on a pseudo-element because backdrop-filter on
+   the bar itself would trap the fixed-position notification panel on phones. */
+.topbar{
+  top:0;
+  z-index:30;
+  height:calc(var(--app-pad) + 48px);
+  margin-block-start:calc(var(--app-pad) * -1);
+  margin-inline-end:calc(var(--app-pad) * -1);
+  padding-top:var(--app-pad);
+}
+.topbar::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:transparent;
+}
+
+/* Account menu: the avatar in the top bar opens name, email, role and sign-out. */
+.profile-menu{position:relative;display:inline-flex}
+.profile-trigger{display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;transition:transform .18s ease}
+.profile-trigger:hover{transform:scale(1.06)}
+.profile-trigger .avatar{display:inline-grid;transition:box-shadow .18s ease}
+.profile-trigger[aria-expanded="true"] .avatar{box-shadow:0 0 0 3px rgba(37,99,235,.24)}
+
+.profile-pop{
+  position:absolute;
+  top:calc(100% + 12px);
+  inset-inline-end:0;
+  z-index:60;
+  width:296px;
+  max-width:calc(100vw - 24px);
+  padding:16px;
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:blur(26px) saturate(170%);
+  backdrop-filter:blur(26px) saturate(170%);
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:22px;
+  box-shadow:inset 0 1px 0 #fff,0 24px 56px -16px rgba(15,35,90,.32),0 2px 10px rgba(15,35,90,.06);
+  animation:profile-pop-in .16s ease-out;
+}
+@keyframes profile-pop-in{from{opacity:0;transform:translateY(-6px)}}
+.profile-pop-head{display:flex;align-items:center;gap:12px;padding-bottom:14px}
+.profile-pop-head .avatar{display:inline-grid;width:46px;height:46px;font-size:var(--type-component)}
+.profile-pop-head>div{min-width:0}
+.profile-pop-head b{display:block;color:#0f2a5c;font-size:var(--type-body);font-weight:var(--weight-semibold);line-height:var(--leading-heading);overflow-wrap:anywhere}
+.profile-pop-role{display:inline-flex;margin-top:4px;padding:2px 10px;border-radius:999px;background:#eaf2ff;color:#1d4ed8;font-size:var(--type-label);font-weight:var(--weight-medium)}
+.profile-pop-rows{display:grid;gap:2px;padding:10px 0;border-block:1px solid rgba(100,116,139,.16)}
+.profile-pop-rows>div{display:flex;align-items:center;gap:10px;min-width:0;padding:6px 4px;color:#475569;font-size:var(--type-secondary)}
+.profile-pop-rows svg{flex:none;color:#7c8ca8}
+.profile-pop-rows span{min-width:0;overflow-wrap:anywhere}
+.profile-pop-logout{
+  width:100%;
+  height:42px;
+  margin-top:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border:1px solid rgba(254,202,202,.9);
+  border-radius:13px;
+  background:rgba(254,242,242,.85);
+  color:#dc2626;
+  font-weight:var(--weight-semibold);
+  transition:background .18s ease,border-color .18s ease;
+}
+.profile-pop-logout:hover{background:#fee2e2;border-color:#fca5a5}
+.profile-pop-install{width:100%;height:42px;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid rgba(191,219,254,.95);border-radius:13px;background:rgba(239,246,255,.9);color:#1d4ed8;font-weight:var(--weight-semibold);cursor:pointer}
+.profile-pop-install:hover{background:#dbeafe;border-color:#93c5fd}
+.profile-pop-install-hint{margin:12px 0 0;display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(239,246,255,.8);color:#1e3a8a;font-size:13px;line-height:1.6}
+.profile-pop-install-hint svg{flex:none;margin-top:3px}
+
+@media(max-width:760px){
+  .app{--app-pad:12px}
+  .topbar{margin-inline-start:calc(var(--app-pad) * -1)}
+  /* The drawer floats over real page content on phones; keep it legible. */
+  .sidebar{
+    background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.74));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 24px 64px -12px rgba(15,35,90,.35);
+  }
+}
+
+@media(max-width:450px){
+  .app{--app-pad:8px}
+}
+
+@media print{
+  .topbar::before{display:none}
+  .app{background:none}
+}
+/* Collapsed desktop navigation keeps every permitted destination within reach. */
+.sidebar .brand .brand-symbol{display:none}
+@media(min-width:761px){
+  .app.sidebar-collapsed[dir] .sidebar{width:64px;padding:10px 7px;opacity:1;pointer-events:auto;transform:none;border-radius:18px}
+  .app.sidebar-collapsed .main{margin-inline-start:88px}
+  .app.sidebar-collapsed .sidebar .brand{height:98px;min-height:98px;padding:0;margin:0 0 12px;flex-direction:column;gap:8px}
+  .app.sidebar-collapsed .sidebar .brand .brand-symbol{display:block;position:relative;order:-1;width:40px;height:48px;overflow:hidden;flex-shrink:0;margin:0}
+  .app.sidebar-collapsed .sidebar .brand .brand-symbol img{position:absolute;left:0;top:0;width:130px;height:48px;max-width:none;object-fit:fill}
+  .app.sidebar-collapsed .sidebar .brand-logo{display:none}
+  .app.sidebar-collapsed .sidebar .brand .sidebar-collapse{position:static;transform:none;margin:0;width:36px;height:36px;background:transparent;border-color:transparent}
+  .app.sidebar-collapsed .sidebar nav{gap:10px;padding:0;scrollbar-width:none;scrollbar-gutter:auto}
+  .app.sidebar-collapsed .sidebar nav::-webkit-scrollbar{display:none}
+  .app.sidebar-collapsed .sidebar nav button{width:46px;min-height:44px;height:44px;max-height:44px;padding:0;gap:0;justify-content:center;border-radius:11px;flex:0 0 44px}
+  .app.sidebar-collapsed .sidebar nav button>span{display:none}
+  .app.sidebar-collapsed .sidebar nav button svg{width:21px;height:21px;flex-shrink:0}
+  .app.sidebar-collapsed .sidebar nav button.nav-group-start{margin-top:4px}
+  .app.sidebar-collapsed .sidebar nav button.nav-group-start::before{display:none}
+  .app.sidebar-collapsed .sidebar nav button.active{background:#e8edf5;box-shadow:none;color:#172b4d}
+  .app.sidebar-collapsed[dir] .sidebar nav button.active{box-shadow:none}
+  .app.sidebar-collapsed .sidebar nav button.active svg{color:#172b4d}
+}

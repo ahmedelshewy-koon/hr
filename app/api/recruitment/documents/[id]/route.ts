@@ -1,10 +1,6 @@
 import { env } from "cloudflare:workers";
-import { createDatabase } from "../../../../../db/postgres";
-import {
-  apiFailure,
-  enforceRateLimit,
-  requireActor,
-} from "../../../api-security";
+import { withDatabase } from "../../../route-helpers";
+import { enforceRateLimit, requireActor } from "../../../api-security";
 import { requireApplicationAccess } from "../../../../recruitment/recruitment-access";
 
 type Row = Record<string, unknown>;
@@ -19,8 +15,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const db = createDatabase();
-  try {
+  return withDatabase("Unable to retrieve candidate document", async db => {
     const actor = await requireActor(request, db),
       id = Number((await context.params).id);
     await enforceRateLimit(
@@ -60,9 +55,5 @@ export async function GET(
         "content-security-policy": "default-src 'none'; sandbox",
       },
     });
-  } catch (error) {
-    return apiFailure(error, "Unable to retrieve candidate document");
-  } finally {
-    await db.close();
-  }
+  });
 }

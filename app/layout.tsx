@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
+import { PwaRegistration } from "./pwa-registration";
+
+export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0b1f4d" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -10,7 +13,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Sanad HR — People, simply managed",
     description: "Sanad's bilingual employee experience and HR operations platform.",
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    manifest: "/manifest.webmanifest",
+    appleWebApp: { capable: true, title: "سند", statusBarStyle: "default" },
+    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg", apple: "/sanad-icon-192.png" },
     openGraph: {
       title: "Sanad HR — People, simply managed",
       description: "A modern bilingual employee experience and HR operations platform.",
@@ -31,6 +36,7 @@ export default function RootLayout({
         className="antialiased"
       >
         {children}
+        <PwaRegistration />
       </body>
     </html>
   );

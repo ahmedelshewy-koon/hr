@@ -26,7 +26,7 @@ Sanad HR is a single-tenant HR system built as a Cloudflare-hosted site. It comb
 
 - **Dashboard** — headcount, attendance, and leave snapshot with quick actions.
 - **Employees** — employee records, job titles, departments (CRUD), organizational hierarchy.
-- **Leave** — leave types, per-country leave policies, entitlements/balances, official holiday calendar (Egypt/Saudi Arabia, recurring or one-off).
+- **Leave** — leave types (with their default annual days), balances, official holiday calendar (Egypt/Saudi Arabia, recurring or one-off).
 - **Attendance** — daily attendance records, punch events, lateness/overtime tracking, scheduling (fixed hours, grace period, required daily minutes).
 - **Requests & Approvals** — unified request pipeline (leave, late arrival, early departure, WFH, expense reimbursement, certificates) with multi-stage approval (`pending_manager` → HR, etc.).
 - **Org Chart** — visual structure across company divisions → departments → teams → employees.
@@ -38,7 +38,7 @@ Sanad HR is a single-tenant HR system built as a Cloudflare-hosted site. It comb
 
 Defined in [`db/schema.ts`](db/schema.ts) via Drizzle, backed by PostgreSQL:
 
-`departments`, `job_titles`, `employees`, `roles`, `users`, `permissions`, `requests`, `approvals`, `attendance_logs`, `daily_attendance`, `leave_types`, `leave_policies`, `leave_balances`, `holidays`, `documents`, `audit_logs`, `system_settings`.
+`departments`, `job_titles`, `employees`, `roles`, `users`, `permissions`, `requests`, `approvals`, `attendance_logs`, `daily_attendance`, `leave_types`, `leave_balances`, `holidays`, `documents`, `audit_logs`, `system_settings`.
 
 Employees carry bilingual names (`name_en`/`name_ar`), department/job title/manager references, work schedule (days, check-in/out, grace minutes), and employment metadata (country, salary, type). Leave and attendance are normalized per employee/day/type for reporting and balance tracking.
 

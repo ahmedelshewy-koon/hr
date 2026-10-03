@@ -1,4 +1,4 @@
-# Sanad HR — Migration Safety Report
+# HR — Migration Safety Report
 
 **Date:** 2026-09-19
 **Scope:** Repair the Drizzle migration baseline so `npm run db:generate` is safe again. No features, no unrelated refactoring, no database changes.

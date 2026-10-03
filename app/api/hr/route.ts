@@ -17,6 +17,7 @@ import { POSTPONED_ORIGINAL_DAY } from "../../leave/holiday-calendar";
 import { validIsoDate } from "../../leave/leave-calculation";
 import { mapAttendanceDeviceUser } from "../../attendance/zkteco-service";
 import { readBiometricWorkspace } from "../../attendance/biometric-query";
+import { newAgentToken, parseDeviceInput } from "../../attendance/biometric-agents";
 import { apiFailure, enforceRateLimit, enforceWriteOrigin, loadPermissions } from "../api-security";
 import { MANAGED_DEPARTMENTS_CTE } from "../../organization/department-scope";
 import { HR_DATA_SCOPES, branchHrCanSee, branchHrEmployeeIds, branchHrEmployeeSql, isBranchScopedHr, normalizeHrDataScope } from "../../employees/hr-data-scope";
@@ -162,8 +163,8 @@ async function ensureDemoData(d1:PostgresDatabase){
   const demoOwner=await d1.prepare("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' AND r.name IN ('Super Admin','HR Manager') ORDER BY CASE r.name WHEN 'Super Admin' THEN 0 ELSE 1 END,u.id LIMIT 1").first<{id:number}>();
   if(!demoOwner)throw new Response("Create an active administrator before enabling test data",{status:400});
   const dueDate=new Date(Date.now()+45*86400000).toISOString().slice(0,10),endDate=new Date(Date.now()+90*86400000).toISOString().slice(0,10);
-  const networking=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Networking & IT Essentials','Sanad Learning','online','[SANAD_DEMO_DATA] Practical networking, infrastructure, troubleshooting, and IT support.',?,?,'active',1,24,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
-  const programming=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Modern Programming Fundamentals','Sanad Engineering Academy','internal','[SANAD_DEMO_DATA] Programming practices, clean code, testing, and secure delivery.',?,?,'active',1,12,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
+  const networking=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Networking & IT Essentials','HR Learning','online','[HR_DEMO_DATA] Practical networking, infrastructure, troubleshooting, and IT support.',?,?,'active',1,24,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
+  const programming=await d1.prepare("INSERT INTO training_courses(title,provider,course_type,description,start_date,end_date,status,mandatory,validity_months,created_by_user_id,created_at,updated_at) VALUES ('Modern Programming Fundamentals','HR Engineering Academy','internal','[HR_DEMO_DATA] Programming practices, clean code, testing, and secure delivery.',?,?,'active',1,12,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(today,endDate,demoOwner.id).first<{id:number}>();
   const isNetworkingEmployee=(employee:typeof employees[number])=>/el\s*shewy|الشيو/i.test(`${employee.name_en} ${employee.name_ar}`)||/IT Systems|نظم/i.test(`${employee.department_name} ${employee.department_name_ar}`);
   const isProgrammingEmployee=(employee:typeof employees[number])=>/Software Development|برمجة/i.test(`${employee.department_name} ${employee.department_name_ar}`);
   for(const employee of employees){
@@ -178,7 +179,7 @@ async function deleteDemoData(d1:PostgresDatabase){
   const testEmployees="SELECT id FROM employees WHERE employee_code LIKE 'TEST-%'";
   const testRequests=`SELECT id FROM requests WHERE request_code LIKE 'TEST-REQ-%' OR employee_id IN (${testEmployees})`;
   const demoReviews="SELECT r.id FROM performance_reviews r JOIN performance_cycles c ON c.id=r.cycle_id WHERE c.name LIKE 'TEST-DEMO | %'";
-  const demoCourses="SELECT id FROM training_courses WHERE description LIKE '[SANAD_DEMO_DATA]%'";
+  const demoCourses="SELECT id FROM training_courses WHERE description LIKE '[HR_DEMO_DATA]%' OR description LIKE '[SANAD_DEMO_DATA]%'";
   await d1.prepare(`DELETE FROM performance_comments WHERE review_id IN (${demoReviews})`).run();
   await d1.prepare(`DELETE FROM performance_goals WHERE review_id IN (${demoReviews})`).run();
   await d1.prepare(`DELETE FROM performance_reviews WHERE id IN (${demoReviews})`).run();
@@ -355,7 +356,7 @@ export async function GET(request: Request) {
     if(new URL(request.url).searchParams.get("view")==="biometric"){
       await authorize(d1,user,"attendance","view");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can view biometric devices",{status:403});
-      return Response.json(await readBiometricWorkspace(d1,new URL(request.url),await branchHrEmployeeIds(d1,scopeActor(user))),{headers:{"cache-control":"no-store"}});
+      return Response.json(await readBiometricWorkspace(d1,new URL(request.url),await branchHrEmployeeIds(d1,scopeActor(user)),user.role_name==="Super Admin"),{headers:{"cache-control":"no-store"}});
     }
     // This handler asks ~22 permission questions. Loading the role's grid once turns
     // that many round trips into one, which matters because the dashboard polls here.
@@ -372,11 +373,13 @@ export async function GET(request: Request) {
     if(user.department_id&&!visibleDepartmentIds.includes(Number(user.department_id)))visibleDepartmentIds.push(Number(user.department_id));
     const visibleDepartmentList=visibleDepartmentIds.length?visibleDepartmentIds.join(","):"-1";
     const branchHrSql=await branchHrEmployeeSql(d1,scopeActor(user));
+    // HR privileges (fullCompany) and seeing every employee (wholeCompany) differ only for a branch HR.
+    const wholeCompany=fullCompany&&!branchHrSql;
     const employeeScope=fullCompany?(branchHrSql??"TRUE"):user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR e.department_id IN (${departmentList}))`:`e.id=${Number(user.employee_id)||-1}`;
     const hrSql=await effectiveHrSql(d1);
     const requestEmployeeScope=fullCompany?`(${hrSql}=${Number(user.id)} OR e.id=${Number(user.employee_id)||-1})`:user.role_name==="Department Manager"?`(e.id=${Number(user.employee_id)||-1} OR (${EMPLOYEE_MANAGER_SQL})=${Number(user.employee_id)||-1})`:employeeScope;
     const departmentScope=fullCompany?"TRUE":user.role_name==="Department Manager"?`d.id IN (${visibleDepartmentList})`:`d.id=${Number(user.department_id)||-1}`;
-    const safeEmployeeColumns="e.company_id,e.hr_user_id,e.id,e.employee_code,e.name_en,e.name_ar,e.work_email,e.work_phone,e.department_id,e.job_title_id,e.manager_id,e.organizational_level,e.start_date,e.end_date,e.employment_status,e.country,e.work_location,e.employment_type,e.schedule_type,e.work_days,e.check_in_time,e.check_out_time,e.grace_minutes,e.required_daily_minutes,e.avatar_url,e.created_at,e.updated_at";
+    const safeEmployeeColumns="e.company_id,e.hr_user_id,e.id,e.employee_code,e.legacy_employee_code,e.name_en,e.name_ar,e.work_email,e.work_phone,e.department_id,e.job_title_id,e.manager_id,e.organizational_level,e.start_date,e.end_date,e.employment_status,e.country,e.work_location,e.employment_type,e.schedule_type,e.work_days,e.check_in_time,e.check_out_time,e.grace_minutes,e.required_daily_minutes,e.avatar_url,e.created_at,e.updated_at";
     const employeeColumns=fullCompany||user.role_name==="Employee"?"e.*":safeEmployeeColumns;
     const employeeIdParam = user.employee_id ?? 0;
     const demoSetting=await d1.prepare("SELECT value_json FROM system_settings WHERE setting_key='demo_data'").first<{value_json:string}>();
@@ -446,12 +449,13 @@ export async function GET(request: Request) {
     // Hidden managers: full-company viewers learn whether the stored manager is deleted or missing (chart diagnostics);
     // everyone else only learns that the manager is outside their access scope.
     const hiddenManagerIds=[...new Set(employeeRows.results.filter(r=>r.manager_id&&!visibleIds.has(Number(r.manager_id))).map(r=>Number(r.manager_id)))];
-    const hiddenManagerStatus=fullCompany&&hiddenManagerIds.length?new Map((await d1.prepare('SELECT id,employment_status FROM employees WHERE id=ANY(?::int[])').bind(hiddenManagerIds).all<{id:number;employment_status:string}>()).results.map(r=>[Number(r.id),r.employment_status])):new Map<number,string>();
-    for(const row of employeeRows.results){if(row.manager_id&&!visibleIds.has(Number(row.manager_id))){row.manager_name=null;row.manager_name_ar=null;row.org_manager_id=null;const status=hiddenManagerStatus.get(Number(row.manager_id));row.manager_scope=!fullCompany?'restricted':status===undefined?'missing':status==='deleted'?'deleted':'restricted';}if(organization){Object.assign(row,assignmentById.get(Number(row.id)));}}
-    if(branchHrSql){if(organization)organization.hrRules=[];companyHrCatalog.hrCandidates=[];}
+    const hiddenManagerStatus=wholeCompany&&hiddenManagerIds.length?new Map((await d1.prepare('SELECT id,employment_status FROM employees WHERE id=ANY(?::int[])').bind(hiddenManagerIds).all<{id:number;employment_status:string}>()).results.map(r=>[Number(r.id),r.employment_status])):new Map<number,string>();
+    for(const row of employeeRows.results){if(row.manager_id&&!visibleIds.has(Number(row.manager_id))){row.manager_name=null;row.manager_name_ar=null;row.org_manager_id=null;const status=hiddenManagerStatus.get(Number(row.manager_id));row.manager_scope=!wholeCompany?'restricted':status===undefined?'missing':status==='deleted'?'deleted':'restricted';}if(organization){Object.assign(row,assignmentById.get(Number(row.id)));}}
+    // A branch HR reads the rules (to name each employee's HR) but cannot change them; it never sees HR candidates.
+    if(branchHrSql)companyHrCatalog.hrCandidates=[];
     if(organization&&!fullCompany){organization.departments=organization.departments.filter(r=>visibleDepartmentIds.includes(Number(r.id)));organization.hrRules=[];for(const unit of organization.departments){if(!visibleIds.has(Number(unit.manager_employee_id)))unit.manager_employee_id=null;}organization.positions=organization.positions.filter(p=>!p.department_id||visibleDepartmentIds.includes(Number(p.department_id)));companyHrCatalog.hrResponsibles=companyHrCatalog.hrResponsibles.filter(h=>visibleIds.has(Number(h.employee_id)));companyHrCatalog.hrCandidates=[];}
 
-    return Response.json({ organization, employeeScope:fullCompany&&!branchHrSql?'full':'limited',hrDataScope:normalizeHrDataScope(user.hr_data_scope),hrDataScopes:HR_DATA_SCOPES, ...companyHrCatalog, currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
+    return Response.json({ organization, employeeScope:wholeCompany?'full':'limited',hrDataScope:normalizeHrDataScope(user.hr_data_scope),hrDataScopes:HR_DATA_SCOPES, ...companyHrCatalog, currentUser:user, allowedPages, canManagePayroll:canPayroll, demoDataEnabled:demoEnabled, employees:employeeRows.results, departments:departmentRows.results, jobTitles:jobRows.results, requests:requestRows.results, requestApprovals:requestApprovalRows.results, attendance:attendanceRows.results, attendanceCorrections:attendanceCorrectionRows.results, attendanceCorrectionActions:attendanceCorrectionActionRows.results, attendanceExceptions:attendanceExceptionRows.results, attendanceLogs:attendanceLogRows.results, holidays:holidayRows.results, leaveTypes:leaveTypeRows.results, employeeLeaveTypes:employeeLeaveTypeRows.results, leaveBalances:leaveBalanceRows.results, roles:roleRows.results, users:userRows.results, permissions:permissions.results, audit:auditRows.results, settings:settingRows.results, salaryStructures:salaryStructureRows.results, salaryAllowances:salaryAllowanceRows.results, payrollRuns:payrollRunRows.results, payrollItems:payrollItemRows.results, payrollAllowanceLines:payrollAllowanceLineRows.results, loansAdvances:loanRows.results, taxBrackets:taxBracketRows.results, insuranceRates:insuranceRateRows.results });
   } catch(error) { return apiFailure(error,"Unexpected server error"); }
   finally { await d1.close(); }
 }
@@ -578,8 +582,8 @@ export async function POST(request: Request) {
         const companyHr=await validateCompanyHr(tx,payload);
         const managerId=Number(payload.managerId)||null;
         const result=await createEmployeeRecord(tx,{...payload,nameEn,nameAr,workEmail:email,startDate,country:required(payload.country,"Country"),departmentId,jobTitleId:Number(payload.jobTitleId)||null,managerId,workLocation:clean(payload.workLocation)||null,employmentType:clean(payload.employmentType)||"full_time"});
-        await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,religion=?,passport_number=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-          .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.religion,100)||null,clean(payload.passportNumber,100)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,endDate,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",scheduleWorkDays(payload),clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,scheduledDailyMinutes(clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00")??(Number(payload.requiredDailyMinutes)||480),clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
+        await tx.prepare("UPDATE employees SET fingerprint_code=?,personal_phone=?,work_phone=?,nationality=?,nationality_country=?,religion=?,passport_number=?,gender=?,birth_date=?,identification_number=?,address=?,end_date=?,employment_status=?,salary=?,salary_currency=?,schedule_type=?,work_days=?,check_in_time=?,check_out_time=?,grace_minutes=?,required_daily_minutes=?,bank_name=?,bank_account_number=?,bank_iban=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+          .bind(clean(payload.fingerprintCode)||null,clean(payload.personalPhone)||null,clean(payload.workPhone)||null,clean(payload.nationality)||null,clean(payload.nationalityCountry)||null,clean(payload.religion,100)||null,clean(payload.passportNumber,100)||null,clean(payload.gender)||null,clean(payload.birthDate)||null,clean(payload.identificationNumber)||null,clean(payload.address,1000)||null,endDate,clean(payload.employmentStatus)||"active",Number(payload.salary)||null,clean(payload.salaryCurrency)||"SAR",clean(payload.scheduleType)||"fixed",scheduleWorkDays(payload),clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00",Number(payload.graceMinutes)||15,scheduledDailyMinutes(clean(payload.checkInTime)||"09:00",clean(payload.checkOutTime)||"17:00")??(Number(payload.requiredDailyMinutes)||480),clean(payload.bankName)||null,clean(payload.bankAccountNumber)||null,clean(payload.bankIban)||null,result.id).run();
         await tx.prepare("UPDATE employees SET company_id=?,hr_user_id=? WHERE id=?").bind(companyHr.companyId,companyHr.hrUserId,result.id).run();
         await refreshReportingLevels(tx,result.id);
         await syncEmployeeLeaveTypes(tx,result.id,payload.leaveTypeIds,user.id);
@@ -830,6 +834,47 @@ export async function POST(request: Request) {
       if(!queued)return Response.json({ok:true,status:"queued",alreadyQueued:true},{status:202});
       await audit(d1,request,user,"biometric_sync_queued","attendance","attendance_device",String(deviceId),null,{deviceName:device.name,syncId:queued?.id});
       return Response.json({ok:true,id:queued?.id,status:queued?.status},{status:202});
+    }
+    if(["save_attendance_device","create_attendance_agent","rotate_attendance_agent_token","set_attendance_agent_enabled"].includes(action)) {
+      await authorize(d1,user,"attendance","edit");
+      if(user.role_name!=="Super Admin")throw new Response("Only a system administrator can configure biometric devices",{status:403});
+      if(action==="save_attendance_device"){
+        const id=Number(payload.id)||null,input=parseDeviceInput(payload);
+        if(input.agentId&&!await d1.prepare("SELECT id FROM attendance_agents WHERE id=?").bind(input.agentId).first())throw new Response("Office connector not found",{status:404});
+        const duplicate=await d1.prepare("SELECT id FROM attendance_devices WHERE agent_id IS NOT DISTINCT FROM ? AND ip_address=? AND port=? AND id IS DISTINCT FROM ?").bind(input.agentId,input.ipAddress,input.port,id).first();
+        if(duplicate)throw new Response("A device with this IP address and port already exists",{status:409});
+        const before=id?await d1.prepare("SELECT id,name,model,ip_address,port,timezone,agent_id,enabled FROM attendance_devices WHERE id=?").bind(id).first<Row>():null;
+        if(id&&!before)throw new Response("Attendance device not found",{status:404});
+        const saved=id
+          ?await d1.prepare("UPDATE attendance_devices SET name=?,model=?,ip_address=?,port=?,timezone=?,agent_id=?,enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id=? RETURNING id").bind(input.name,input.model,input.ipAddress,input.port,input.timezone,input.agentId,input.enabled,id).first<Row>()
+          :await d1.prepare("INSERT INTO attendance_devices (name,model,ip_address,port,timezone,agent_id,enabled,status) VALUES (?,?,?,?,?,?,?,'offline') RETURNING id").bind(input.name,input.model,input.ipAddress,input.port,input.timezone,input.agentId,input.enabled).first<Row>();
+        const deviceId=Number(saved!.id);
+        // A new or re-addressed device is downloaded right away instead of waiting for a counter change.
+        const addressChanged=!before||before.ip_address!==input.ipAddress||Number(before.port)!==input.port||(before.agent_id??null)!==input.agentId;
+        if(input.enabled&&addressChanged){
+          if(before)await d1.prepare("UPDATE attendance_devices SET status='offline',last_error=NULL,last_seen_at=NULL WHERE id=?").bind(deviceId).run();
+          await d1.prepare("INSERT INTO attendance_device_syncs (device_id,status,trigger,requested_by_user_id,requested_at) VALUES (?,'queued','device_saved',?,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING").bind(deviceId,user.id).run();
+        }
+        await audit(d1,request,user,before?"biometric_device_updated":"biometric_device_added","attendance","attendance_device",String(deviceId),before,input);
+        return Response.json({ok:true,id:deviceId,syncQueued:Boolean(input.enabled&&addressChanged)});
+      }
+      if(action==="create_attendance_agent"){
+        const name=required(payload.name,"Connector name").slice(0,120),token=await newAgentToken();
+        const created=await d1.prepare("INSERT INTO attendance_agents (name,token_hash,token_hint,created_by_user_id) VALUES (?,?,?,?) RETURNING id").bind(name,token.hash,token.hint,user.id).first<Row>();
+        await audit(d1,request,user,"biometric_connector_created","attendance","attendance_agent",String(created!.id),null,{name,tokenHint:token.hint});
+        return Response.json({ok:true,id:Number(created!.id),token:token.token},{headers:{"cache-control":"no-store"}});
+      }
+      const agentId=Number(payload.agentId);const agent=await d1.prepare("SELECT id,name,enabled,token_hint FROM attendance_agents WHERE id=?").bind(agentId||0).first<Row>();if(!agent)throw new Response("Office connector not found",{status:404});
+      if(action==="rotate_attendance_agent_token"){
+        const token=await newAgentToken();
+        await d1.prepare("UPDATE attendance_agents SET token_hash=?,token_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(token.hash,token.hint,agentId).run();
+        await audit(d1,request,user,"biometric_connector_token_rotated","attendance","attendance_agent",String(agentId),{tokenHint:agent.token_hint},{tokenHint:token.hint});
+        return Response.json({ok:true,id:agentId,token:token.token},{headers:{"cache-control":"no-store"}});
+      }
+      const enabled=payload.enabled?1:0;
+      await d1.prepare("UPDATE attendance_agents SET enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(enabled,agentId).run();
+      await audit(d1,request,user,enabled?"biometric_connector_enabled":"biometric_connector_disabled","attendance","attendance_agent",String(agentId),{enabled:agent.enabled},{enabled});
+      return Response.json({ok:true});
     }
     if(action==="map_attendance_device_user") {
       await authorize(d1,user,"attendance_adjustments","edit");

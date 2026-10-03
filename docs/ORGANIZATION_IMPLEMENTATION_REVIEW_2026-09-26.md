@@ -33,7 +33,7 @@ An earlier successful rehearsal is retained separately. A fresh backup/rehearsal
 
 ## 3. Isolated restore result
 
-**Passed.** PostgreSQL 18 restored the dump with error-on-failure into `127.0.0.1:5657 / sanad_org_rehearsal`, using a separate cluster under the output directory. The live cluster on port 5545 was not used for DDL or tests. Original-column hashes and row counts matched the exported snapshot after restore.
+**Passed.** PostgreSQL 18 restored the dump with error-on-failure into `127.0.0.1:5657 / hr_org_rehearsal`, using a separate cluster under the output directory. The live cluster on port 5545 was not used for DDL or tests. Original-column hashes and row counts matched the exported snapshot after restore.
 
 ## 4. Migration rehearsal result
 

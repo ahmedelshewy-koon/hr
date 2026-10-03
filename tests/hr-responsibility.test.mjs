@@ -278,8 +278,13 @@ test('profile: optional override retains automatic HR resolution in the simplifi
   const html = render({ form });
   // The simplified editor omits the derived summary; the profile and review show it.
   assert.doesNotMatch(html, /Resolved HR Responsible \(derived — read only\)/);
-  assert.match(html, /Employee HR override \(optional\)/);
-  assert.match(html, /No override — use automatic HR assignment/);
+  assert.match(html, />HR responsible</);
+  // The HR is named right away in the automatic option, with no explanation under the field.
+  assert.match(html, />Automatic: Sara[^<(]*</);
+  assert.doesNotMatch(html, /Current HR responsible/);
+  // Without the rule list (a limited viewer) the saved HR name from the server is used while company and branch are unchanged.
+  const saved = render({ form, catalog: { ...profileCatalog, hrRules: [] }, before: { id: 5, company_id: ASUS, branch_id: CAIRO, hr_user_id: null, hr_name: 'Saved HR' } });
+  assert.match(saved, />Automatic: Saved HR</);
   const automatic = resolvedHrResponsibility(profileCatalog, form, roster);
   assert.equal(automatic.userId, SARA);
   assert.match(hr.hrSourceText(automatic, profileCatalog, false), /Asus Cards \+ Cairo rule/);

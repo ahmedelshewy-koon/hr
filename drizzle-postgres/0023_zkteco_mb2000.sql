@@ -75,8 +75,5 @@ CREATE TABLE IF NOT EXISTS "attendance_device_syncs" (
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_attendance_device_syncs_status_requested" ON "attendance_device_syncs" USING btree ("status","requested_at");
 --> statement-breakpoint
+-- Devices are added per customer from Attendance > Biometric device; no address is seeded.
 CREATE UNIQUE INDEX IF NOT EXISTS "idx_attendance_device_syncs_active" ON "attendance_device_syncs" ("device_id") WHERE "status" IN ('queued','running');
---> statement-breakpoint
-INSERT INTO "attendance_devices" ("name","model","ip_address","port","timezone","sync_interval_seconds","enabled","status")
-VALUES ('Main office biometric','ZKTeco MB2000','192.168.1.147',4370,'Africa/Cairo',300,1,'offline')
-ON CONFLICT ("ip_address","port") DO UPDATE SET "model"=excluded."model","name"=excluded."name","updated_at"=CURRENT_TIMESTAMP;

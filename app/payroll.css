@@ -1,50 +1,66 @@
 .payroll-runs-table .tr{grid-template-columns:1.4fr 1fr .8fr 1fr 1fr 48px}
-.salary-structures-table .tr{grid-template-columns:1.6fr 1fr 1.4fr 1fr 1fr 1fr}
+.modal-layer:has(>.drawer>.drawer-fields),.modal-layer:has(>.bank-export-drawer){background:color-mix(in srgb,var(--sana-teal) 56.86%,transparent);backdrop-filter:blur(4px)}
+.drawer:has(>.drawer-fields),.bank-export-drawer{overflow-y:auto}
+.drawer:has(>.drawer-fields)>header,.bank-export-drawer>header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sana-space-4);padding:var(--sana-space-6);border-bottom:1px solid var(--line);flex:none}
+.drawer:has(>.drawer-fields)>header h2,.bank-export-drawer>header h2{font-size:var(--type-section);margin:4px 0}
+.drawer:has(>.drawer-fields)>header p{font-size:var(--type-secondary);margin:0}
+.drawer:has(>.drawer-fields)>header .icon-button,.bank-export-drawer>header .icon-button{flex:none}
+.drawer>.drawer-fields{display:grid;gap:var(--sana-space-4);padding:var(--sana-space-6);flex:none}
+.drawer-fields>label{display:grid;gap:var(--sana-space-2);min-width:0}
+.drawer-fields>label>span{font-size:var(--type-secondary);color:var(--sana-ink)}
+.drawer-fields :is(input,select),.allowance-row :is(input,select){width:100%;min-width:0;min-height:40px;padding:8px 12px;border:1px solid var(--line)}
+.drawer:has(>.drawer-fields)>.allowance-editor,.bank-export-drawer>.allowance-editor{flex:none}
+.drawer:has(>.drawer-fields)>footer,.bank-export-drawer>footer{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:var(--sana-space-2);padding:var(--sana-space-3) var(--sana-space-4);border-top:1px solid var(--line);background:var(--sana-white);margin-top:auto;flex:none}
+.bank-export-drawer .allowance-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 32px}
+@media(max-width:760px){
+  .drawer:has(>.drawer-fields)>header,.bank-export-drawer>header,.drawer>.drawer-fields{padding:var(--sana-space-4)}
+}
+.salary-structure-table .tr{grid-template-columns:1.6fr 1fr 1.4fr 1fr 1fr 1fr}
 .loans-table .tr{grid-template-columns:1.6fr 1fr 1.6fr 1fr 1fr}
 .payroll-items-scroll{overflow-x:auto}
 .payroll-items-table{min-width:1100px}
 .payroll-items-table .tr{grid-template-columns:1.5fr repeat(8,1fr) 40px}
-.payroll-items-table .negative{color:#ef4444}
+.payroll-items-table .negative{color:var(--sana-danger)}
 
 .tax-panel{margin-top:16px;overflow:hidden}
-.tax-panel>header{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;padding:16px 24px}
+.tax-panel>header{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:var(--sana-space-4);padding:var(--sana-space-4) var(--sana-space-6)}
 .tax-panel h2{font-size:var(--type-section);margin:3px 0 4px}
 .tax-panel p{color:var(--muted);font-size:var(--type-label);margin:0}
 .tax-panel table{border-collapse:collapse;width:100%}
-.tax-panel th,.tax-panel td{border-bottom:1px solid var(--line);padding:12px 16px;text-align:center;white-space:nowrap}
-.tax-panel th{background:#f8fafc;color:var(--muted);font-size:var(--type-label);font-weight:var(--weight-semibold)}
+.tax-panel th,.tax-panel td{border-bottom:1px solid var(--line);padding:var(--sana-space-3) var(--sana-space-4);text-align:center;white-space:nowrap}
+.tax-panel th{background:var(--sana-white);color:var(--muted);font-size:var(--type-label);font-weight:var(--weight-semibold)}
 .tax-panel tbody tr:last-child td{border-bottom:0}
-.tax-panel.export-config{align-items:center;display:flex;justify-content:space-between;gap:16px;padding:16px 24px}
+.tax-panel.export-config{align-items:center;display:flex;justify-content:space-between;gap:var(--sana-space-4);padding:var(--sana-space-4) var(--sana-space-6)}
 .tax-panel.export-config h2{font-size:var(--type-section);margin:3px 0 4px}
 
-.loan-progress{display:grid;gap:4px}
-.loan-progress-bar{background:var(--line);border-radius:999px;height:6px;overflow:hidden;width:100%}
-.loan-progress-bar span{background:#2563eb;display:block;height:100%}
+.loan-progress{display:grid;gap:var(--sana-space-1)}
+.loan-progress-bar{background:var(--line);border-radius:var(--sana-radius-pill);height:6px;overflow:hidden;width:100%}
+.loan-progress-bar span{background:var(--sana-teal-mid);display:block;height:100%}
 .loan-progress small{color:var(--muted);font-size:var(--type-label)}
 
-.allowance-editor{border-top:1px solid var(--line);display:grid;gap:12px;padding:16px 24px}
+.allowance-editor{border-top:1px solid var(--line);display:grid;gap:var(--sana-space-3);padding:var(--sana-space-4) var(--sana-space-6)}
 .allowance-editor>header{align-items:center;display:flex;justify-content:space-between}
 .allowance-editor>header b{font-size:var(--type-label)}
-.allowance-row{align-items:center;display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr 32px}
+.allowance-row{align-items:center;display:grid;gap:var(--sana-space-2);grid-template-columns:1fr 1fr 1fr 32px}
 .allowance-row select,.allowance-row input{width:100%}
 .allowance-editor p.muted{color:var(--muted);font-size:var(--type-label);margin:0}
-.icon-button{align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--muted);cursor:pointer;display:flex;height:32px;justify-content:center;width:32px}
-.icon-button:hover{background:#eaf2ff;color:#2563eb}
-.outline.small{font-size:var(--type-label);height:32px;padding:0 12px}
+.icon-button{align-items:center;background:var(--sana-white);border:1px solid var(--line);border-radius:var(--sana-radius-control);color:var(--muted);cursor:pointer;display:flex;height:32px;justify-content:center;width:32px}
+.icon-button:hover{background:var(--sana-canvas);color:var(--sana-teal-mid)}
+.outline.small{font-size:var(--type-label);height:32px;padding:0 var(--sana-space-3)}
 
 .payroll-run-detail-drawer{max-width:960px;width:96vw}
-.payroll-run-actions{align-items:center;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;padding:16px 24px}
+.payroll-run-actions{align-items:center;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:var(--sana-space-2);padding:var(--sana-space-4) var(--sana-space-6)}
 
 .payslip-drawer{max-width:460px}
 .payslip-close{margin:16px 16px 0 auto}
-.payslip-card{padding:8px 24px 24px}
-.payslip-head{align-items:flex-start;display:flex;gap:16px;justify-content:space-between;padding-bottom:16px}
+.payslip-card{padding:var(--sana-space-2) var(--sana-space-6) var(--sana-space-6)}
+.payslip-head{align-items:flex-start;display:flex;gap:var(--sana-space-4);justify-content:space-between;padding-bottom:var(--sana-space-4)}
 .payslip-head h2{font-size:var(--type-section);margin:4px 0}
 .payslip-head p{color:var(--muted);font-size:var(--type-label);margin:0}
 .payslip-rows{border-top:1px solid var(--line);display:grid}
-.payslip-row{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;padding:12px 0}
-.payslip-row .negative{color:#ef4444}
-.payslip-net{align-items:center;display:flex;justify-content:space-between;padding-top:16px}
+.payslip-row{align-items:center;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;padding:var(--sana-space-3) 0}
+.payslip-row .negative{color:var(--sana-danger)}
+.payslip-net{align-items:center;display:flex;justify-content:space-between;padding-top:var(--sana-space-4)}
 .payslip-net span{color:var(--muted);font-size:var(--type-label)}
 .payslip-net b{font-size:var(--type-page)}
 
@@ -61,8 +77,8 @@
 }
 
 @media(max-width:900px){
-  /* min-width:0 is required alongside the stack: globals sets .data-table .tr
-     to min-width:850px below 1050px, which would force a stacked row to scroll */
-  .payroll-runs-table .tr,.payroll-runs-table .th,.salary-structures-table .tr,.salary-structures-table .th,.loans-table .tr,.loans-table .th{grid-template-columns:1fr;min-width:0}
+  /* Keep each value beneath its heading, using the existing scrollable-table pattern. */
+  .payroll-runs-table,.salary-structure-table,.loans-table{overflow-x:auto}
+  .payroll-runs-table .tr,.salary-structure-table .tr,.loans-table .tr{min-width:720px}
   .allowance-row{grid-template-columns:1fr}
 }

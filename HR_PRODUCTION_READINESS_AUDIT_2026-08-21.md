@@ -1,4 +1,4 @@
-# Sanad HR — Final Production Readiness Audit
+# HR — Final Production Readiness Audit
 
 **Audit date:** 21 August 2026  
 **Scope:** Production readiness verification and blocker-only fixes  
@@ -52,7 +52,7 @@ Production readiness cannot be claimed because the configured PostgreSQL endpoin
 
 ## C. Must Fix Before Launch
 
-1. Supply a verified, non-production `DATABASE_URL` for the intended Sanad HR database without exposing its password.
+1. Supply a verified, non-production `DATABASE_URL` for the intended HR database without exposing its password.
 2. Confirm `current_database()`, `current_user`, PostgreSQL version, and timezone.
 3. Record migration state and take a recoverable backup when meaningful data exists.
 4. Run the official full migration command through `0013_hr_core_completion`.
@@ -207,7 +207,7 @@ Only the following audit/fix-related changes were made:
    - Added `lang="ar"` to the already RTL Arabic login surface.
 2. `tests/production-readiness.test.mjs`
    - Added a regression assertion for Arabic language and RTL semantics.
-3. `SANAD_HR_PRODUCTION_READINESS_AUDIT_2026-08-21.md`
+3. `HR_PRODUCTION_READINESS_AUDIT_2026-08-21.md`
    - Added this audit report.
 
 All other existing modified/untracked files predated this audit turn and were preserved.

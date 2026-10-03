@@ -86,9 +86,10 @@ export function OrganizationSettings({ rtl, access, employees, hrResponsibles, h
   }, [post, rtl, reload, onChanged, notify]);
   const saveJobTitle = useCallback(async (payload: Row) => { try { await onSaveJobTitle(payload); } catch (error) { throw settingsError(error as Row, 400, rtl); } await reload(); await onChanged(); notify(rtl ? 'تم حفظ المسمى الوظيفي' : 'Job title saved'); }, [onSaveJobTitle, reload, onChanged, notify, rtl]);
   const saveHrResponsible = useCallback(async (payload: Row) => { await onSaveHrResponsible(payload); await reload(); await onChanged(); notify(rtl ? 'تم حفظ الإعدادات' : 'Settings saved'); }, [onSaveHrResponsible, reload, onChanged, notify, rtl]);
-  const saveHrAssignment = useCallback(async (companyId: string, branchId: string, employeeId: string) => {
-    const result = await post({ action: 'save_hr_assignment', companyId, branchId, employeeId });
-    await reload(); await onChanged(); notify(rtl ? 'تم حفظ مسؤول الموارد البشرية' : 'HR responsible saved');
+  const saveHrAssignment = useCallback(async (companyId: string, branchId: string, employeeId: string, hrDataScope = 'assigned') => {
+    const result = await post({ action: 'save_hr_assignment', companyId, branchId, employeeId, hrDataScope });
+    const covered = Number(result?.employeesCovered ?? 0);
+    await reload(); await onChanged(); notify(rtl ? `تم حفظ مسؤول الموارد البشرية وتحديثه في ملفات ${covered} موظف` : `HR responsible saved and set on ${covered} employee profiles`);
     return result;
   }, [post, reload, onChanged, notify, rtl]);
 

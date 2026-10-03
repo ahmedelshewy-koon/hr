@@ -3,7 +3,7 @@ import {pbkdf2Sync,randomBytes} from "node:crypto";
 import postgres from "postgres";
 
 const base=process.env.RUNTIME_BASE_URL||"http://localhost:3000";
-const email=process.env.RUNTIME_EMAIL||"runtime.audit.20260822@sanad.local";
+const email=process.env.RUNTIME_EMAIL||"runtime.audit.20260822@hr.local";
 const password=process.env.RUNTIME_PASSWORD;
 if(!password)throw new Error("RUNTIME_PASSWORD is required");
 const sql=postgres(process.env.DATABASE_URL||"postgresql://koon_hr_admin@127.0.0.1:5545/koon_hr",{ssl:false,max:1});
@@ -19,7 +19,7 @@ const options=(await call("/api/talent/options")).body,manager=options.employees
 const stamp=Date.now().toString().slice(-8),date=new Date().toISOString().slice(0,10),future=new Date(Date.now()+90*86400000).toISOString().slice(0,10);
 
 const job=(await call("/api/recruitment",{action:"create_job",title:`Runtime HRMS ${stamp}`,departmentId:manager.department_id,hiringManagerEmployeeId:manager.manager_id||manager.id,location:"Cairo",employmentType:"full_time",openingsCount:1,status:"open"})).body;
-const candidate=(await call("/api/recruitment",{action:"add_candidate",jobId:job.id,name:`Runtime Candidate ${stamp}`,email:`runtime.candidate.${stamp}@sanad.local`,phone:"01000000000",source:"Runtime audit"})).body;
+const candidate=(await call("/api/recruitment",{action:"add_candidate",jobId:job.id,name:`Runtime Candidate ${stamp}`,email:`runtime.candidate.${stamp}@hr.local`,phone:"01000000000",source:"Runtime audit"})).body;
 await call("/api/recruitment",{action:"move_candidate",candidateId:candidate.id,stage:"screening"});await call("/api/recruitment",{action:"move_candidate",candidateId:candidate.id,stage:"interview"});
 const interview=(await call("/api/recruitment",{action:"schedule_interview",candidateId:candidate.id,interviewerEmployeeId:manager.id,scheduledAt:new Date(Date.now()+86400000).toISOString(),interviewType:"technical"})).body;
 await call("/api/recruitment",{action:"complete_interview",interviewId:interview.id,feedback:"Runtime verified",rating:5,recommendation:"hire"});
@@ -32,7 +32,7 @@ let lifecycle=(await call(`/api/lifecycle?employeeId=${hire.employeeId}`)).body;
 
 const asset=(await call("/api/assets",{action:"create",assetCode:`RT-${stamp}`,category:"Laptop",name:"Runtime laptop",brandModel:"AuditBook",serialNumber:`RTSN-${stamp}`,condition:"new"})).body;
 await call("/api/assets",{action:"assign",assetId:asset.id,employeeId:hire.employeeId,condition:"new"});await expectStatus("/api/assets",{action:"assign",assetId:asset.id,employeeId:hire.employeeId,condition:"new"},409);
-const course=(await call("/api/learning",{action:"create_course",title:`Runtime Safety ${stamp}`,provider:"Sanad",courseType:"online",startDate:date,endDate:future,mandatory:true,validityMonths:12})).body;
+const course=(await call("/api/learning",{action:"create_course",title:`Runtime Safety ${stamp}`,provider:"HR",courseType:"online",startDate:date,endDate:future,mandatory:true,validityMonths:12})).body;
 const enrollment=(await call("/api/learning",{action:"enroll",courseId:course.id,employeeId:hire.employeeId,dueDate:future})).body;await expectStatus("/api/learning",{action:"enroll",courseId:course.id,employeeId:hire.employeeId,dueDate:future},409);await call("/api/learning",{action:"update_enrollment",enrollmentId:enrollment.id,status:"in_progress"});const completion=(await call("/api/learning",{action:"update_enrollment",enrollmentId:enrollment.id,status:"completed",completionDate:date,score:96})).body;assert.ok(completion.certificateExpiry);
 
 

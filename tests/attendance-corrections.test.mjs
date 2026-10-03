@@ -15,6 +15,12 @@ test("detects missing checkout only after day completion",()=>{
   assert.deepEqual(calculateDailyAttendance({actualIn:"09:00",dayComplete:false,isWorkingDay:true}).exceptions,[]);
 });
 
+test("an open day's latest door punch is not an early departure or short day",()=>{
+  const input={scheduledIn:"09:00",scheduledOut:"17:00",actualIn:"09:17",actualOut:"10:34",requiredMinutes:480,graceMinutes:10,isWorkingDay:true};
+  assert.deepEqual(calculateDailyAttendance({...input,dayComplete:false}).exceptions,["late_arrival"]);
+  assert.deepEqual(calculateDailyAttendance({...input,dayComplete:true}).exceptions,["late_arrival","early_departure","insufficient_hours"]);
+});
+
 test("detects missing check-in and absence only on a completed working day",()=>{
   const result=calculateDailyAttendance({isWorkingDay:true,dayComplete:true});
   assert.equal(result.status,"absent");assert.deepEqual(result.exceptions,["missing_check_in","absent"]);

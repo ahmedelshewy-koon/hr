@@ -47,14 +47,15 @@ export function calculateDailyAttendance(input: AttendanceCalculationInput): Att
   const scheduledOut=input.scheduledOut?minutes(input.scheduledOut):null;
   const late=scheduledIn===null?0:Math.max(0,minutes(input.actualIn)-scheduledIn-grace);
   let early=0;
-  if(input.actualOut&&scheduledOut!==null){
+  // While the day is open the latest punch is not a checkout yet (door punches), so only a closed day can end early.
+  if(input.actualOut&&scheduledOut!==null&&input.dayComplete!==false){
     const scheduledEnd=scheduledIn!==null&&scheduledOut<=scheduledIn?scheduledOut+1440:scheduledOut;
     const actualEnd=minutes(input.actualOut)<minutes(input.actualIn)?minutes(input.actualOut)+1440:minutes(input.actualOut);
     early=Math.max(0,scheduledEnd-actualEnd);
   }
   if(late>0)exceptions.push("late_arrival");
   if(early>0)exceptions.push("early_departure");
-  if(input.actualOut&&required>0&&worked<required)exceptions.push("insufficient_hours");
+  if(input.actualOut&&required>0&&worked<required&&input.dayComplete!==false)exceptions.push("insufficient_hours");
   const overtime=Math.max(0,worked-required);
   const status=!input.actualOut?"needs_review":late>0?"late":type==="remote"?"remote":"present";
   return {workedMinutes:worked,lateMinutes:late,earlyMinutes:early,overtimeMinutes:overtime,status,attendanceType:type,exceptions:[...new Set(exceptions)]};

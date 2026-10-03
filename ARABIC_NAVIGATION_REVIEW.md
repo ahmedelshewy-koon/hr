@@ -1,4 +1,4 @@
-# Sanad HR — Arabic, Terminology & Navigation Review
+# HR — Arabic, Terminology & Navigation Review
 
 Date: 2026-09-19 · Scope: Arabic wording, terminology consistency, page naming and navigation only.
 No database schema, HR data, business rules or authorization rules were changed.

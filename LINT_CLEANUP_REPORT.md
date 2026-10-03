@@ -1,4 +1,4 @@
-# Sanad HR — Lint Cleanup Report
+# HR — Lint Cleanup Report
 
 **Date:** 2026-09-19
 **Scope:** Clear the remaining `npm run lint` errors and reduce warnings without changing business logic, permissions, API behavior, database schema or user-facing workflows.
@@ -62,7 +62,7 @@ The other warning, `exhaustive-deps` on `latestRequest.current` in the `useHRDat
 
 ### 5 × `@next/next/no-img-element` (warnings)
 
-Four static `/sanad-logo.png` images (sidebar, login, org print header, lifecycle header) and one user avatar in `hr-app.tsx`. The app runs on vinext (Vite + Cloudflare), uses `next/image` nowhere, and has no Next image optimizer. Swapping in `<Image>` would need explicit sizes, would touch the print layout, and gives no benefit here. I did not turn the rule off globally either; five warnings is a smaller footprint than a config exemption.
+Four static `/hr-logo.png` images (sidebar, login, org print header, lifecycle header) and one user avatar in `hr-app.tsx`. The app runs on vinext (Vite + Cloudflare), uses `next/image` nowhere, and has no Next image optimizer. Swapping in `<Image>` would need explicit sizes, would touch the print layout, and gives no benefit here. I did not turn the rule off globally either; five warnings is a smaller footprint than a config exemption.
 
 ### 2 × documented `eslint-disable-next-line react-hooks/set-state-in-effect`
 

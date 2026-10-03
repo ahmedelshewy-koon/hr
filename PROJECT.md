@@ -1,10 +1,10 @@
-# Sanad HR
+# HR
 
-**Sanad HR — People, simply managed.** A bilingual (Arabic/English, RTL-aware) employee experience and HR operations platform covering the full employee lifecycle: org structure, leave, attendance, approvals, documents, and role-based administration for a multi-country company (Egypt / Saudi Arabia).
+**HR — People, simply managed.** A bilingual (Arabic/English, RTL-aware) employee experience and HR operations platform covering the full employee lifecycle: org structure, leave, attendance, approvals, documents, and role-based administration for a multi-country company (Egypt / Saudi Arabia).
 
 ## Overview
 
-Sanad HR is a single-tenant HR system built as a Cloudflare-hosted site. It combines:
+HR is a single-tenant HR system built as a Cloudflare-hosted site. It combines:
 
 - An **employee/HR self-service portal** — requests, approvals, personal records.
 - An **HR admin console** — employees, departments, job titles, org chart, leave, attendance, users & permissions, system settings.

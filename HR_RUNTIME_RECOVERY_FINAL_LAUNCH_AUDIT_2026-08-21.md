@@ -1,4 +1,4 @@
-# Sanad HR — Runtime Recovery & Final Launch Audit
+# HR — Runtime Recovery & Final Launch Audit
 
 **Date:** 21 August 2026  
 **Scope:** Runtime recovery, migration verification, live E2E, blocker fixes, regression testing  
@@ -399,7 +399,7 @@ Migration rerun: PASS
 - `app/attendance/attendance-service.ts`
 - `app/api/dashboard/route.ts`
 - `tests/production-readiness.test.mjs`
-- `SANAD_HR_RUNTIME_RECOVERY_FINAL_LAUNCH_AUDIT_2026-08-21.md`
+- `HR_RUNTIME_RECOVERY_FINAL_LAUNCH_AUDIT_2026-08-21.md`
 
 Existing user and earlier HR Core changes were preserved.
 

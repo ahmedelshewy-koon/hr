@@ -14,7 +14,7 @@ for(const width of [360,390,768,1440]){
   for(const label of ['إجازاتي','طلباتي','الرئيسية']){await page.locator('.employee-mobile-nav').getByRole('button',{name:label,exact:true}).click();await page.waitForTimeout(150);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow ${label}`);}
   await page.locator('.employee-mobile-nav').getByRole('button',{name:'المزيد'}).click();assert(await page.locator('.sidebar.open').isVisible());await page.locator('.mobile-close').click();await page.waitForTimeout(400);
  }
- await page.screenshot({path:`output/sanad-mobile-${width}.png`,fullPage:true});assert.deepEqual(errors,[]);console.log(`PASS ${width}px: navigation, no overflow, no runtime errors`);await context.close();
+ await page.screenshot({path:`output/hr-mobile-${width}.png`,fullPage:true});assert.deepEqual(errors,[]);console.log(`PASS ${width}px: navigation, no overflow, no runtime errors`);await context.close();
 }
 const offlineContext=await browser.newContext();
 const offlinePage=await offlineContext.newPage();

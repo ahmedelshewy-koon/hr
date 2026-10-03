@@ -2,13 +2,14 @@
 
 import { localizeApiMessage } from "./api-messages";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Check, Clock3, Download, Fingerprint, Link2, RefreshCw, Search, Users, Wifi, X } from "lucide-react";
+import { Activity, Check, Clock3, Download, Fingerprint, Link2, RefreshCw, Search, Settings, Users, Wifi, X } from "lucide-react";
 import { AttendanceReportPanel } from "./attendance-report-panel";
+import { BiometricSetup } from "./biometric-setup";
 import { localizedDisplayValue } from "./localization";
 import "./biometric-workspace.css";
 import type { Row } from "./ui-types";
 
-type Payload = { devices: Row[]; users: Row[]; syncs: Row[]; summary: Row; records: Row[]; page: number; pageSize: number; total: number };
+type Payload = { devices: Row[]; users: Row[]; syncs: Row[]; summary: Row; records: Row[]; page: number; pageSize: number; total: number; canManageDevices?: boolean; setupUnavailable?: boolean; agents?: Row[]; allDevices?: Row[] };
 type Props = { rtl: boolean; employees: Row[]; notify: (message: string) => void; onMapped: () => void };
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const dateTime = (value: unknown, rtl: boolean, timezone = "Africa/Cairo") => {
@@ -43,6 +44,7 @@ export function BiometricWorkspace({ rtl, employees, notify, onMapped }: Props) 
   const [mapping, setMapping] = useState<Row | null>(null);
   const [employeeId, setEmployeeId] = useState("");
   const [mappingError, setMappingError] = useState("");
+  const [setupOpen, setSetupOpen] = useState(false);
   const parentReload = useRef(onMapped);
   useEffect(() => { parentReload.current = onMapped; }, [onMapped]);
   const syncStamp = data?.devices.map(device => device.last_sync_at || "").join("|") || "";
@@ -107,14 +109,17 @@ export function BiometricWorkspace({ rtl, employees, notify, onMapped }: Props) 
   const unlinked = (data?.users || []).filter(user => !user.employee_id).length;
   const name = (row: Row) => (rtl ? row.employee_name_ar || row.employee_name : row.employee_name) || row.device_user_name || row.display_name || "—";
   const changeView = (next: string) => { setView(next); setPage(1); };
+  const openSetup = () => data?.setupUnavailable ? notify(rtl ? "إعداد الأجهزة يحتاج تحديث قاعدة البيانات (migration 0032) أولًا." : "Device setup needs the database update (migration 0032) first.") : setSetupOpen(true);
   return <div className="biometric-workspace">
     {error && <div className="error-banner" role="alert">{error}<button onClick={() => setRefresh(value => value + 1)}>{rtl ? "إعادة المحاولة" : "Retry"}</button></div>}
+    {data?.canManageDevices && <div className="biometric-toolbar"><button className="outline" onClick={openSetup}><Settings size={16}/>{rtl ? "إعداد الأجهزة" : "Device setup"}</button></div>}
+    {data && !data.devices.length && <section className="biometric-empty-device"><Fingerprint size={34}/><h2>{rtl ? "لم تتم إضافة جهاز بصمة بعد" : "No biometric device yet"}</h2><p>{data.canManageDevices ? (rtl ? "أضف الجهاز بعنوان IP والبورت، وثبّت «رابط المكتب» مرة واحدة على كمبيوتر داخل شبكة الجهاز؛ بعدها تُسحب البصمات تلقائيًا." : "Add the device by IP address and port, and install the office connector once on a computer on the device network; punches are then pulled automatically.") : (rtl ? "اطلب من مدير النظام إضافة جهاز البصمة." : "Ask a system administrator to add the biometric device.")}</p>{data.canManageDevices && <button className="primary" onClick={openSetup}>{rtl ? "إعداد الجهاز" : "Set up device"}</button>}</section>}
     {(data?.devices || []).map(device => {
       const fresh = device.last_seen_at && observedAt - new Date(device.last_seen_at).getTime() < Math.max(600, Number(device.sync_interval_seconds) * 2) * 1000;
       const online = device.status === "online" && fresh;
       const pending = ["queued", "running"].includes(device.latest_sync_status);
       return <article className="biometric-device" key={device.id}>
-        <div className="biometric-device-title"><span className="biometric-device-icon"><Fingerprint size={30}/></span><div><small>{rtl ? "جهاز البصمة · المكتب الرئيسي" : "MAIN OFFICE · BIOMETRIC DEVICE"}</small><h2>{device.model}</h2><span dir="ltr">{device.ip_address}:{device.port}</span></div></div>
+        <div className="biometric-device-title"><span className="biometric-device-icon"><Fingerprint size={30}/></span><div><small>{rtl ? "جهاز البصمة · " : "BIOMETRIC DEVICE · "}{device.name}</small><h2>{device.model}</h2><span dir="ltr">{device.ip_address}:{device.port}</span></div></div>
         <div className="biometric-device-status"><span className={online ? "bio-connected" : "bio-disconnected"}><Wifi size={15}/>{online ? (rtl ? "متصل" : "Connected") : (rtl ? "غير متصل حاليًا" : "Not connected")}</span><small>{rtl ? "آخر مزامنة ناجحة" : "Last successful sync"}</small><b>{dateTime(device.last_sync_at, rtl, device.timezone)}</b></div>
         <div className="biometric-device-action"><button className="primary" disabled={busy || pending} onClick={() => void synchronize(Number(device.id))}><RefreshCw size={17} className={pending ? "bio-spinning" : ""}/>{pending ? syncLabel(device.latest_sync_status, rtl) : rtl ? "مزامنة الآن" : "Sync now"}</button><small>{rtl ? "مزامنة يدويًا أو عند اكتشاف بيانات جديدة" : "Sync manually or when new data is detected"}</small></div>
         {device.last_error && <p className="biometric-connection-error" role="status">{rtl ? "آخر محاولة لم تكتمل: " : "Last attempt failed: "}{device.last_error}</p>}
@@ -140,6 +145,7 @@ export function BiometricWorkspace({ rtl, employees, notify, onMapped }: Props) 
       {view !== "users" && view !== "report" && <footer className="biometric-pagination"><button className="outline" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>{rtl ? "السابق" : "Previous"}</button><span>{rtl ? "صفحة" : "Page"} {page} / {Math.max(1, Math.ceil((data?.total || 0) / 50))}</span><button className="outline" disabled={page * 50 >= (data?.total || 0)} onClick={() => setPage(value => value + 1)}>{rtl ? "التالي" : "Next"}</button></footer>}
     </section>
     <details className="panel biometric-sync-history"><summary>{rtl ? "سجل المزامنة" : "Sync history"}</summary><div className="biometric-table-scroll"><table className="biometric-table"><thead><tr><th>{rtl ? "الوقت" : "Time"}</th><th>{rtl ? "الحالة" : "Status"}</th><th>{rtl ? "بصمات جديدة" : "New punches"}</th><th>{rtl ? "التفاصيل" : "Details"}</th></tr></thead><tbody>{data?.syncs.map(sync => <tr key={sync.id}><td>{dateTime(sync.requested_at, rtl)}</td><td>{syncLabel(sync.status, rtl)}</td><td>{sync.punches_imported}</td><td>{sync.error || (rtl ? "مستخدمو الجهاز: " : "Device users: ") + sync.users_found}</td></tr>)}</tbody></table></div></details>
+    {setupOpen && data?.canManageDevices && <BiometricSetup rtl={rtl} agents={data.agents || []} devices={data.allDevices || []} notify={notify} onChanged={() => setRefresh(value => value + 1)} onClose={() => setSetupOpen(false)}/>}
     {mapping && <div className="modal-layer"><button className="modal-scrim" onClick={() => !busy && setMapping(null)} aria-label={rtl ? "إغلاق" : "Close"}/><aside className="drawer attendance-drawer" role="dialog" aria-modal="true" aria-labelledby="bio-map-title"><header><div><small>{rtl ? "ربط رقم البصمة" : "LINK BIOMETRIC ID"}</small><h2 id="bio-map-title">{mapping.display_name} · {mapping.device_user_id}</h2><p>{rtl ? "اختر الموظف المطابق. سيتم احتساب بصماته السابقة تلقائيًا." : "Select the matching employee. Past punches will be applied automatically."}</p></div><button className="icon-btn" disabled={busy} onClick={() => setMapping(null)} aria-label={rtl ? "إغلاق" : "Close"}><X/></button></header><div className="attendance-form">{mappingError && <div className="form-error" role="alert">{mappingError}</div>}<label><span>{rtl ? "الموظف" : "Employee"}</span><select value={employeeId} onChange={event => setEmployeeId(event.target.value)}><option value="">{rtl ? "اختر الموظف..." : "Select employee..."}</option>{employees.filter(employee => !linked.has(Number(employee.id)) && (!employee.fingerprint_code || String(employee.fingerprint_code) === String(mapping.device_user_id))).map(employee => <option key={employee.id} value={employee.id}>{rtl ? employee.name_ar || employee.name_en : employee.name_en} · {employee.employee_code}</option>)}</select></label></div><footer><button className="outline" disabled={busy} onClick={() => setMapping(null)}>{rtl ? "إلغاء" : "Cancel"}</button><button className="primary" disabled={busy || !employeeId} onClick={() => void mapUser()}><Link2 size={16}/>{rtl ? "ربط وتحديث الحضور" : "Link & update attendance"}</button></footer></aside></div>}
   </div>;
 }

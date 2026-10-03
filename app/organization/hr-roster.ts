@@ -12,7 +12,7 @@ type Db = PostgresDatabase | TransactionDatabase;
 export const HR_ELIGIBLE_SQL = "(u.status='active' AND r.name IN ('HR Manager','Super Admin') AND u.employee_id IS NOT NULL AND he.employment_status IN ('active','probation','notice_period'))";
 
 /** Roster entries (hr_responsibles) with the facts the UI needs to explain eligibility. */
-export const HR_ROSTER_SQL = `SELECT h.user_id,h.status,u.email,u.employee_id,u.status AS account_status,r.name AS role_name,he.employment_status AS employee_status,
+export const HR_ROSTER_SQL = `SELECT h.user_id,h.status,u.email,u.employee_id,u.status AS account_status,u.hr_data_scope,r.name AS role_name,he.employment_status AS employee_status,
   COALESCE(he.name_en,he.name_ar,u.email) AS name_en,COALESCE(he.name_ar,he.name_en,u.email) AS name_ar,he.employee_code,${HR_ELIGIBLE_SQL} AS eligible
   FROM hr_responsibles h JOIN users u ON u.id=h.user_id JOIN roles r ON r.id=u.role_id LEFT JOIN employees he ON he.id=u.employee_id ORDER BY name_en,h.user_id`;
 

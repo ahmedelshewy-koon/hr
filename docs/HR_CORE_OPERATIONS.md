@@ -1,4 +1,4 @@
-# Sanad HR Core Operations
+# HR Core Operations
 
 ## Production initialization
 

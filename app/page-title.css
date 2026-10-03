@@ -24,11 +24,11 @@
 .lifecycle-heading,
 .portal-welcome{
   min-height:48px;
-  padding:2px 4px;
+  padding:2px var(--sana-space-1);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:20px;
+  gap:var(--sana-space-4);
   background:transparent;
   border:0;
   border-radius:0;
@@ -60,8 +60,26 @@
   .lifecycle-heading,
   .portal-welcome{
     min-height:48px;
-    padding:2px 4px;
+    padding:2px var(--sana-space-1);
     border-radius:0;
     flex-wrap:wrap;
+  }
+}
+
+/* The top bar already names the page on desktop, so the page's own title is not repeated below it.
+   Phones hide the top-bar label (.sana-module-label), so they keep the in-page title. Action buttons stay. */
+@media(min-width:761px){
+  .content :is(.page-heading,.approvals-head,.attendance-page-head,.learning-heading,.lifecycle-heading,.portal-welcome,.ats-heading,.chart-heading)>div:first-child>h1,
+  .content .ats-heading>div:first-child>span,
+  .content .dashboard-heading .dashboard-title{
+    display:none!important;
+  }
+  .content :is(.page-heading,.approvals-head,.attendance-page-head,.learning-heading,.lifecycle-heading,.portal-welcome,.ats-heading){
+    min-height:0;
+    justify-content:flex-end;
+  }
+  /* A heading left with nothing to show takes no space. */
+  .content :is(.page-heading,.approvals-head,.attendance-page-head,.learning-heading,.lifecycle-heading,.portal-welcome,.ats-heading):not(:has(>:not(div:first-child))){
+    display:none;
   }
 }

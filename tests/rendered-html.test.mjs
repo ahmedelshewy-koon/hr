@@ -58,7 +58,7 @@ test("renders workforce departments, job titles, and organization chart from API
   assert.match(app, /Managing Director\|العضو المنتدب/);
   assert.match(app, /org-department-grid/);
   assert.match(app, /pageStyle\.textContent="@page \{ size: A4 landscape; margin: 8mm; \}"/);
-  assert.match(app, /className="org-print-page-header"><img src="\/sanad-logo\.png" alt="Sanad"\/><div><h1>\{title\}<\/h1><p>\{subtitle\}<\/p><\/div>/);
+  assert.match(app, /className="org-print-page-header"><img src="\/hr-logo\.png" alt="HR"\/><div><h1>\{title\}<\/h1><p>\{subtitle\}<\/p><\/div>/);
   assert.match(app, /title=\{rtl\?"الهيكل العام لشركة أسس"/);
   assert.match(app, /\{key:"asas-saudi",departments:asasSaudiDepartment\?/);
   assert.match(app, /\{key:"asas-egypt",departments:asasEgyptDepartment\?/);

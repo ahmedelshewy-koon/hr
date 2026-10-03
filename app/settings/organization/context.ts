@@ -32,7 +32,7 @@ export type OrganizationSettingsValue = {
   /** Super Admin only: deletes a unit (with its sub-units), position or job title even when in use, clearing references. */
   forceDeleteEntity: (entity: string, id: unknown) => Promise<void>;
   saveHrResponsible: (payload: Row) => Promise<void>;
-  saveHrAssignment: (companyId: string, branchId: string, employeeId: string) => Promise<Row>;
+  saveHrAssignment: (companyId: string, branchId: string, employeeId: string, hrDataScope?: string) => Promise<Row>;
   goTo: (section: string) => void;
 };
 

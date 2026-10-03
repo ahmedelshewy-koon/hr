@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Briefcase, Building2, ChevronDown, ChevronUp, CircleCheck, Crosshair, ExternalLink, IdCard, Info, Layers, ListTree, MapPin, Minus, Network, Pencil, Plus, Printer, RotateCcw, Search, Users, X, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Briefcase, Building2, ChevronDown, ChevronUp, CircleCheck, Crosshair, ExternalLink, Filter, IdCard, Info, Layers, MapPin, Minus, Network, Pencil, Plus, Printer, RotateCcw, Users, X, type LucideIcon } from 'lucide-react';
 import type { Row } from './ui-types';
 import type { OrganizationCatalog } from './organization/assignment-policy';
-import { ancestorPath, chartFilterOptions, chartPool, computeChartDiagnostics, deriveOrganizationView, deriveReportingView, directReportCount, needsReview, NOT_ASSIGNED, reviewItems, searchEmployees, type ChartFilters, type ChartInput, type ChartIssue, type ChartNode, type ContextReason, type ReportingView, type Severity, type UnitNode } from './organization/chart-model';
+import { ancestorPath, chartFilterOptions, chartPool, computeChartDiagnostics, deriveOrganizationView, deriveReportingView, directReportCount, needsReview, NOT_ASSIGNED, reviewItems, type ChartFilters, type ChartInput, type ChartIssue, type ChartNode, type ContextReason, type ReportingView, type Severity, type UnitNode } from './organization/chart-model';
 import { nameOf } from './organization/selectors';
 import './organization-settings.css';
 import './organization-chart.css';
@@ -15,8 +15,8 @@ import './organization-chart.css';
  */
 
 const STACK_MIN = 5, PRINT_WIDTH = 1060, PRINT_HEIGHT = 690,CANVAS_PADDING = 36, NARROW = 760;
-/** Beyond this many nodes the default view opens two levels and "Expand all" is disabled. */
-const LARGE_VIEW = 300, EXPAND_ALL_LIMIT = 1500, REVIEW_PAGE = 100;
+/** Maximum review rows shown before requesting more. */
+const REVIEW_PAGE = 100;
 
 type Lang = { rtl: boolean };
 const t = (rtl: boolean, en: string, ar: string) => (rtl ? ar : en);
@@ -312,11 +312,11 @@ export type OrganizationChartProps = {
 };
 
 export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit, openProfile, editProfile }: OrganizationChartProps) {
-  const [view, setView] = useState<'reporting' | 'organization'>('reporting'), [orgMode, setOrgMode] = useState<'department' | 'branch'>('department');
-  const [filters, setFilters] = useState<ChartFilters>({ status: 'current' }), [query, setQuery] = useState(''), [showEmpty, setShowEmpty] = useState(false);
+  const [view] = useState<'reporting' | 'organization'>('reporting'), [orgMode] = useState<'department' | 'branch'>('department');
+  const [filters, setFilters] = useState<ChartFilters>({ status: 'current' }), [showEmpty, setShowEmpty] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false), [quickId, setQuickId] = useState<number | null>(null), [focused, setFocused] = useState<number | null>(null);
-  const [treeState, setTreeState] = useState<Expansion<number>>({ base: 'default', flipped: new Set() }), [unitState, setUnitState] = useState<Expansion<string>>({ base: 'default', flipped: new Set() });
-  const [layout, setLayout] = useState<'auto' | 'tree' | 'list'>('auto'), [narrow, setNarrow] = useState(false), [scale, setScale] = useState(1);
+  const [treeState, setTreeState] = useState<Expansion<number>>({ base: 'all', flipped: new Set() }), [unitState, setUnitState] = useState<Expansion<string>>({ base: 'all', flipped: new Set() });
+  const [layout] = useState<'auto' | 'tree' | 'list'>('auto'), [narrow, setNarrow] = useState(false), [scale, setScale] = useState(1);
   const canvas = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
 
   useEffect(() => { const media = window.matchMedia(`(max-width: ${NARROW}px)`), update = () => setNarrow(media.matches); update(); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
@@ -328,11 +328,9 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
   const reporting: ReportingView = useMemo(() => deriveReportingView(input, filters), [input, filters]);
   const organization = useMemo(() => view === 'organization' ? deriveOrganizationView(input, filters, orgMode, { showEmpty }) : null, [input, filters, orgMode, showEmpty, view]);
   const reviewCount = useMemo(() => [...reporting.matchIds].filter(id => needsReview(diagnostics.get(id))).length, [reporting, diagnostics]);
-  const results = useMemo(() => searchEmployees(input, reporting.matchIds, query), [input, reporting, query]);
   const listLayout = view === 'reporting' && (layout === 'list' || (layout === 'auto' && narrow));
-  const nodeCount = view === 'reporting' ? reporting.nodes.size : reporting.matchCount;
-  const defaultDepth = nodeCount > LARGE_VIEW ? 2 : Number.POSITIVE_INFINITY;
-  const unitDefaultDepth = (organization?.matchCount ?? 0) > LARGE_VIEW ? 2 : 4;
+  const defaultDepth = Number.POSITIVE_INFINITY;
+  const unitDefaultDepth = Number.POSITIVE_INFINITY;
 
   const setFilter = (key: keyof ChartFilters, value: string) => setFilters(current => {
     const next = { ...current, [key]: value || undefined };
@@ -361,8 +359,6 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
     toggle: (node, depth) => setTreeState(state => withOpen(state, [[node.id, !isOpenIn(state, node.id, depth < defaultDepth), depth < defaultDepth]])), open: id => { setFocused(null); setQuickId(id); } };
   const unitCtx: UnitContext = { rtl, catalog, diagnostics, pool, expansion: unitState, defaultDepth: unitDefaultDepth, selected: quickId, focused,
     toggle: (key, depth) => setUnitState(state => withOpen(state, [[key, !isOpenIn(state, key, depth < unitDefaultDepth), depth < unitDefaultDepth]])), open: id => { setFocused(null); setQuickId(id); } };
-  const expandAll = () => (view === 'reporting' ? setTreeState({ base: 'all', flipped: new Set() }) : setUnitState({ base: 'all', flipped: new Set() }));
-  const collapseAll = () => (view === 'reporting' ? setTreeState({ base: 'none', flipped: new Set() }) : setUnitState({ base: 'none', flipped: new Set() }));
 
   // Zoom, fit and print apply to the tree layout only; the list layout reflows naturally.
   const naturalWidth = () => { const el = content.current; if (!el) return 0; const previous = el.style.zoom; el.style.zoom = '1'; const width = Math.max(0, ...[...el.querySelectorAll<HTMLElement>('.reporting-roots>li')].map(li => li.offsetWidth)); el.style.zoom = previous; return width; };
@@ -393,11 +389,10 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
     <option value="">{t(rtl, 'All', 'الكل')}</option>{none && <option value={NOT_ASSIGNED}>{none}</option>}
     {rows.map(row => <option key={row.id} value={row.id}>{key === 'department' ? unitText(rtl, catalog, row.id) : nameOf(row, rtl)}{key !== 'department' && row.status !== 'active' ? t(rtl, ' (inactive)', ' (غير نشط)') : ''}</option>)}
   </select></label>;
-  const tooLarge = nodeCount > EXPAND_ALL_LIMIT;
 
   return <section className="organization-workspace org-chart" dir={rtl ? 'rtl' : 'ltr'}>
     <header className="chart-heading">
-      <div><h1>{t(rtl, 'Organizational chart', 'الهيكل التنظيمي')}</h1><p>{view === 'reporting' ? t(rtl, 'Who reports to whom — built only from each employee’s stored direct manager.', 'من يتبع من — مبني فقط من المدير المباشر المحفوظ لكل موظف.') : t(rtl, 'Where everyone sits — built from stored Company, Branch and unit assignments.', 'أين يقع كل موظف — مبني من الشركة والفرع والوحدة المحفوظة.')}</p></div>
+      <div><h1>{t(rtl, 'Organizational chart', 'الهيكل التنظيمي')}</h1></div>
       <div className="chart-stats" aria-live="polite">
         <span><b>{reporting.matchCount}</b>{t(rtl, 'Employees in view', 'موظفون في العرض')}</span>
         {view === 'reporting' && reporting.contextCount > 0 && <span className="context"><b>{reporting.contextCount}</b>{t(rtl, 'Reporting context (not counted)', 'سياق التبعية (غير محتسب)')}</span>}
@@ -405,27 +400,17 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
       </div>
     </header>
 
-    <div className="chart-toolbar">
-      <div className="chart-segment" role="group" aria-label={t(rtl, 'View', 'العرض')}>
-        <button type="button" aria-pressed={view === 'reporting'} className={view === 'reporting' ? 'active' : ''} onClick={() => setView('reporting')}><Network size={16} />{t(rtl, 'Reporting', 'التبعية')}</button>
-        <button type="button" aria-pressed={view === 'organization'} className={view === 'organization' ? 'active' : ''} onClick={() => setView('organization')}><ListTree size={16} />{t(rtl, 'Organization', 'الوحدات التنظيمية')}</button>
-      </div>
-      {view === 'organization' && <div className="chart-segment" role="group" aria-label={t(rtl, 'Group by', 'التجميع حسب')}>
-        <button type="button" aria-pressed={orgMode === 'department'} className={orgMode === 'department' ? 'active' : ''} onClick={() => setOrgMode('department')}>{t(rtl, 'By Department', 'حسب الإدارة')}</button>
-        <button type="button" aria-pressed={orgMode === 'branch'} className={orgMode === 'branch' ? 'active' : ''} onClick={() => setOrgMode('branch')}>{t(rtl, 'By Branch', 'حسب الفرع')}</button>
-      </div>}
-      <div className="chart-search">
-        <label><Search size={16} /><span className="sr-only">{t(rtl, 'Search employees', 'البحث عن موظف')}</span>
-          <input type="search" value={query} placeholder={t(rtl, 'Search name, code, job title or position', 'ابحث بالاسم أو الرقم أو المسمى أو الوظيفة')} role="combobox" aria-expanded={Boolean(query && results.length)} aria-controls="chart-search-results" aria-autocomplete="list"
-            onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && results[0]) { reveal(num(results[0].id)); setQuery(''); } if (event.key === 'Escape') setQuery(''); }} /></label>
-        {query.trim() && <ul id="chart-search-results" role="listbox" className="chart-search-results">
-          {results.map(row => { const role = roleLabels(rtl, catalog, row); return <li key={row.id} role="option" aria-selected="false"><button type="button" onClick={() => { reveal(num(row.id)); setQuery(''); }}><b>{nameOf(row, rtl)}</b><small>{[row.employee_code, role.primary].filter(Boolean).join(' · ')}</small></button></li>; })}
-          {!results.length && <li className="muted">{t(rtl, 'No employee in the current view matches', 'لا يوجد موظف مطابق في العرض الحالي')}</li>}
-        </ul>}
-      </div>
-    </div>
-
-    <div className="org-assignment-fields chart-filters">
+    <div className="org-control-row chart-actions">
+    <details className="chart-filter-menu" onKeyDown={event => {
+      if (event.key === 'Escape') {
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector('summary')?.focus();
+      }
+    }} onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.open = false;
+    }}>
+      <summary className="outline"><Filter size={16} /><span>{t(rtl, 'Filter', 'فلتر')}</span><ChevronDown size={16} /></summary>
+      <div className="org-assignment-fields chart-filters">
       {select('company', t(rtl, 'Company', 'الشركة'), options.companies, t(rtl, 'Company not assigned', 'شركة غير محددة'))}
       {select('branch', t(rtl, 'Branch', 'الفرع'), options.branches, t(rtl, 'Branch not assigned', 'فرع غير محدد'))}
       {select('department', t(rtl, 'Department', 'الإدارة'), options.departments)}
@@ -433,15 +418,9 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
         <option value="current">{t(rtl, 'Current employees', 'الموظفون الحاليون')}</option><option value="all">{t(rtl, 'All statuses', 'كل الحالات')}</option>
         {options.statuses.map(status => <option key={status} value={status}>{statusLabel(rtl, status)}</option>)}
       </select></label>
-    </div>
+      </div>
+    </details>
 
-    <div className="org-control-row chart-actions">
-      <button type="button" className="outline" onClick={expandAll} disabled={tooLarge} title={tooLarge ? t(rtl, 'Too many employees to expand at once — use filters or search', 'عدد كبير جدًا للتوسيع دفعة واحدة — استخدم التصفية أو البحث') : undefined}>{t(rtl, 'Expand all', 'توسيع الكل')}</button>
-      <button type="button" className="outline" onClick={collapseAll}>{t(rtl, 'Collapse all', 'طي الكل')}</button>
-      {view === 'reporting' && <div className="chart-segment small" role="group" aria-label={t(rtl, 'Layout', 'طريقة العرض')}>
-        <button type="button" aria-pressed={!listLayout} className={!listLayout ? 'active' : ''} onClick={() => setLayout('tree')}>{t(rtl, 'Tree', 'شجرة')}</button>
-        <button type="button" aria-pressed={listLayout} className={listLayout ? 'active' : ''} onClick={() => setLayout('list')}>{t(rtl, 'List', 'قائمة')}</button>
-      </div>}
       {view === 'reporting' && !listLayout && <>
         <button type="button" className="outline" aria-label={t(rtl, 'Zoom out', 'تصغير')} onClick={() => setScale(v => Math.max(.35, v - .1))}><Minus /></button><span>{Math.round(scale * 100)}%</span>
         <button type="button" className="outline" aria-label={t(rtl, 'Zoom in', 'تكبير')} onClick={() => setScale(v => Math.min(2, v + .1))}><Plus /></button>
@@ -450,7 +429,6 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
         <button type="button" className="outline" onClick={print}><Printer />{t(rtl, 'Print', 'طباعة')}</button>
       </>}
       {view === 'organization' && fullAccess && <label className="chart-check"><input type="checkbox" checked={showEmpty} onChange={event => setShowEmpty(event.target.checked)} />{t(rtl, 'Show empty units', 'إظهار الوحدات الفارغة')}</label>}
-      <span className="chart-readonly"><Info size={14} />{t(rtl, 'Read-only: edit assignments in the Employee Profile or Settings', 'للعرض فقط: عدّل التعيينات من ملف الموظف أو الإعدادات')}</span>
     </div>
 
     {reviewOpen && <NeedsReviewPanel rtl={rtl} catalog={catalog} diagnostics={diagnostics} pool={pool} matchIds={reporting.matchIds} openProfile={id => { const row = pool.find(r => num(r.id) === id); if (row) openProfile(row); }} reveal={id => reveal(id)} />}

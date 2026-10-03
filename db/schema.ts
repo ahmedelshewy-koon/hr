@@ -49,6 +49,8 @@ export const employees = pgTable(
   {
     id: serial("id").primaryKey(),
     employeeCode: text("employee_code").notNull(),
+    // The pre-renumbering code (e.g. EMP1767255793641), kept so old exports and searches still match.
+    legacyEmployeeCode: text("legacy_employee_code"),
     nameEn: text("name_en").notNull(),
     nameAr: text("name_ar").notNull(),
     workEmail: text("work_email").notNull(),
@@ -56,6 +58,7 @@ export const employees = pgTable(
     personalPhone: text("personal_phone"),
     workPhone: text("work_phone"),
     nationality: text("nationality"),
+    nationalityCountry: text("nationality_country"),
     religion: text("religion"),
     passportNumber: text("passport_number"),
     gender: text("gender"),
@@ -117,9 +120,11 @@ export const companies = pgTable("companies", {
   nameAr: text("name_ar"),
   nameEn: text("name_en"),
   code: text("code").unique(),
+  // Prefix for generated employee codes (KS → KS-001). Null falls back to EMP.
+  employeeCodePrefix: text("employee_code_prefix"),
   status: text("status").notNull().default("active"),
   ...timestamps,
-}, t => [uniqueIndex("idx_companies_name").on(sql`lower(btrim(${t.name}))`)]);
+}, t => [uniqueIndex("idx_companies_name").on(sql`lower(btrim(${t.name}))`), uniqueIndex("idx_companies_employee_code_prefix").on(t.employeeCodePrefix)]);
 
 // Organizational master data. No backfill or reinterpretation of legacy assignments.
 export const branches = pgTable("branches", {
@@ -310,10 +315,29 @@ export const attendanceLogs = pgTable(
   ],
 );
 
+// An office connector: a small program on the customer's LAN that reads the devices and posts to the hosted app.
+export const attendanceAgents = pgTable(
+  "attendance_agents",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    tokenHint: text("token_hint").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    agentVersion: text("agent_version"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+    lastIp: text("last_ip"),
+    createdByUserId: integer("created_by_user_id"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("idx_attendance_agents_token_hash").on(t.tokenHash)],
+);
+
 export const attendanceDevices = pgTable(
   "attendance_devices",
   {
     id: serial("id").primaryKey(),
+    agentId: integer("agent_id"),
     name: text("name").notNull(),
     model: text("model").notNull(),
     ipAddress: text("ip_address").notNull(),
@@ -330,7 +354,8 @@ export const attendanceDevices = pgTable(
     lastError: text("last_error"),
     ...timestamps,
   },
-  (t) => [uniqueIndex("idx_attendance_devices_ip_port").on(t.ipAddress, t.port)],
+  // Branches can reuse the same private address on different LANs, so the address is unique per connector.
+  (t) => [uniqueIndex("idx_attendance_devices_agent_ip_port").on(t.agentId, t.ipAddress, t.port)],
 );
 
 export const attendanceDeviceUsers = pgTable(

@@ -54,7 +54,7 @@ test("candidate matching is weighted, deterministic, and evidence-backed", () =>
       totalExperience: 4,
       location: "Cairo",
       currentJobTitle: "Data Analyst",
-      currentCompany: "SANAD Labs",
+      currentCompany: "Acme Labs",
       education: ["BSc Computer Science"],
       skills: ["SQL", "Python"],
       languages: ["English"],

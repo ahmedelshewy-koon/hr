@@ -103,7 +103,7 @@ function CompletionReport({rtl,lifecycle,tasks,assets,ownerOptions,close}:{rtl:b
   const issuedAt=lifecycle.completed_at||lifecycle.updated_at||lifecycle.created_at;
   const issuedDate=new Date(String(issuedAt||""));
   const issuedYear=Number.isNaN(issuedDate.getTime())?new Date().getFullYear():issuedDate.getFullYear();
-  const reference=`SANAD-${onboarding?"ONB":"OFF"}-${issuedYear}-${String(lifecycle.id).padStart(5,"0")}`;
+  const reference=`HR-${onboarding?"ONB":"OFF"}-${issuedYear}-${String(lifecycle.id).padStart(5,"0")}`;
   const requiredTasks=tasks.filter(task=>Number(task.required)===1);
   const requiredPending=requiredTasks.filter(task=>task.status!=="completed").length;
   const activeAssets=assets.filter(asset=>!asset.returned_at);
@@ -135,7 +135,7 @@ function CompletionReport({rtl,lifecycle,tasks,assets,ownerOptions,close}:{rtl:b
   return <div className="lifecycle-report-layer"><button className="lifecycle-scrim" onClick={close} aria-label={rtl?"إغلاق":"Close"}/><section className="lifecycle-report hr-record" dir={rtl?"rtl":"ltr"}>
     <div className="report-controls"><button className="outline" onClick={close}><X size={16}/>{rtl?"إغلاق":"Close"}</button><button className="primary" onClick={()=>window.print()} disabled={!finalApproved}><Printer size={16}/>{rtl?"طباعة أو حفظ مستند":"Print / Save PDF"}</button></div>
     <header className="record-header">
-      <img src="/sanad-logo.png" alt={rtl?"شعار سند":"SANAD logo"}/>
+      <img src="/hr-logo.png" alt={rtl?"شعار HR":"HR logo"}/>
       <div className="record-title">
         <h1>{onboarding?(rtl?"سجل إتمام تهيئة ومباشرة الموظف":"Employee Onboarding & Commencement Completion Record"):(rtl?"سجل إنهاء خدمة الموظف وإخلاء الطرف النهائي":"Employee Offboarding & Final Clearance Record")}</h1>
         <dl><div><dt>{rtl?"الرقم المرجعي":"Reference Number"}</dt><dd>{reference}</dd></div><div><dt>{rtl?"تاريخ إصدار المستند":"Document Issue Date"}</dt><dd>{date(issuedAt,rtl)}</dd></div><div><dt>{rtl?"حالة المستند":"Document Status"}</dt><dd className={finalApproved?"approved":"withheld"}>{finalApproved?(rtl?"معتمد إلكترونيًا":"Electronically Approved"):(rtl?"غير معتمد":"Approval Withheld")}</dd></div></dl>

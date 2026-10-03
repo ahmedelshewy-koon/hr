@@ -34,7 +34,15 @@ const religions: Option[] = [
   { value: "prefer_not_to_say", ar: "أفضل عدم الإفصاح", en: "Prefer not to say" },
 ];
 
-const locations: Option[] = COUNTRIES.map(country => ({ value: country.value, ar: country.ar, en: country.value }));
+const nationalityCountryAliases: Record<string, string> = { Saudi: "Saudi Arabia", Palestine: "Palestinian Territories", Turkey: "Türkiye" };
+
+/** Country of the nationality (not the work country); "" when the nationality has no single country. */
+export function countryForNationality(nationality: string) {
+  const value = nationalityCountryAliases[nationality] || nationality;
+  return COUNTRIES.some(country => country.value === value) ? value : "";
+}
+
+const locations: Option[] =COUNTRIES.map(country => ({ value: country.value, ar: country.ar, en: country.value }));
 
 export function EmployeeSelect({ field, value, rtl, existing = [], onChange }: {
   field: "nationality" | "religion" | "workLocation" | "country";

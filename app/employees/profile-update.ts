@@ -7,8 +7,9 @@ import { refreshReportingLevels } from '../organization/reporting-service.ts';
 import { scheduledDailyMinutes } from './schedule-policy.ts';
 import { resolvedContractEndDate } from './contract-policy.ts';
 import { validateCompanyHr } from './company-hr-catalog.ts';
+import { assertEmployeeCodeFree, cleanEmployeeCode } from './employee-code.ts';
 
-const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',employmentStatus:'employment_status',salaryCurrency:'salary_currency',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
+const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',nationalityCountry:'nationality_country',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',employmentStatus:'employment_status',salaryCurrency:'salary_currency',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
 
 /** Called inside the authorized API transaction. Omitted fields are never rewritten. */
 export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:number,payload:Row,actor:{id:number;ip?:string|null;employeeId?:number|null;roleName?:string},afterSave?:(db:TransactionDatabase)=>Promise<void>) {
@@ -29,6 +30,10 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
     const value=String(payload[key]??'').trim().slice(0,limit);
     if(['nameEn','nameAr','workEmail','startDate','country'].includes(key)&&!value)throw new Response(`${key} is required`,{status:400});
     updates[column]=key==='workEmail'?value.toLowerCase():value||null;
+  }
+  if(payload.employeeCode!==undefined){
+    const code=cleanEmployeeCode(payload.employeeCode);
+    if(code!==before.employee_code){await assertEmployeeCodeFree(db,code,employeeId);updates.employee_code=code;}
   }
   for(const [key,column] of Object.entries({salary:'salary',graceMinutes:'grace_minutes',requiredDailyMinutes:'required_daily_minutes'})){
     if(payload[key]===undefined)continue;

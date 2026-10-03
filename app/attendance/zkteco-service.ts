@@ -5,6 +5,7 @@ import { aggregateBiometricPunches, localParts, uniqueFingerprintMatch, type Bio
 
 type DB = PostgresDatabase | TransactionDatabase;
 type Row = Record<string, unknown>;
+const PUNCH_CHUNK = 5000;
 export type DeviceSnapshot = {
   deviceTime: string;
   users: { userId: string; uid: number; name: string; role: number }[];
@@ -15,7 +16,8 @@ function object(value: unknown): Row {
   try { const parsed = JSON.parse(String(value || "{}")); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; }
 }
 
-export async function rebuildDeviceUserAttendance(db: DB, deviceId: number, deviceUserId: string) {
+/** `fromDate` (YYYY-MM-DD) limits the daily recalculation to work dates on or after it; omitted means all history. */
+export async function rebuildDeviceUserAttendance(db: DB, deviceId: number, deviceUserId: string, fromDate?: string) {
   const user = await db.prepare("SELECT du.employee_id,d.name AS device_name,d.ip_address,d.timezone,e.check_in_time,e.check_out_time FROM attendance_device_users du JOIN attendance_devices d ON d.id=du.device_id JOIN employees e ON e.id=du.employee_id AND e.employment_status!='deleted' WHERE du.device_id=? AND du.device_user_id=?")
     .bind(deviceId, deviceUserId).first<Row>();
   const employeeId = Number(user?.employee_id);
@@ -23,14 +25,17 @@ export async function rebuildDeviceUserAttendance(db: DB, deviceId: number, devi
   // Same employee lock as portal attendance; the device lock also serializes mapping.
   await db.prepare("SELECT pg_advisory_xact_lock(?)").bind(employeeId).run();
   await db.prepare("UPDATE attendance_device_punches SET employee_id=? WHERE device_id=? AND device_user_id=? AND employee_id IS NULL").bind(employeeId, deviceId, deviceUserId).run();
-  const pending = (await db.prepare("SELECT id,punched_at FROM attendance_device_punches WHERE device_id=? AND device_user_id=? AND employee_id=? AND attendance_log_id IS NULL ORDER BY punched_at,id").bind(deviceId, deviceUserId, employeeId).all<Row>()).results;
-  for (const punch of pending) {
-    const inserted = await db.prepare("INSERT INTO attendance_logs (employee_id,event_at,event_type,source,device,location,created_at) VALUES (?,?,'biometric_punch','biometric',?,?,CURRENT_TIMESTAMP) RETURNING id").bind(employeeId, punch.punched_at, user.device_name, user.ip_address).first<{ id: number }>();
-    await db.prepare("UPDATE attendance_device_punches SET attendance_log_id=? WHERE id=?").bind(inserted!.id, punch.id).run();
-  }
+  // Log ids are drawn up front so every punch is linked to its own log in one statement.
+  const pending = (await db.prepare("WITH pending AS MATERIALIZED (SELECT id,punched_at,nextval(pg_get_serial_sequence('attendance_logs','id')) AS log_id FROM attendance_device_punches WHERE device_id=? AND device_user_id=? AND employee_id=? AND attendance_log_id IS NULL), logs AS (INSERT INTO attendance_logs (id,employee_id,event_at,event_type,source,device,location,created_at) SELECT log_id,?,punched_at,'biometric_punch','biometric',?,?,CURRENT_TIMESTAMP FROM pending) UPDATE attendance_device_punches p SET attendance_log_id=pending.log_id FROM pending WHERE p.id=pending.id RETURNING p.id,p.punched_at")
+    .bind(deviceId, deviceUserId, employeeId, employeeId, user.device_name, user.ip_address).all<Row>()).results;
   const timezone = String(user.timezone);
+  // Newly imported or newly linked punches can land on old days (and an overnight shift on the day before).
+  for (const punch of pending) {
+    const touched = shiftDate(localParts(punch.punched_at as string | Date, timezone).date, -1);
+    if (fromDate && touched < fromDate) fromDate = touched;
+  }
   const punches = (await db.prepare("SELECT punched_at,punch_type FROM attendance_device_punches WHERE employee_id=? ORDER BY punched_at,id").bind(employeeId).all<BiometricPunch & Row>()).results;
-  const days = aggregateBiometricPunches(punches, timezone, String(user.check_in_time || "09:00"), String(user.check_out_time || "17:00"));
+  const days = aggregateBiometricPunches(punches, timezone, String(user.check_in_time || "09:00"), String(user.check_out_time || "17:00")).filter(day => !fromDate || day.workDate >= fromDate);
   for (const day of days) {
     await db.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(employeeId, Number(day.workDate.replaceAll("-", ""))).run();
     const corrections = (await db.prepare("SELECT requested_values,correction_type FROM attendance_corrections WHERE employee_id=? AND attendance_date=? AND status='resolved' AND current_stage='completed' ORDER BY resolved_at,created_at,id").bind(employeeId, day.workDate).all<Row>()).results;
@@ -55,7 +60,10 @@ export async function rebuildDeviceUserAttendance(db: DB, deviceId: number, devi
   return { dates: days.length, logs: pending.length };
 }
 
-export async function importDeviceSnapshot(db: PostgresDatabase, deviceId: number, syncId: number, snapshot: DeviceSnapshot) {
+const shiftDate = (date: string, days: number) => new Date(new Date(date + "T12:00:00Z").getTime() + days * 86400000).toISOString().slice(0, 10);
+
+/** `incremental` skips recalculating old days that received no new punches (used by the remote connector). */
+export async function importDeviceSnapshot(db: PostgresDatabase, deviceId: number, syncId: number, snapshot: DeviceSnapshot, options: { incremental?: boolean } = {}) {
   return db.transaction(async tx => {
     await tx.prepare("SELECT pg_advisory_xact_lock(904370,?)").bind(deviceId).run();
     const employees = (await tx.prepare("SELECT * FROM employees WHERE employment_status!='deleted'").all<{ id: number; fingerprint_code: string | null }>()).results;
@@ -65,14 +73,24 @@ export async function importDeviceSnapshot(db: PostgresDatabase, deviceId: numbe
         .bind(deviceId, user.userId, user.uid, uniqueFingerprintMatch(employees, user.userId), user.name, user.role).run();
     }
     let imported = 0;
-    for (const punch of snapshot.punches) {
-      const inserted = await tx.prepare("INSERT INTO attendance_device_punches (device_id,device_user_id,punch_serial,punched_at,punch_type,verify_type) VALUES (?,?,?,?,?,?) ON CONFLICT(device_id,device_user_id,punched_at,punch_type,verify_type) DO NOTHING RETURNING id")
-        .bind(deviceId, punch.userId, punch.serial, punch.punchedAt, punch.state, punch.verifyType).first<Row>();
-      if (inserted) imported++;
+    // One statement per chunk: the database may be remote, so a round trip per punch is too slow.
+    for (let start = 0; start < snapshot.punches.length; start += PUNCH_CHUNK) {
+      const chunk = snapshot.punches.slice(start, start + PUNCH_CHUNK);
+      const inserted = await tx.prepare("INSERT INTO attendance_device_punches (device_id,device_user_id,punch_serial,punched_at,punch_type,verify_type) SELECT ?,p.user_id,p.serial,p.punched_at,p.state,p.verify_type FROM unnest(?::text[],?::integer[],?::timestamptz[],?::integer[],?::integer[]) AS p(user_id,serial,punched_at,state,verify_type) ON CONFLICT(device_id,device_user_id,punched_at,punch_type,verify_type) DO NOTHING RETURNING id")
+        .bind(deviceId, chunk.map(p => p.userId), chunk.map(p => p.serial), chunk.map(p => p.punchedAt), chunk.map(p => p.state), chunk.map(p => p.verifyType)).all<Row>();
+      imported += inserted.results.length;
     }
     const mappings = (await tx.prepare("SELECT device_user_id FROM attendance_device_users WHERE device_id=? AND employee_id IS NOT NULL ORDER BY employee_id").bind(deviceId).all<Row>()).results;
+    // Incremental: recent days (so they can close) plus whatever days the new punches touch.
+    let fromDate: string | undefined;
+    if (options.incremental) {
+      const device = await tx.prepare("SELECT timezone FROM attendance_devices WHERE id=?").bind(deviceId).first<Row>();
+      fromDate = shiftDate(localParts(new Date(), String(device?.timezone || "Africa/Cairo")).date, -2);
+    }
+    // Recorded before recalculating: this snapshot covers everything up to now, which lets past days close.
+    await tx.prepare("UPDATE attendance_devices SET last_sync_at=CURRENT_TIMESTAMP WHERE id=?").bind(deviceId).run();
     let dates = 0;
-    for (const mapping of mappings) dates += (await rebuildDeviceUserAttendance(tx, deviceId, String(mapping.device_user_id))).dates;
+    for (const mapping of mappings) dates += (await rebuildDeviceUserAttendance(tx, deviceId, String(mapping.device_user_id), fromDate)).dates;
     const unmatched = await tx.prepare("SELECT count(*)::integer AS count FROM attendance_device_users WHERE device_id=? AND employee_id IS NULL AND enabled=1").bind(deviceId).first<{ count: number }>();
     await tx.prepare("UPDATE attendance_devices SET status='online',device_time=?,user_count=?,log_count=?,last_seen_at=CURRENT_TIMESTAMP,last_sync_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(snapshot.deviceTime, snapshot.users.length, snapshot.punches.length, deviceId).run();
     await tx.prepare("UPDATE attendance_device_syncs SET status='success',completed_at=CURRENT_TIMESTAMP,users_found=?,punches_found=?,punches_imported=?,unmatched_users=?,error=NULL WHERE id=?").bind(snapshot.users.length, snapshot.punches.length, imported, unmatched!.count, syncId).run();

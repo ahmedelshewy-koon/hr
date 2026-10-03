@@ -17,7 +17,7 @@ const passwordHash = () => {
 const [superRole] = await sql`select id from roles where name='Super Admin'`;
 const [employeeRole] = await sql`select id from roles where name='Employee'`;
 assert.ok(superRole?.id && employeeRole?.id, "system roles");
-const adminEmail = `ats.runtime.admin.${stamp}@sanad.local`;
+const adminEmail = `ats.runtime.admin.${stamp}@hr.local`;
 await sql`
   insert into users(email,role_id,password_hash,status,must_change_password,session_version,created_at,updated_at)
   values(${adminEmail},${superRole.id},${passwordHash()},'active',0,1,current_timestamp,current_timestamp)
@@ -26,7 +26,7 @@ await sql`
 const interviewerRows = [];
 for (const number of [1, 2]) {
   const code = `ATSI-${stamp.slice(-8)}-${number}`;
-  const email = `ats.interviewer.${number}.${stamp}@sanad.local`;
+  const email = `ats.interviewer.${number}.${stamp}@hr.local`;
   const [employee] = await sql`
     insert into employees(employee_code,name_en,name_ar,work_email,start_date,employment_status,country,created_at,updated_at)
     values(${code},${`ATS Interviewer ${number}`},${`محاور اختبار ${number}`},${email},current_date::text,'active','Egypt',current_timestamp,current_timestamp)
@@ -196,7 +196,7 @@ const interview = await call(adminCookie, "/api/recruitment", {
   scheduledAt,
   durationMinutes: 60,
   meetingMethod: "video",
-  location: "https://meet.sanad.local/ats-verification",
+  location: "https://meet.hr.local/ats-verification",
 });
 await expectStatus(adminCookie, "/api/recruitment", {
   action: "schedule_interview",
@@ -208,7 +208,7 @@ await expectStatus(adminCookie, "/api/recruitment", {
 }, 409);
 const rescheduledAt = new Date(new Date(scheduledAt).getTime() + 3 * 3600000).toISOString();
 await call(adminCookie, "/api/recruitment", {
-  action: "reschedule_interview", interviewId: interview.id, scheduledAt: rescheduledAt, durationMinutes: 75, meetingMethod: "video", location: "SANAD Meet",
+  action: "reschedule_interview", interviewId: interview.id, scheduledAt: rescheduledAt, durationMinutes: 75, meetingMethod: "video", location: "HR Meet",
 });
 
 const interviewData = await call(interviewerCookies[0], `/api/recruitment?view=interview&id=${interview.id}`);

@@ -34,4 +34,17 @@ test('selecting an employee grants HR access, adds the roster entry and saves th
   assert.ok(writes.some(write => write.sql.startsWith('UPDATE users SET role_id') && write.params[0] === 7));
   assert.ok(writes.some(write => write.sql.startsWith('INSERT INTO hr_responsibles') && write.params[0] === 20));
   assert.ok(writes.some(write => write.sql.startsWith('INSERT INTO hr_responsibility_rules') && write.params[2] === 20));
+  assert.equal(result.overridesCleared, 0);
+  // Assigned from Settings without a choice, the HR sees only the employees it is responsible for.
+  assert.equal(result.hrDataScope, 'assigned');
+  assert.ok(writes.some(write => write.sql.startsWith('UPDATE users SET hr_data_scope=?') && write.params[0] === 'assigned' && write.params[1] === 20));
+  const everyone = await saveHrAssignment(db, { companyId: 5, branchId: 3, employeeId: 9, hrDataScope: 'all' }, 1);
+  assert.equal(everyone.hrDataScope, 'all');
+});
+
+test('saving a company + branch HR clears per-employee HR overrides there, except the chosen HR person', async () => {
+  const source = await import('node:fs').then(fs => fs.readFileSync(new URL('../app/organization/hr-assignment-service.ts', import.meta.url), 'utf8'));
+  assert.match(source, /UPDATE employees SET hr_user_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE company_id=\? AND branch_id=\? AND id<>\? AND hr_user_id IS NOT NULL AND employment_status<>'deleted'/);
+  assert.match(source, /\.bind\(companyId, branchId, employeeId\)\.all<Row>\(\)/);
+  assert.match(source, /clearedEmployeeOverrides/);
 });

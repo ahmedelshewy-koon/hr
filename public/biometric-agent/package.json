@@ -1,0 +1,16 @@
+{
+  "name": "hr-biometric-connector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads ZKTeco devices on the office network and sends attendance to the hosted HR app.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node agent.mjs"
+  },
+  "dependencies": {
+    "zkteco-js": "1.7.2"
+  }
+}

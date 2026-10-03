@@ -12,7 +12,7 @@ test("dashboard counts recorded check-ins independently of checkout/review statu
   const base = process.env.DASHBOARD_TEST_BASE || "http://localhost:3000";
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1080 }, timezoneId: "UTC" });
-    await context.addInitScript(() => localStorage.setItem("sanad-language", "en"));
+    await context.addInitScript(() => localStorage.setItem("hr-language", "en"));
     const fixture = {
       currentUser: { id: 1, email: "dashboard@test.invalid", role_name: "Super Admin", employee_id: null, allowed_pages: ["dashboard"] },
       employees: Array.from({ length: 6 }, (_, i) => ({ id: i + 1, name_en: "Test " + (i + 1), name_ar: "اختبار", employment_status: "active", country: i < 3 ? "Egypt" : "Saudi Arabia" })),

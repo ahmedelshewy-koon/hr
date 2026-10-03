@@ -46,7 +46,7 @@ try{
   try{
    const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});
    await context.addCookies([{name:'koon_portal_session',value:cookie.split('=')[1],url:base}]);
-   await context.addInitScript(()=>localStorage.setItem('sanad-language','en'));
+   await context.addInitScript(()=>localStorage.setItem('hr-language','en'));
    const page=await context.newPage();await page.goto(base);
    await page.locator('.sidebar').getByRole('button',{name:'Employees',exact:true}).click();
    await page.getByRole('button',{name:`Edit ${marker}`,exact:true}).click();

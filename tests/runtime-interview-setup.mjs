@@ -11,7 +11,7 @@ const hash=`pbkdf2-sha256$210000$${salt.toString('base64url')}$${pbkdf2Sync(pass
 let userId, templateId, jobId; const questionIds=[];
 try {
  const [role]=await sql`SELECT id FROM roles WHERE name='Super Admin'`;
- const email=`setup.test.${stamp}@sanad.local`;
+ const email=`setup.test.${stamp}@hr.local`;
  const [user]=await sql`INSERT INTO users(email,role_id,password_hash,status,must_change_password,session_version) VALUES (${email},${role.id},${hash},'active',0,1) RETURNING id`;
  userId=user.id;
  const headers={'content-type':'application/json',origin:base,'sec-fetch-site':'same-origin'};

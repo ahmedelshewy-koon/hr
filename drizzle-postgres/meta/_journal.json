@@ -218,6 +218,34 @@
       "when": 1790422744917,
       "tag": "0030_organizational_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790773448045,
+      "tag": "0031_hr_data_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790776914266,
+      "tag": "0032_biometric_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790927245245,
+      "tag": "0033_employee_nationality_country",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790955849915,
+      "tag": "0034_employee_codes",
+      "breakpoints": true
     }
   ]
 }

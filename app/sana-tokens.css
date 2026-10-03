@@ -1,0 +1,38 @@
+/* SANA source: DESIGN SYSTEM.svg. Shared across HR and future ERP modules.
+   CRM supplies composition; semantic feedback colors come from DS badges.
+   The reference outlines its text and does not identify a font family. */
+:root {
+  --sana-white:#FFFFFF;
+  --sana-canvas:#F4F3EF;
+  --sana-canvas-warm:#F0EDE8;
+  --sana-line:#E7E7E7;
+  --sana-disabled:#A8A8A8;
+  --sana-muted:#6D6D6D;
+  --sana-ink:#111B1B;
+  --sana-teal:#0B4237;
+  --sana-teal-mid:#1C7861;
+  --sana-mint:#79CBAA;
+  --sana-mint-light:#95E0D1;
+  --sana-mint-soft:#D9FBF3;
+  --sana-success:#02B847;
+  --sana-success-bg:color-mix(in srgb, var(--sana-success) 16%, white);
+  --sana-warning:#E28B0C;
+  --sana-warning-bg:color-mix(in srgb, var(--sana-warning) 16%, white);
+  --sana-danger:#B10000;
+  --sana-danger-bg:color-mix(in srgb, var(--sana-danger) 16%, white);
+  --sana-info:#137FEC;
+  --sana-info-bg:color-mix(in srgb, var(--sana-info) 16%, white);
+  --sana-space-1:4px; --sana-space-2:8px; --sana-space-3:12px;
+  --sana-space-4:16px; --sana-space-6:24px; --sana-space-8:32px;
+  --sana-space-12:48px; --sana-space-16:64px;
+  --sana-radius-detail:4px;
+  --sana-radius-control:24px;
+  --sana-radius-card:24px;
+  --sana-radius-large:32px;
+  --sana-radius-pill:999px;
+  --sana-shadow:0 2px 8px #00000014,0 0 16px #9AEDDD14;
+  --sana-shadow-popover:0 4px 16px #00000016;
+  --sana-button:linear-gradient(100deg,#1C7861,#0B4237);
+  --sana-sidebar:linear-gradient(180deg,#001617,#0B4237);
+  --sana-chart-1:#0B4237; --sana-chart-2:#79CBAA; --sana-chart-3:#95E0D1;
+}

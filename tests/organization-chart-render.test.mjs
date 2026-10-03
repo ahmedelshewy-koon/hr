@@ -43,12 +43,21 @@ const render=(Component,extra={})=>renderToStaticMarkup(React.createElement(Comp
 
 test('default view is the Reporting tree with read-only controls and no editing affordances',()=>{
   const html=render(OrganizationChart);
-  assert.match(html,/aria-pressed="true"[^>]*>.*?Reporting/);
-  for(const label of ['Organization','Company','Branch','Department','Status','Expand all','Collapse all','Needs review','Employees in view'])assert.ok(html.includes(label),label);
-  assert.match(html,/Read-only: edit assignments in the Employee Profile or Settings/);
+  assert.match(html,/class="reporting-roots"/);
+  assert.doesNotMatch(html,/class="chart-toolbar"|role="combobox"|aria-label="View"|aria-label="Layout"/);
+  for(const label of ['Organization','Company','Branch','Department','Status','Needs review','Employees in view'])assert.ok(html.includes(label),label);
+  assert.doesNotMatch(html,/Expand all|Collapse all/);
+  assert.doesNotMatch(html,/class="chart-readonly"/);
   assert.doesNotMatch(html,/draggable|onDrop|contenteditable/i);
   assert.doesNotMatch(html,/Change manager|Move to|Assign position|Save/);
   assert.equal((html.match(/<select/g)||[]).length,4,'only the four filters');
+});
+
+test('large reporting trees open every level by default',()=>{
+  const rows=Array.from({length:305},(_,index)=>({id:index+1,name_en:`Employee ${index+1}`,employment_status:'active',company_id:6,...(index>0?{manager_id:index<4?index:1}:{})}));
+  const html=render(OrganizationChart,{employees:rows});
+  assert.match(html,/data-node-id="4"/);
+  assert.doesNotMatch(html,/class="reporting-toggle" aria-expanded="false"/);
 });
 
 test('context node for a non-current manager is labelled and excluded from the employee count',()=>{
@@ -78,7 +87,8 @@ test('cards show Position first and Job Title separately, plus compact warning b
 test('Arabic renders RTL with Arabic labels and names',()=>{
   const html=render(OrganizationChart,{rtl:true});
   assert.match(html,/dir="rtl"/);
-  for(const text of ['الهيكل التنظيمي','التبعية','الوحدات التنظيمية','يحتاج مراجعة','سياق التبعية','المدير المباشر خارج نطاق صلاحياتك','نواف','قديم: كون برمجة'])assert.ok(html.includes(text),text);
+  for(const text of ['الهيكل التنظيمي','فلتر','يحتاج مراجعة','سياق التبعية','المدير المباشر خارج نطاق صلاحياتك','نواف','قديم: كون برمجة'])assert.ok(html.includes(text),text);
+  assert.doesNotMatch(html,/الوحدات التنظيمية|ابحث بالاسم أو الرقم/);
 });
 
 const quick=(extra={})=>renderToStaticMarkup(React.createElement(QuickView,{rtl:false,catalog,employee:employees[1],pool:employees,fullAccess:true,issues:computeChartDiagnostics({employees,catalog,fullAccess:true}).get(2)??[],canEdit:false,close(){},openProfile(){},editProfile(){},showManager(){},reveal(){},...extra}));
@@ -104,9 +114,10 @@ test('chart source performs no writes and the API never tells a limited viewer w
   const chart=fs.readFileSync(new URL('../app/organization-chart.tsx',import.meta.url),'utf8')+fs.readFileSync(new URL('../app/organization/chart-model.ts',import.meta.url),'utf8');
   assert.doesNotMatch(chart,/fetch\(|hrApi|method:\s*['"]POST|draggable|onDrag/);
   const route=fs.readFileSync(new URL('../app/api/hr/route.ts',import.meta.url),'utf8');
-  assert.match(route,/row\.manager_scope=!fullCompany\?'restricted':/);
+  assert.match(route,/row\.manager_scope=!wholeCompany\?'restricted':/);
   assert.match(route,/row\.manager_name=null;row\.manager_name_ar=null;row\.org_manager_id=null;/);
-  assert.match(route,/employeeScope:fullCompany\?'full':'limited'/);
+  assert.match(route,/const wholeCompany=fullCompany&&!branchHrSql;/);
+  assert.match(route,/employeeScope:wholeCompany\?'full':'limited'/);
 });
 
 test('Needs Review lists employee, problem, field, severity and an Open Employee Profile action per item',()=>{

@@ -1,24 +1,24 @@
 /* Scoped recruitment layout: keep navigation, cards and forms independent of shell styles. */
-.ats-page { min-width: 0; gap: 20px; }
+.ats-page { min-width: 0; gap: var(--sana-space-4); }
 .ats-page > *, .ats-panel, .ats-plan-main { min-width: 0; }
 .ats-page .ats-nav, .ats-page .ats-inline-tabs, .ats-page .ats-detail-tabs {
   flex: none; flex-direction: row; align-items: center; min-height: 48px;
-  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; gap: 8px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; gap: var(--sana-space-2);
 }
-.ats-page .ats-nav { background: #fff; padding: 5px; border: 1px solid var(--line); border-radius: 12px; }
-.ats-page .ats-nav button { padding: 10px 16px; border-radius: 8px; flex: 0 0 auto; min-height: 40px; }
+.ats-page .ats-nav { background: var(--sana-white); padding: var(--sana-space-1); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
+.ats-page .ats-nav button { padding: var(--sana-space-2) var(--sana-space-4); border-radius: var(--sana-radius-control); flex: 0 0 auto; min-height: 40px; }
 .ats-page .ats-nav button.active { background: var(--light-blue); color: var(--blue); }
 .ats-page .ats-nav button.active::after { display: none; }
-.ats-page .ats-inline-tabs button, .ats-page .ats-detail-tabs button { padding: 14px 12px; flex-shrink: 0; }
+.ats-page .ats-inline-tabs button, .ats-page .ats-detail-tabs button { padding: var(--sana-space-3) var(--sana-space-3); flex-shrink: 0; }
 .ats-page .ats-inline-tabs button.active::after, .ats-page .ats-detail-tabs button.active::after { bottom: 0; }
-.ats-heading { align-items: center; flex-wrap: wrap; gap: 12px; }
+.ats-heading { align-items: center; flex-wrap: wrap; gap: var(--sana-space-3); }
 .ats-heading p { max-width: 70ch; line-height: 1.8; }
-.ats-page .ats-panel { box-shadow: 0 2px 6px #0b1f4d04; }
-.ats-kpis > article { min-width: 0; padding: 16px; border-radius: 12px; }
+.ats-page .ats-panel { box-shadow: var(--sana-shadow); }
+.ats-kpis > article { min-width: 0; padding: var(--sana-space-4); border-radius: var(--sana-radius-control); }
 .ats-kpis strong { font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.3; }
 .ats-kpis small { line-height: 1.7; }
 .ats-overview-grid { align-items: start; }
-.ats-panel > header, .ats-list-head, .ats-filter { flex-wrap: wrap; gap: 12px; }
+.ats-panel > header, .ats-list-head, .ats-filter { flex-wrap: wrap; gap: var(--sana-space-3); }
 .ats-table .row > span { min-width: 0; overflow-wrap: anywhere; }
 .ats-table .row { min-height: 64px; }
 .ats-table .row.head { min-height: 44px; }
@@ -26,44 +26,44 @@
 .ats-page .ats-filter label { min-width: 0; flex: 1 1 240px; }
 .ats-editor-actions, .ats-correction-actions, .ats-decision-actions { flex-wrap: wrap; }
 .ats-plan > article { grid-template-columns: 38px minmax(0, 1fr); }
-.ats-plan-main > header { gap: 12px; align-items: start; }
+.ats-plan-main > header { gap: var(--sana-space-3); align-items: start; }
 .ats-plan-main > p { line-height: 1.8; overflow-wrap: anywhere; }
-.ats-plan-meta span { padding: 7px 10px; }
+.ats-plan-meta span { padding: var(--sana-space-2) var(--sana-space-2); }
 .ats-template-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
-.ats-template-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 14px; padding: 16px; }
-.ats-template-list > article { padding: 18px; background: #fff; }
+.ats-template-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: var(--sana-space-3); padding: var(--sana-space-4); }
+.ats-template-list > article { padding: var(--sana-space-4); background: var(--sana-white); }
 .ats-template-list article > header { grid-template-columns: 34px minmax(0, 1fr) auto; }
 .ats-template-list article > header > button { grid-column: 2 / -1; justify-self: start; }
 .ats-template-list h3, .ats-card-title-row h3 { white-space: normal; overflow-wrap: anywhere; line-height: 1.7; }
-.ats-template-list article > header > .ats-status { width: auto; height: auto; border-radius: 99px; padding: 4px 8px; }
+.ats-template-list article > header > .ats-status { width: auto; height: auto; border-radius: var(--sana-radius-pill); padding: var(--sana-space-1) var(--sana-space-2); }
 .ats-question-bank { min-width: 0; scrollbar-width: thin; }
-.ats-question-bank article { padding: 18px; }
+.ats-question-bank article { padding: var(--sana-space-4); }
 .ats-question-bank b { line-height: 1.8; overflow-wrap: anywhere; }
 .ats-question-bank p { line-height: 1.8; color: var(--muted); }
 .ats-question-form :is(input, select, textarea) { min-width: 0; width: 100%; }
 .ats-drawer :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { min-width: 0; max-width: 100%; }
 .ats-drawer textarea { resize: vertical; }
-.ats-drawer-footer { background: #fff; padding-bottom: max(14px, env(safe-area-inset-bottom)); flex-wrap: wrap; }
+.ats-drawer-footer { background: var(--sana-white); padding-bottom: max(14px, env(safe-area-inset-bottom)); flex-wrap: wrap; }
 .ats-drawer-body .form-error { align-self: start; line-height: 1.8; }
-.ats-template-edit-form .ats-editor-actions:last-child { position: sticky; bottom: -20px; background: #fff; padding: 14px 0; border-top: 1px solid var(--line); z-index: 2; }
+.ats-template-edit-form .ats-editor-actions:last-child { position: sticky; bottom: -20px; background: var(--sana-white); padding: var(--sana-space-3) 0; border-top: 1px solid var(--line); z-index: 2; }
 .ats-page button:disabled { cursor: not-allowed; }
-@media (max-width: 1450px) { .ats-overview-grid { grid-template-columns: minmax(0, 1fr); } .ats-clear { min-height: 150px; padding: 24px; } }
+@media (max-width: 1450px) { .ats-overview-grid { grid-template-columns: minmax(0, 1fr); } .ats-clear { min-height: 150px; padding: var(--sana-space-6); } }
 @media (max-width: 900px) { .ats-template-workspace { grid-template-columns: minmax(0, 1fr); } .ats-template-form { border-inline-end: 0; border-bottom: 1px solid var(--line); } }
 @media (max-width: 600px) {
-  .ats-page { gap: 14px; }
+  .ats-page { gap: var(--sana-space-3); }
   .ats-heading > .primary { width: 100%; justify-content: center; }
-  .ats-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .ats-kpis > article { padding: 12px; gap: 8px; }
-  .ats-page .ats-nav button { padding: 10px 12px; }
-  .ats-template-list { padding: 12px; }
+  .ats-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sana-space-2); }
+  .ats-kpis > article { padding: var(--sana-space-3); gap: var(--sana-space-2); }
+  .ats-page .ats-nav button { padding: var(--sana-space-2) var(--sana-space-3); }
+  .ats-template-list { padding: var(--sana-space-3); }
   .ats-drawer { width: 100vw; max-width: 100vw; }
-  .ats-drawer > header, .ats-drawer-body { padding: 16px; }
+  .ats-drawer > header, .ats-drawer-body { padding: var(--sana-space-4); }
   .ats-drawer-footer > button { flex: 1; justify-content: center; }
-  .ats-plan > article { padding: 12px; gap: 10px; }
+  .ats-plan > article { padding: var(--sana-space-3); gap: var(--sana-space-2); }
   .ats-plan-main > header { flex-wrap: wrap; }
   .ats-interview-row > button { grid-template-columns: minmax(0, 1fr) auto; }
   .ats-detail-head, .ats-detail-head.candidate { grid-template-columns: minmax(0, 1fr); }
-  .ats-question-bank article { grid-template-columns: 30px minmax(0, 1fr); padding: 12px; }
+  .ats-question-bank article { grid-template-columns: 30px minmax(0, 1fr); padding: var(--sana-space-3); }
   .ats-question-bank article > .ats-card-actions { grid-column: 2; }
 }
 

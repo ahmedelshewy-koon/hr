@@ -1,4 +1,4 @@
-# Sanad HR — Final Complete HR System Implementation
+# HR — Final Complete HR System Implementation
 
 **Date:** 22 August 2026  
 **Scope:** Performance, Recruitment/ATS, Employee Lifecycle, Assets, Learning, and cross-module integrations  

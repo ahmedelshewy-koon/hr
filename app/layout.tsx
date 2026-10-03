@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { PwaRegistration } from "./pwa-registration";
 
-export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0b1f4d" };
+export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0B4237" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -11,15 +11,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
   return {
-    title: "Sanad HR — People, simply managed",
-    description: "Sanad's bilingual employee experience and HR operations platform.",
+    title: "HR — People, simply managed",
+    description: "A bilingual employee experience and HR operations platform.",
     manifest: "/manifest.webmanifest",
-    appleWebApp: { capable: true, title: "سند", statusBarStyle: "default" },
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg", apple: "/sanad-icon-192.png" },
+    appleWebApp: { capable: true, title: "HR", statusBarStyle: "default" },
+    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg", apple: "/hr-icon-192.png" },
     openGraph: {
-      title: "Sanad HR — People, simply managed",
+      title: "HR — People, simply managed",
       description: "A modern bilingual employee experience and HR operations platform.",
-      images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "Sanad HR — People, simply managed" }],
+      images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "HR — People, simply managed" }],
     },
     twitter: { card: "summary_large_image", images: [`${origin}/og.png`] },
   };

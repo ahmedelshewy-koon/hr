@@ -26,11 +26,11 @@ const catalog={companies:[{id:7,name:'KOON Agency',status:'active'}],branches:[]
 const props={rtl:false,form:{companyId:7,departmentId:5,managerId:987},catalog,employees:[],hrResponsibles:[],onChange(){}};
 test('profile renders all assignment controls, unresolved setup and retained missing records',()=>{
   const html=renderToStaticMarkup(React.createElement(OrganizationAssignmentFields,props));
-  for(const label of ['Company','Branch','Department','Section (optional)','Position','Job title','Direct manager','Employee HR override (optional)','Assignment effective date','No override — use automatic HR assignment'])assert.ok(html.includes(label),label);
+  for(const label of ['Company','Branch','Department','Section (optional)','Position','Job title','Direct manager','HR responsible','Automatic: no HR set for this company and branch'])assert.ok(html.includes(label),label);
   assert.doesNotMatch(html,/>Work location</);
   assert.doesNotMatch(html,/Resolved HR Responsible \(derived — read only\)/);
   assert.match(html,/retained — needs review/);assert.match(html,/Unavailable record #987/);
-  assert.equal((html.match(/<select/g)||[]).length,8);assert.equal((html.match(/type="date"/g)||[]).length,1);
+  assert.equal((html.match(/<select/g)||[]).length,8);assert.equal((html.match(/type="date"/g)||[]).length,0);
 });
 test('review shows before and after labels for clears without other personal data',()=>{
   const html=renderToStaticMarkup(React.createElement(AssignmentReview,{...props,before:{company_id:7,department_id:5},form:{companyId:7,departmentId:'',salary:9999}}));
@@ -38,7 +38,7 @@ test('review shows before and after labels for clears without other personal dat
 });
 test('Arabic profile keeps bilingual controls and retained values',()=>{
   const html=renderToStaticMarkup(React.createElement(OrganizationAssignmentFields,{...props,rtl:true}));
-  assert.match(html,/تاريخ سريان التعيين/);assert.doesNotMatch(html,/مسؤول الموارد البشرية الفعلي \(مشتق — للعرض فقط\)/);assert.match(html,/قيمة محفوظة/);
+  assert.doesNotMatch(html,/تاريخ سريان التعيين/);assert.doesNotMatch(html,/مسؤول الموارد البشرية الفعلي \(مشتق — للعرض فقط\)/);assert.match(html,/قيمة محفوظة/);
 });
 
 const {ImpactReviewPanel}=await import('../app/settings/organization/impact-review.tsx');

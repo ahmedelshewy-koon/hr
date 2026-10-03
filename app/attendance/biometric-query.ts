@@ -25,7 +25,7 @@ const dailyFrom = "FROM daily_attendance a JOIN employees e ON e.id=a.employee_i
 /** `employeeIds` limits rows to those employees (a branch HR); null means every employee. */
 const filterArgs = (f: ReturnType<typeof filters>, employeeIds: number[] | null = null) => [f.from, f.from, f.to, f.to, f.query, f.match, employeeIds, employeeIds];
 
-export async function readBiometricWorkspace(db: PostgresDatabase, url: URL, employeeIds: number[] | null = null) {
+export async function readBiometricWorkspace(db: PostgresDatabase, url: URL, employeeIds: number[] | null = null, includeSetup = false) {
   const tab = url.searchParams.get("tab") === "punches" ? "punches" : "daily";
   const f = filters(url);
   const page = Math.max(1, Math.min(100000, Math.floor(Number(url.searchParams.get("page")) || 1)));
@@ -48,7 +48,20 @@ export async function readBiometricWorkspace(db: PostgresDatabase, url: URL, emp
       db.prepare("SELECT count(*)::integer AS total " + dailyFrom).bind(...filterArgs(f, employeeIds)).first<{ total: number }>(),
     ]);
   }
-  return { devices: devices.results, users: users.results, syncs: syncs.results, summary, records: records.results, page, pageSize: limit, total: total?.total || 0 };
+  const setup = includeSetup ? await readBiometricSetup(db) : null;
+  return { devices: devices.results, users: users.results, syncs: syncs.results, summary, records: records.results, page, pageSize: limit, total: total?.total || 0, canManageDevices: includeSetup, ...setup };
+}
+
+/** Device and connector configuration for the administrator; never includes token hashes. */
+async function readBiometricSetup(db: PostgresDatabase) {
+  // Until migration 0032 runs, the attendance screen still loads; only device setup is unavailable.
+  const migrated = await db.prepare("SELECT to_regclass('attendance_agents') IS NOT NULL AS ready").first<{ ready: boolean }>();
+  if (!migrated?.ready) return { agents: [], allDevices: [], setupUnavailable: true };
+  const [agents, allDevices] = await Promise.all([
+    db.prepare("SELECT a.id,a.name,a.enabled,a.token_hint,a.agent_version,a.last_seen_at,a.last_ip,a.created_at,(SELECT count(*)::integer FROM attendance_devices d WHERE d.agent_id=a.id) AS device_count FROM attendance_agents a ORDER BY a.id").all(),
+    db.prepare("SELECT id,agent_id,name,model,ip_address,port,timezone,enabled,status,last_seen_at,last_sync_at,last_error FROM attendance_devices ORDER BY id").all(),
+  ]);
+  return { agents: agents.results, allDevices: allDevices.results };
 }
 
 

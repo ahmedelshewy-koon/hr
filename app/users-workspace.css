@@ -1,44 +1,44 @@
 .user-account-create{
   grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) auto;
-  gap:16px;
-  padding:20px;
+  gap:var(--sana-space-4);
+  padding:var(--sana-space-4);
 }
 .user-account-create>div{grid-column:1/-1}
 .user-account-create>div b{font-size:var(--type-body)}
 .user-account-create>label{min-width:0}
 .user-account-create select{min-width:0}
 .user-account-create>.primary{white-space:nowrap}
-.user-account-create em{padding-top:12px;border-top:1px solid var(--line)}
-.user-account-create+.table-panel .filterbar{gap:16px;padding:16px}
+.user-account-create em{padding-top:var(--sana-space-3);border-top:1px solid var(--line)}
+.user-account-create+.table-panel .filterbar{gap:var(--sana-space-4);padding:var(--sana-space-4)}
 .user-account-create+.table-panel .filterbar>label{width:min(360px,100%);min-width:0}
 .user-account-create+.table-panel .filter-count{flex:none;white-space:nowrap}
-.user-access-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:20px;padding:20px;align-items:start}
-.user-access-card{display:flex;flex-direction:column;align-items:center;min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff;text-align:center}
-.user-access-card>.avatar{width:80px;height:80px;flex:none;border:4px solid #d0d7e4;background:#e7ebf2;color:#0b1f4d;font-size:26px;margin-bottom:16px}
+.user-access-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:var(--sana-space-4);padding:var(--sana-space-4);align-items:start}
+.user-access-card{display:flex;flex-direction:column;align-items:center;min-width:0;padding:var(--sana-space-4);border:1px solid var(--line);border-radius:var(--sana-radius-control);background:var(--sana-white);text-align:center}
+.user-access-card>.avatar{width:80px;height:80px;flex:none;border:4px solid var(--sana-disabled);background:var(--sana-line);color:var(--sana-teal);font-size:26px;margin-bottom:16px}
 .user-access-card h3{margin:0 0 6px;font-size:var(--type-body);font-weight:var(--weight-semibold);overflow-wrap:anywhere;max-width:100%}
 .user-card-email{color:var(--muted);font-size:var(--type-secondary);overflow-wrap:anywhere;max-width:100%}
-.user-card-job{color:#52627e;font-size:var(--type-secondary);margin-bottom:6px;max-width:100%;overflow-wrap:anywhere}
-.user-card-badges{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;max-width:100%}
-.user-card-role{padding:3px 10px;border-radius:999px;background:#e7ebf2;color:#0b1f4d;font-size:var(--type-label)}
-.user-card-status{flex:none;white-space:nowrap;padding:3px 10px;border-radius:999px;font-size:var(--type-label)}
-.user-card-status.active{background:#d5f5e4;color:#16834b}
-.user-card-status.disabled{background:#f1f5f9;color:#64748b}
-.user-card-actions{display:flex;justify-content:center;gap:20px;width:100%;border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
-.user-card-actions button{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:#0b1f4d;cursor:pointer}
-.user-card-actions button:hover:not(:disabled),.user-card-actions button[aria-expanded="true"]{background:#eaf2ff;color:#155ae7}
-.user-card-actions button:focus-visible{outline:2px solid #155ae7;outline-offset:2px}
+.user-card-job{color:var(--sana-teal-mid);font-size:var(--type-secondary);margin-bottom:6px;max-width:100%;overflow-wrap:anywhere}
+.user-card-badges{display:flex;align-items:center;justify-content:center;gap:var(--sana-space-2);margin-top:10px;max-width:100%}
+.user-card-role{padding:3px var(--sana-space-2);border-radius:var(--sana-radius-pill);background:var(--sana-line);color:var(--sana-teal);font-size:var(--type-label)}
+.user-card-status{flex:none;white-space:nowrap;padding:3px var(--sana-space-2);border-radius:var(--sana-radius-pill);font-size:var(--type-label)}
+.user-card-status.active{background:var(--sana-mint-light);color:var(--sana-success)}
+.user-card-status.disabled{background:var(--sana-canvas);color:var(--sana-teal-mid)}
+.user-card-actions{display:flex;justify-content:center;gap:var(--sana-space-4);width:100%;border-top:1px solid var(--line);margin-top:16px;padding-top:var(--sana-space-3)}
+.user-card-actions button{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:var(--sana-radius-control);background:transparent;color:var(--sana-teal);cursor:pointer}
+.user-card-actions button:hover:not(:disabled),.user-card-actions button[aria-expanded="true"]{background:var(--sana-canvas);color:var(--sana-teal-mid)}
+.user-card-actions button:focus-visible{outline:2px solid var(--sana-teal-mid);outline-offset:2px}
 .user-card-actions button:disabled{opacity:.4;cursor:not-allowed}
-.user-card-edit{display:grid;gap:12px;width:100%;padding-top:12px;text-align:start}
-.user-card-edit label{display:grid;gap:6px;font-size:var(--type-label);color:var(--muted)}
-.user-card-edit select{width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font:inherit}
+.user-card-edit{display:grid;gap:var(--sana-space-3);width:100%;padding-top:var(--sana-space-3);text-align:start}
+.user-card-edit label{display:grid;gap:var(--sana-space-1);font-size:var(--type-label);color:var(--muted)}
+.user-card-edit select{width:100%;height:38px;padding:0 var(--sana-space-2);border:1px solid var(--line);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--text);font:inherit}
 @media(max-width:900px){
   .user-account-create{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .user-account-create>.primary{grid-column:1/-1;justify-self:start}
   .user-account-create em{grid-column:1/-1}
 }
 @media(max-width:540px){
-  .user-account-create{grid-template-columns:minmax(0,1fr);padding:16px}
+  .user-account-create{grid-template-columns:minmax(0,1fr);padding:var(--sana-space-4)}
   .user-account-create>.primary{width:100%;justify-content:center}
-  .user-account-create+.table-panel .filterbar{flex-wrap:wrap;gap:10px}
+  .user-account-create+.table-panel .filterbar{flex-wrap:wrap;gap:var(--sana-space-2)}
   .user-account-create+.table-panel .filterbar>label{flex-basis:100%}
 }

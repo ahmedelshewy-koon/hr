@@ -20,9 +20,9 @@ export function LoginBand() {
 
 export function LoginShowcase() {
   return (
-    <section className="login-visual" aria-label="مزايا منصة سند">
+    <section className="login-visual" aria-label="مزايا منصة HR">
       <div className="login-visual-top">
-        <span className="login-visual-brand" dir="ltr">SANAD <i>HR</i></span>
+        <span className="login-visual-brand" dir="ltr"><i>HR</i> PLATFORM</span>
       </div>
       <div className="login-visual-content">
         <h2>أدر فريقك <span>بثقة</span></h2>

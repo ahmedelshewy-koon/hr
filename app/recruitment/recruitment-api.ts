@@ -1519,7 +1519,7 @@ async function uploadCv(
           )
           .bind(
             documentId,
-            "sanad-parser-1",
+            "hr-parser-1",
             raw.slice(0, 200000),
             JSON.stringify({ ...extracted, rawText: raw.slice(0, 200000) }),
             status,
@@ -1573,7 +1573,7 @@ async function uploadCv(
         .run();
       await db
         .prepare(
-          "INSERT INTO candidate_cv_parsed_data(document_id,parser_version,status,extracted_json,created_at,updated_at) VALUES (?,'sanad-parser-1','failed','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+          "INSERT INTO candidate_cv_parsed_data(document_id,parser_version,status,extracted_json,created_at,updated_at) VALUES (?,'hr-parser-1','failed','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
         )
         .bind(documentId)
         .run();

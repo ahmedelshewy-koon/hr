@@ -30,8 +30,8 @@ export async function GET(request:Request){
     const limited=source.length>MISSING_EMPLOYEE_LIMIT;
     const rows=missingEmployeeRows(source.slice(0,MISSING_EMPLOYEE_LIMIT),arabic);
     const columns=MISSING_EMPLOYEE_COLUMNS.map(key=>({key,label:csvColumnLabel(key,arabic)}));
-    if(format==="xlsx")return new Response(excelWorkbook(columns,rows,arabic),{headers:{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":"attachment; filename=\"sanad-missing-employee-data.xlsx\"","cache-control":"private, no-store","x-content-type-options":"nosniff","x-report-limited":String(limited)}});
-    if(format==="csv")return new Response(`\uFEFF${csv(rows,columns,arabic)}`,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=\"sanad-missing-employee-data.csv\"","cache-control":"private, no-store","x-content-type-options":"nosniff","x-report-limited":String(limited)}});
+    if(format==="xlsx")return new Response(excelWorkbook(columns,rows,arabic),{headers:{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":"attachment; filename=\"hr-missing-employee-data.xlsx\"","cache-control":"private, no-store","x-content-type-options":"nosniff","x-report-limited":String(limited)}});
+    if(format==="csv")return new Response(`\uFEFF${csv(rows,columns,arabic)}`,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=\"hr-missing-employee-data.csv\"","cache-control":"private, no-store","x-content-type-options":"nosniff","x-report-limited":String(limited)}});
     return Response.json({type,columns,rows,limited},{headers:{"cache-control":"private, no-store"}});
   }
   let query="",columns:{key:string;label:string}[]=[];
@@ -46,6 +46,6 @@ export async function GET(request:Request){
   else if(type==="learning"){await requirePermission(db,actor,"learning","export");if(status){where.push("x.status=?");args.push(status);}query=`SELECT e.employee_code,e.name_en AS employee,d.name_en AS department,c.title AS course,c.provider,c.course_type,c.mandatory,x.status,x.due_date,x.completion_date,x.score,x.certificate_expiry FROM training_enrollments x JOIN training_courses c ON c.id=x.course_id JOIN employees e ON e.id=x.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE ${where.join(" AND ")||"1=1"} ORDER BY x.id DESC LIMIT 10000`;columns=["employee_code","employee","department","course","provider","course_type","mandatory","status","due_date","completion_date","score","certificate_expiry"].map(key=>({key,label:key}));}
   else throw new Response("Unsupported report type",{status:400});
   const arabic=url.searchParams.get("lang")==="ar";columns=columns.map(column=>({key:column.key,label:csvColumnLabel(column.key,arabic)}));
-  const rows=(await db.prepare(query).bind(...args).all()).results as Row[];if(format==="csv")return new Response(`\uFEFF${csv(rows,columns,arabic)}`,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="sanad-${type}.csv"`,"cache-control":"private, no-store","x-content-type-options":"nosniff"}});return Response.json({type,columns,rows,limited:rows.length===10000},{headers:{"cache-control":"no-store"}});
+  const rows=(await db.prepare(query).bind(...args).all()).results as Row[];if(format==="csv")return new Response(`\uFEFF${csv(rows,columns,arabic)}`,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="hr-${type}.csv"`,"cache-control":"private, no-store","x-content-type-options":"nosniff"}});return Response.json({type,columns,rows,limited:rows.length===10000},{headers:{"cache-control":"no-store"}});
 });
 }

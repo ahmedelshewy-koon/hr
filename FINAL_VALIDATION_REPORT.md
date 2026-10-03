@@ -1,4 +1,4 @@
-# Sanad HR — Final Validation Report
+# HR — Final Validation Report
 
 **Date:** 2026-09-19
 **Scope:** Validate the final merged working tree against the real PostgreSQL database, fix regressions only. The tree is `main` @ `cceafff` plus uncommitted work: the refactor described in `REFACTOR_REPORT.md`, the biometric / page-availability features, and a parallel learning-module session.

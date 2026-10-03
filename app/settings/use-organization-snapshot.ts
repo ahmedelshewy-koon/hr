@@ -60,4 +60,5 @@ export function useOrganizationSnapshot(enabled: boolean) {
 /** Lets other screens (for example the retired Departments tab) open a specific Settings section. */
 let requestedSection: string | null = null;
 export const requestOrganizationSection = (section: string) => { requestedSection = section; };
+export const hasRequestedOrganizationSection = () => requestedSection !== null;
 export const consumeOrganizationSection = () => { const section = requestedSection; requestedSection = null; return section; };

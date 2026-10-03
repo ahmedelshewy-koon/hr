@@ -1,24 +1,19 @@
 "use client";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { localizeApiMessage } from "./api-messages";
 import { PAGE_LABELS } from "./navigation-labels";
 import { ApprovalsTab, AttendanceTab, DocumentsTab, LeaveTab, OverviewTab, TalentTab, WorkforceTab } from "./reports-sections";
 import { Badge, ExportButton, Panel, makeDateLabel, makeNumberFormat, type ReportContext } from "./reports-widgets";
 import { buildHighlights, type ReportTab } from "./reports/report-highlights";
-import { PERIOD_PRESETS, REPORT_MAX_DAYS, cairoToday, daysBetween, periodPreset, presetOf, type PeriodPresetId } from "./reports/report-period";
+import { REPORT_MAX_DAYS, cairoToday, daysBetween, periodPreset } from "./reports/report-period";
 import type { ReportOverview } from "./reports/report-types";
 import { statusLabel } from "./reports/report-labels";
 import "./reports-workspace.css";
 
 type TabId = ReportTab | "exports";
 type ExportItem = { type: string; ar: string; en: string; arNote: string; enNote: string; byPeriod: boolean; available: (data: ReportOverview) => boolean };
-
-const PRESET_LABEL: Record<PeriodPresetId, { ar: string; en: string }> = {
-  this_month: { ar: "هذا الشهر", en: "This month" }, last_month: { ar: "الشهر الماضي", en: "Last month" }, last_30: { ar: "آخر 30 يومًا", en: "Last 30 days" },
-  this_quarter: { ar: "هذا الربع", en: "This quarter" }, this_year: { ar: "هذه السنة", en: "This year" },
-};
 
 const EXPORTS: ExportItem[] = [
   { type: "missing_employee_data", ar: "بيانات الموظفين المطلوبة الناقصة", en: "Missing required employee data", arNote: "ملف Excel بالموظفين الذين تنقصهم بيانات مطلوبة فقط، مع الشركة وموقع العمل وأسماء الحقول الناقصة. بحد أقصى ١٠٬٠٠٠ موظف.", enNote: "Excel file listing only employees with missing required data, their company, work location and missing field names. Up to 10,000 employees.", byPeriod: false, available: () => true },
@@ -36,7 +31,6 @@ const EXPORTS: ExportItem[] = [
 
 export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (message: string) => void }) {
   const t = (ar: string, en: string) => (rtl ? ar : en);
-  const [today] = useState(cairoToday);
   const [range, setRange] = useState(() => periodPreset("this_month", cairoToday()));
   const [tab, setTab] = useState<TabId>("overview");
   const [data, setData] = useState<ReportOverview | null>(null);
@@ -105,7 +99,7 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
         throw new Error(localizeApiMessage(body.error || (rtl ? "تعذر تصدير التقرير" : "Unable to export the report"), rtl));
       }
       const blob = await response.blob();
-      const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") || "")?.[1] || `sanad-${type}.${format}`;
+      const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") || "")?.[1] || `hr-${type}.${format}`;
       const url = URL.createObjectURL(blob), link = document.createElement("a");
       link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
       notify(response.headers.get("x-report-limited") === "true" ? (rtl ? "تم تصدير أول ١٠٬٠٠٠ موظف؛ ضيّق عوامل التصفية لتصدير الباقي." : "Exported the first 10,000 employees; narrow the filters to export the rest.") : (rtl ? "تم تصدير الملف" : "File exported"));
@@ -125,11 +119,10 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
     { id: "leave", label: t("الإجازات", "Leave") },
     { id: "approvals", label: t("الاعتمادات", "Approvals"), count: data ? data.approvals.pendingNow.manager + data.approvals.pendingNow.hr : undefined },
     ...(data?.documents ? [{ id: "documents" as const, label: t("المستندات", "Documents"), count: data.documents.totals.expired + data.documents.totals.expiring }] : []),
-    ...(hasTalent ? [{ id: "talent" as const, label: t("التوظيف والتطوير", "Talent & assets") }] : []),
+    ...(hasTalent ? [{ id: "talent" as const, label: t("التوظيف", "Recruitment") }] : []),
     { id: "exports", label: t("تصدير الملفات", "File exports") },
   ];
   const activeTab = tabs.some(item => item.id === tab) ? tab : "overview";
-  const preset = presetOf(from, to, today);
 
   return <div className="reports-workspace">
     <header className="page-heading">
@@ -140,19 +133,16 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
       </div>
     </header>
 
-    <section className="rp-toolbar" aria-label={t("الفترة", "Period")}>
-      <div className="rp-presets" role="group" aria-label={t("فترات جاهزة", "Quick periods")}>
-        {PERIOD_PRESETS.map(id => <button key={id} type="button" className={preset === id ? "active" : ""} aria-pressed={preset === id} onClick={() => setRange(periodPreset(id, today))}>{PRESET_LABEL[id][rtl ? "ar" : "en"]}</button>)}
-      </div>
+    <section className="rp-toolbar" aria-label={t("أقسام التقارير والفترة", "Report sections and period")}>
+      {data && <div className="rp-tabs" role="tablist" aria-label={t("أقسام التقارير", "Report sections")}>
+        {tabs.map(item => <button key={item.id} type="button" role="tab" aria-selected={activeTab === item.id} className={activeTab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>
+          {item.label}{item.count ? <em>{fmt(item.count)}</em> : null}
+        </button>)}
+      </div>}
       <div className="rp-dates">
         <label><span>{t("من", "From")}</span><input type="date" value={from} max={to || undefined} onChange={event => setRange(current => ({ ...current, from: event.target.value }))}/></label>
         <label><span>{t("إلى", "To")}</span><input type="date" value={to} min={from || undefined} onChange={event => setRange(current => ({ ...current, to: event.target.value }))}/></label>
-        <button type="button" className="outline rp-refresh" disabled={loading || Boolean(problem)} onClick={() => setNonce(value => value + 1)} title={t("تحديث الأرقام", "Refresh the figures")}><RefreshCw size={15} className={loading ? "rp-spin" : undefined}/>{t("تحديث", "Refresh")}</button>
       </div>
-      {data && !problem && <p className="rp-scope">
-        <Badge tone={data.scope === "team" ? "warn" : "info"}>{data.scope === "team" ? t("بيانات فريقك فقط", "Your team only") : t("كل الشركة", "Whole company")}</Badge>
-        {t(`المقارنة مع الفترة السابقة: ${data.previous.from} → ${data.previous.to}`, `Compared with the previous period: ${data.previous.from} → ${data.previous.to}`)}
-      </p>}
     </section>
 
     {problem === "order" && <div className="error-banner" role="alert">{t("تاريخ البداية يجب ألا يكون بعد تاريخ النهاية.", "The start date must not be after the end date.")}</div>}
@@ -162,11 +152,6 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
     {!data && !problem && !error && <div className="rp-skeleton" aria-busy="true" aria-label={t("جارٍ تحميل التقارير", "Loading the reports")}>{Array.from({ length: 8 }, (_, index) => <i key={index}/>)}</div>}
 
     {data && <>
-      <div className="rp-tabs" role="tablist" aria-label={t("أقسام التقارير", "Report sections")}>
-        {tabs.map(item => <button key={item.id} type="button" role="tab" aria-selected={activeTab === item.id} className={activeTab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>
-          {item.label}{item.count ? <em>{fmt(item.count)}</em> : null}
-        </button>)}
-      </div>
       <div className={`rp-body${loading ? " loading" : ""}`} aria-busy={loading}>
         {activeTab === "overview" && <OverviewTab data={data} ctx={ctx} highlights={highlights} goTo={setTab}/>}
         {activeTab === "workforce" && <WorkforceTab data={data} ctx={ctx}/>}

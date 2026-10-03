@@ -9,21 +9,21 @@ import type {Row} from "./ui-types";
 
 // Quick ratings for a criterion; the number box next to them fine-tunes the exact score.
 const RATINGS=[{score:50,en:"Weak",ar:"ضعيف"},{score:65,en:"Fair",ar:"مقبول"},{score:75,en:"Good",ar:"جيد"},{score:85,en:"Very Good",ar:"جيد جدًا"},{score:95,en:"Excellent",ar:"ممتاز"}];
-const TONES=["#d92d20","#dc6803","#3b82f6","#0e9384","#067647"];
+const TONES=["var(--sana-danger)","var(--sana-warning)","var(--sana-mint)","var(--sana-teal-mid)","var(--sana-teal)"];
 const toneFor=(score:number)=>score>=90?TONES[4]:score>=80?TONES[3]:score>=70?TONES[2]:score>=PASS_MARK?TONES[1]:TONES[0];
 
 export type EvaluationSubmit={passed:boolean;evaluation:{scores:Record<string,number>;notes:string};certificateDetails:{durationHours:number;instructorName:string}};
 
 function Ring({value,tone}:{value:number|null;tone:string}){
  const radius=42,circumference=2*Math.PI*radius,shown=value==null?0:Math.max(0,Math.min(100,value));
- return <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r={radius} fill="none" stroke="#e8edf3" strokeWidth="9"/><circle cx="50" cy="50" r={radius} fill="none" stroke={tone} strokeWidth="9" strokeLinecap="round" strokeDasharray={`${circumference*shown/100} ${circumference}`} transform="rotate(-90 50 50)"/><line x1={50+radius*Math.sin(PASS_MARK*Math.PI/50)} y1={50-radius*Math.cos(PASS_MARK*Math.PI/50)} x2={50+(radius+8)*Math.sin(PASS_MARK*Math.PI/50)} y2={50-(radius+8)*Math.cos(PASS_MARK*Math.PI/50)} stroke="#98a2b3" strokeWidth="2"/></svg>}
+ return <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r={radius} fill="none" stroke="var(--sana-line)" strokeWidth="9"/><circle cx="50" cy="50" r={radius} fill="none" stroke={tone} strokeWidth="9" strokeLinecap="round" strokeDasharray={`${circumference*shown/100} ${circumference}`} transform="rotate(-90 50 50)"/><line x1={50+radius*Math.sin(PASS_MARK*Math.PI/50)} y1={50-radius*Math.cos(PASS_MARK*Math.PI/50)} x2={50+(radius+8)*Math.sin(PASS_MARK*Math.PI/50)} y2={50-(radius+8)*Math.cos(PASS_MARK*Math.PI/50)} stroke="var(--sana-muted)" strokeWidth="2"/></svg>}
 
 export function EvaluationModal({rtl,saving,row,error,close,submit}:{rtl:boolean;saving:boolean;row:Row;error?:string;close:()=>void;submit:(result:EvaluationSubmit)=>Promise<void>}){
  const [scores,setScores]=useState<Record<string,string>>({}),[notes,setNotes]=useState("");
  const [duration,setDuration]=useState(String(row.duration_hours??"")),[instructor,setInstructor]=useState(String(row.instructor_employee_name||row.instructor_name||""));
  const dialog=useLearningDialog(close,saving);
  const rated=EVALUATION_CRITERIA.filter(item=>scores[item.key]!==undefined&&scores[item.key]!=="").length,complete=rated===EVALUATION_CRITERIA.length;
- const overall=complete?overallScore(scores):null,passed=overall!==null&&overall>=PASS_MARK,tone=overall===null?"#98a2b3":toneFor(overall);
+ const overall=complete?overallScore(scores):null,passed=overall!==null&&overall>=PASS_MARK,tone=overall===null?"var(--sana-muted)":toneFor(overall);
  const set=(key:string,raw:string)=>{if(raw==="")return setScores(current=>({...current,[key]:""}));const value=Math.max(0,Math.min(100,Math.round(Number(raw)*10)/10));if(Number.isFinite(value))setScores(current=>({...current,[key]:String(value)}))};
  const name=rtl?(row.employee_name_ar||row.employee_name):row.employee_name,issuer=rtl?CERTIFICATE_ISSUER.ar:CERTIFICATE_ISSUER.en;
  return createPortal(<div className="learning-modal-layer" dir={rtl?"rtl":"ltr"} ref={dialog} tabIndex={-1}><button className="learning-scrim" onClick={()=>!saving&&close()} aria-label={rtl?"إغلاق":"Close"}/><form className="learning-modal evaluation-modal" role="dialog" aria-modal="true" aria-labelledby="evaluation-title" aria-busy={saving} onSubmit={event=>{event.preventDefault();if(overall===null||saving)return;void submit({passed,certificateDetails:{durationHours:Number(duration),instructorName:instructor.trim()},evaluation:{scores:Object.fromEntries(EVALUATION_CRITERIA.map(item=>[item.key,Number(scores[item.key])])),notes:notes.trim()}})}}>

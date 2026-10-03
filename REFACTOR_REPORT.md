@@ -1,4 +1,4 @@
-# Sanad HR — Refactor & Cleanup Report
+# HR — Refactor & Cleanup Report
 
 **Date:** 2026-09-19
 **Scope:** Repository-wide audit and safe, incremental refactor. No feature work, no framework changes, no database migrations.
@@ -7,7 +7,7 @@
 
 ## Executive summary
 
-Sanad HR is a ~20,700-line Next-style application (vinext + React 19 RSC) running on Cloudflare Workers against PostgreSQL through a hand-rolled D1-compatible shim. The architecture is sound; the problems were concentrated in **repetition** and in **per-request work that nobody had measured**.
+HR is a ~20,700-line Next-style application (vinext + React 19 RSC) running on Cloudflare Workers against PostgreSQL through a hand-rolled D1-compatible shim. The architecture is sound; the problems were concentrated in **repetition** and in **per-request work that nobody had measured**.
 
 The three findings that mattered:
 

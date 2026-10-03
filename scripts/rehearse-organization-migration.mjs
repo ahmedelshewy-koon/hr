@@ -19,7 +19,7 @@ const dir=resume?path.resolve(resume):path.join(root,'rehearsal-'+stamp),cluster
 if(!dir.startsWith(root+path.sep))throw new Error('Rehearsal must stay within output directory');
 fs.mkdirSync(dir,{recursive:true});
 const dump=path.join(dir,'pre-organization.dump');
-const clone={host:'127.0.0.1',port:5657,user:'postgres',database:'sanad_org_rehearsal'};
+const clone={host:'127.0.0.1',port:5657,user:'postgres',database:'hr_org_rehearsal'};
 const env={...process.env,PGHOST:target.hostname,PGPORT:target.port,PGUSER:decodeURIComponent(target.username),PGPASSWORD:decodeURIComponent(target.password),PGDATABASE:decodeURIComponent(target.pathname.slice(1))};
 const run=(name,args,extraEnv=env)=>{
   // A detached PostgreSQL server can inherit pg_ctl's pipes on Windows.

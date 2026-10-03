@@ -9,7 +9,7 @@ import { effectiveHrSql, requireEmployeeHr } from '../app/employees/hr-assignmen
 
 const config=JSON.parse(fs.readFileSync('outputs/organization-implementation/latest-rehearsal.json','utf8'));
 const target=new URL(config.cloneUrl);
-if(target.hostname!=='127.0.0.1'||target.port!=='5657'||target.pathname!=='/sanad_org_rehearsal')throw new Error('Only the isolated rehearsal target is allowed');
+if(target.hostname!=='127.0.0.1'||target.port!=='5657'||target.pathname!=='/hr_org_rehearsal')throw new Error('Only the isolated rehearsal target is allowed');
 const sql=postgres(config.cloneUrl,{max:1});
 function adapter(tx){return {prepare(source){let values=[];return {bind(...args){values=args;return this;},async all(){return {results:await execute()};},async first(){return (await execute())[0]||null;},async run(){return {results:await execute()};}};async function execute(){let i=0;return tx.unsafe(source.replace(/\?/g,()=>'$'+(++i)),values);}},async batch(queries){return Promise.all(queries.map(q=>q.run()));}};}
 const passed=[];

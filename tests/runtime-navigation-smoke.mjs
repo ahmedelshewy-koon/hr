@@ -77,12 +77,12 @@ const record = (role, what, ok, detail = "") => { results.push({ role, what, ok,
 
 const browser = await chromium.launch({ headless: true });
 const LATIN = /[A-Za-z]{3,}/g;
-const ALLOWED_LATIN = new Set(["CSV", "UTF", "Excel", "PDF", "DOCX", "TXT", "HH", "mm", "AM", "PM", "SAR", "EGP", "USD", "KSA", "IBAN", "CEO", "HR", "SIM", "ATS", "CV", "Sanad", "name", "company", "com", "Person", "Tech"]);
+const ALLOWED_LATIN = new Set(["CSV", "UTF", "Excel", "PDF", "DOCX", "TXT", "HH", "mm", "AM", "PM", "SAR", "EGP", "USD", "KSA", "IBAN", "CEO", "HR", "SIM", "ATS", "CV", "name", "company", "com", "Person", "Tech"]);
 
 for (const [role, pages] of Object.entries(ROLE_PAGES)) {
   const user = { id: 1, email: `${role.replace(/\s/g, "").toLowerCase()}@test.invalid`, employee_id: role === "Super Admin" ? null : 7, employee_name: "Person 7", employee_name_ar: "شخص 7", allowed_pages: pages };
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: L === "ar" ? "ar" : "en-GB", serviceWorkers: "block" });
-  await context.addInitScript(lang => localStorage.setItem("sanad-language", lang), L);
+  await context.addInitScript(lang => localStorage.setItem("hr-language", lang), L);
   const page = await context.newPage();
   page.setDefaultTimeout(6000);
   const consoleErrors = [], apiCalls = [], diag = [];

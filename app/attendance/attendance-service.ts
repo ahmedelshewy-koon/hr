@@ -30,7 +30,15 @@ async function attendanceContext(db:DB,employeeId:number,attendanceDate:string,o
   // "holiday" and "leave" are results of an earlier calculation, not a working mode to carry into the next one.
   const storedType=record?.attendance_type==="holiday"||record?.attendance_type==="leave"?null:record?.attendance_type;
   const attendanceType=String(overrides.attendance_type??storedType??"office");
-  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:holiday,isApprovedLeave:Boolean(leave),dayComplete:typeof overrides.day_complete==="boolean"?overrides.day_complete:attendanceDate<new Date().toISOString().slice(0,10)});
+  let dayComplete=typeof overrides.day_complete==="boolean"?overrides.day_complete:attendanceDate<new Date().toISOString().slice(0,10);
+  // A fingerprint employee's day closes only after their device has synced past it; an offline device must not create early-departure/absence exceptions.
+  if(dayComplete){
+    const checkIn=String(record?.scheduled_in??employee.check_in_time??"09:00"),checkOut=String(record?.scheduled_out??employee.check_out_time??"17:00");
+    const closesOn=checkOut<=checkIn?new Date(new Date(`${attendanceDate}T12:00:00Z`).getTime()+86400000).toISOString().slice(0,10):attendanceDate;
+    const device=await db.prepare("SELECT count(*)::integer AS devices,max(to_char(d.last_sync_at AT TIME ZONE d.timezone,'YYYY-MM-DD HH24:MI')) AS synced_at FROM attendance_device_users du JOIN attendance_devices d ON d.id=du.device_id WHERE du.employee_id=? AND du.enabled=1 AND d.enabled=1").bind(employeeId).first<Row>();
+    if(Number(device?.devices)>0&&(!device?.synced_at||String(device.synced_at)<`${closesOn} ${checkOut.slice(0,5)}`))dayComplete=false;
+  }
+  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:holiday,isApprovedLeave:Boolean(leave),dayComplete});
   return {employee,record,calculation,actualIn,actualOut,attendanceType};
 }
 

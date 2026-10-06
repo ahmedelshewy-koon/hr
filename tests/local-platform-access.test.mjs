@@ -19,3 +19,14 @@ test("public and malformed hosts cannot bypass platform access", () => {
     assert.equal(allowsLocalPortalLogin(host, "development"), true);
   }
 });
+
+test("the configured APP_ORIGIN host may use the portal login flow in production, foreign hosts may not", () => {
+  const origin = "https://hr.example.com";
+  assert.equal(allowsLocalPortalLogin("hr.example.com", "production", origin), true);
+  assert.equal(allowsLocalPortalLogin("HR.Example.com", "production", origin), true);
+  for (const host of ["evil.example.com", "hr.example.com.evil.test", "example.com", "192.168.1.5"]) {
+    assert.equal(allowsLocalPortalLogin(host, "production", origin), false);
+  }
+  assert.equal(allowsLocalPortalLogin("hr.example.com", "production", null), false);
+  assert.equal(allowsLocalPortalLogin("hr.example.com", "production", "not a url"), false);
+});

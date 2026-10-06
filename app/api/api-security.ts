@@ -4,6 +4,7 @@ import { ensureAuthSchema, requirePortalSession } from "../portal-auth";
 import { MANAGED_DEPARTMENTS_CTE } from "../organization/department-scope";
 import { branchHrCanSee, isBranchScopedHr, normalizeHrDataScope, seesWholeCompany, type HrDataScope } from "../employees/hr-data-scope";
 import type { PostgresDatabase } from "../../db/postgres";
+import { appOrigin } from "../app-origin";
 
 export type ApiActor = {
   id: number;
@@ -24,7 +25,8 @@ const READ_ONLY_METHODS = ["GET", "HEAD", "OPTIONS"];
  */
 export function enforceWriteOrigin(request: Request) {
   if (READ_ONLY_METHODS.includes(request.method.toUpperCase())) return;
-  const expected = new URL(request.url).origin;
+  // APP_ORIGIN is the trusted public origin behind a TLS-terminating proxy; forwarded headers are never trusted.
+  const expected = appOrigin() ?? new URL(request.url).origin;
   const origin = request.headers.get("origin");
   const site = request.headers.get("sec-fetch-site");
   if (origin !== expected || (site && !SAFE_FETCH_SITES.includes(site))) {

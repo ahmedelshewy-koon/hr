@@ -1,5 +1,6 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { allowsLocalPortalLogin } from "../../local-platform-access";
+import { appOrigin, isSecureRequest } from "../../app-origin";
 import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPassword, portalLoginEmail, portalSessionCookie, readPortalSession, verifyBootstrapPassword, verifyPassword } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
@@ -23,10 +24,10 @@ async function allowedPagesForUser(d1:PostgresDatabase,userId:number,roleName:st
 async function requirePlatformAccess(request: Request) {
   const user = await getChatGPTUser();
   const hostname = new URL(request.url).hostname;
-  if (!user && !allowsLocalPortalLogin(hostname, process.env.NODE_ENV)) throw new Response("Authentication required", { status:401 });
+  if (!user && !allowsLocalPortalLogin(hostname, process.env.NODE_ENV, appOrigin())) throw new Response("Authentication required", { status:401 });
 }
 
-function isSecure(request: Request) { return new URL(request.url).protocol === "https:"; }
+const isSecure = isSecureRequest;
 const noStore = { "cache-control":"no-store" };
 
 async function bootstrapAdmin(d1: PostgresDatabase, email:string, password:string) {

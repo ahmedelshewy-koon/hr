@@ -1,6 +1,13 @@
-/** Local development still requires a valid portal account and session. */
-export function allowsLocalPortalLogin(hostname: string, mode: string | undefined) {
+/**
+ * Reaching the portal login still requires a valid portal account and session; this only decides whether the
+ * request may use that flow without platform-injected identity headers.
+ * `appOrigin` is the configured APP_ORIGIN: requests addressed to that exact host are the self-hosted production site.
+ */
+export function allowsLocalPortalLogin(hostname: string, mode: string | undefined, appOrigin?: string | null) {
   if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+  if (appOrigin) {
+    try { if (hostname.toLowerCase() === new URL(appOrigin).hostname.toLowerCase()) return true; } catch { /* invalid APP_ORIGIN never matches */ }
+  }
   if (mode !== "development") return false;
   const parts = hostname.split(".");
   if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false;

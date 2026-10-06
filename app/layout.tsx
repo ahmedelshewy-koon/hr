@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import { PwaRegistration } from "./pwa-registration";
+import { appOrigin } from "./app-origin";
 
 export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#031212" };
 
@@ -9,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+  const origin = appOrigin() ?? `${protocol}://${host}`;
   return {
     title: "HR — People, simply managed",
     description: "A bilingual employee experience and HR operations platform.",

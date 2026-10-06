@@ -114,7 +114,9 @@ export async function handleAgentRequest(db: PostgresDatabase, agent: Attendance
       const syncId = Number(payload.syncId) || 0;
       const job = await db.prepare("SELECT id FROM attendance_device_syncs WHERE id=? AND device_id=? AND status='running'").bind(syncId, deviceId).first<Row>();
       if (!job) throw new Response("Sync job is no longer running", { status: 409 });
-      return importDeviceSnapshot(db, deviceId, syncId, parseSnapshot(payload.snapshot), { incremental: true });
+      // A manual "Sync" rebuilds every day (so missing or stale days are repaired); automatic syncs stay incremental.
+      const manual = (await db.prepare("SELECT trigger FROM attendance_device_syncs WHERE id=?").bind(syncId).first<Row>())?.trigger === "manual";
+      return importDeviceSnapshot(db, deviceId, syncId, parseSnapshot(payload.snapshot), { incremental: !manual });
     }
     case "fail": {
       const deviceId = await agentDevice(db, agent, payload.deviceId);

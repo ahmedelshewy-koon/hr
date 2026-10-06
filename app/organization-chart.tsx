@@ -161,7 +161,7 @@ function ReportingList({ roots, ctx }: { roots: ChartNode[]; ctx: TreeContext })
   const { rtl, catalog } = ctx;
   return <ul className="chart-list">{rows.map(({ node, depth }) => {
     const e = node.employee, name = nameOf(e, rtl), role = roleLabels(rtl, catalog, e), open = nodeOpen(node, depth, ctx), context = node.kind === 'context', issues = ctx.diagnostics.get(node.id);
-    return <li key={node.id} className={`chart-list-row ${context ? 'context' : ''} ${ctx.selected === node.id ? 'selected' : ''} ${ctx.focused === node.id ? 'focused' : ''}`} style={{ paddingInlineStart: `${Math.min(depth, 12) * 18 + 6}px` }} data-node-id={node.id}>
+    return <li key={node.id} className={`chart-list-row ${context ? 'context' : ''} ${ctx.selected === node.id ? 'selected' : ''} ${ctx.focused === node.id ? 'focused' : ''}`} style={{ paddingInlineStart: `${Math.min(depth, 12) * 16 + 8}px` }} data-node-id={node.id}>
       {node.children.length ? <button type="button" className="chart-list-toggle" aria-expanded={open} aria-label={`${open ? t(rtl, 'Collapse', 'طي') : t(rtl, 'Expand', 'توسيع')} ${name}`} onClick={() => ctx.toggle(node, depth)}>{open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}<small>{node.children.length}</small></button> : <span className="chart-list-toggle placeholder" />}
       <button type="button" className="chart-list-person" onClick={() => ctx.open(node.id)}>
         <Avatar employee={e} name={name} />
@@ -401,6 +401,7 @@ export function OrganizationChart({ rtl, employees, catalog, fullAccess, canEdit
     </header>
 
     <div className="org-control-row chart-actions">
+    {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape/blur dismissal for the native <details> menu; its <summary> is the interactive control */}
     <details className="chart-filter-menu" onKeyDown={event => {
       if (event.key === 'Escape') {
         event.currentTarget.open = false;

@@ -12,6 +12,9 @@ type DeviceForm = { id: number | null; name: string; model: string; ipAddress: s
 const connectorOnline = (agent: Row) => Boolean(agent.enabled) && Boolean(agent.last_seen_at) && Date.now() - new Date(String(agent.last_seen_at)).getTime() < 90000;
 const when = (value: unknown, rtl: boolean) => value ? new Intl.DateTimeFormat(rtl ? "ar-EG" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(String(value))) : "—";
 
+// Stable ref callback: focuses the first field once when the form opens, not on every re-render.
+const focusOnMount = (element: HTMLInputElement | null) => element?.focus();
+
 async function post(payload: Row) {
   const response = await fetch("/api/hr", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
   const data = await response.json();
@@ -72,7 +75,7 @@ export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClos
       <div className="attendance-form">
         {error && <div className="form-error" role="alert">{error}</div>}
         {form ? <>
-          <label><span>{t("Device name", "اسم الجهاز")}</span><input value={form.name} onChange={event => field("name", event.target.value)} placeholder={t("Main entrance", "البوابة الرئيسية")} autoFocus/></label>
+          <label><span>{t("Device name", "اسم الجهاز")}</span><input value={form.name} onChange={event => field("name", event.target.value)} placeholder={t("Main entrance", "البوابة الرئيسية")} ref={focusOnMount}/></label>
           <div className="bio-setup-pair">
             <label><span>{t("IP address", "عنوان IP")}</span><input dir="ltr" inputMode="decimal" value={form.ipAddress} onChange={event => field("ipAddress", event.target.value.trim())} placeholder="192.168.1.201"/></label>
             <label><span>{t("Port", "البورت")}</span><input dir="ltr" inputMode="numeric" value={form.port} onChange={event => field("port", event.target.value.replace(/\D/g, ""))} placeholder="4370"/></label>

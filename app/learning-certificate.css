@@ -1,19 +1,19 @@
 /* Certificate viewer: a scaled A4-landscape sheet on screen, the sheet alone (297mm x 210mm) when printed. */
 .certificate-portal{position:fixed;inset:0;z-index:2100;display:grid;place-items:center;padding:var(--sana-space-4)}
-.certificate-scrim{position:absolute;inset:0;border:0;background:color-mix(in srgb, var(--sana-teal) 85.1%, transparent);backdrop-filter:blur(4px)}
+.certificate-scrim{position:absolute;inset:0;border:0;background:var(--sana-overlay);backdrop-filter:var(--sana-overlay-blur)}
 .certificate-window{position:relative;z-index:1;display:grid;gap:var(--sana-space-3);justify-items:center;max-width:100%}
 .certificate-toolbar{width:100%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--sana-space-2) var(--sana-space-4);padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);background:var(--sana-white);box-shadow:var(--sana-shadow)}
 .certificate-toolbar>div{display:flex;align-items:center;gap:var(--sana-space-2)}
-.certificate-toolbar>div:first-child{flex-direction:column;align-items:flex-start;gap:1px}
+.certificate-toolbar>div:first-child{flex-direction:column;align-items:flex-start;gap:0}
 .certificate-toolbar>div:first-child b{font-size:var(--type-body);color:var(--sana-teal)}
 .certificate-toolbar>div:first-child span{color:var(--sana-teal-mid);font-size:var(--type-label);letter-spacing:.04em}
-.certificate-lang{padding:3px;border-radius:var(--sana-radius-control);background:var(--sana-canvas)}
-.certificate-lang button{padding:var(--sana-space-1) var(--sana-space-3);border:0;border-radius:var(--sana-radius-control);background:transparent;color:var(--sana-teal);font-size:var(--type-label);font-weight:var(--weight-bold)}
+.certificate-lang{padding:0;border-radius:var(--sana-radius-button);background:var(--sana-canvas)}
+.certificate-lang button{padding:var(--sana-space-1) var(--sana-space-3);border:0;border-radius:var(--sana-radius-button);background:transparent;color:var(--sana-teal);font-size:var(--type-label);font-weight:var(--weight-bold)}
 .certificate-lang button.active{background:var(--sana-white);color:var(--sana-teal);box-shadow:var(--sana-shadow)}
 .certificate-stage{display:grid;place-items:center}
 .certificate-scaler{position:relative;overflow:hidden;border-radius:var(--sana-radius-detail);box-shadow:var(--sana-shadow)}
 .cert-instructor{top:414px;left:150px;right:150px;margin:0;text-align:center;font-size:13px;color:var(--sana-teal)}
-.cert-signatures small{display:block;margin-top:3px;color:var(--sana-teal-mid);font-size:10px}
+.cert-signatures small{display:block;margin-top:0;color:var(--sana-teal-mid);font-size:10px}
 
 .certificate-sheet{position:absolute;inset-block-start:0;inset-inline-start:0;width:1123px;height:794px;overflow:hidden;transform-origin:top left;background:var(--sana-white);color:var(--sana-teal);font-family:"IBM Plex Sans Arabic",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .certificate-sheet[dir="rtl"]{left:0;right:auto;transform-origin:top left}
@@ -29,7 +29,7 @@
 
 .cert-head{top:44px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:var(--sana-space-3)}
 .cert-mark{width:48px;height:48px}
-.cert-head div{display:grid;gap:2px}
+.cert-head div{display:grid;gap:0}
 .cert-head b{font-size:21px;font-weight:700;letter-spacing:.24em}
 .certificate-sheet[dir="rtl"] .cert-head b{letter-spacing:0;font-size:24px}
 .cert-head span{color:var(--sana-teal-mid);font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
@@ -37,7 +37,7 @@
 
 .cert-title{top:116px;left:0;right:0;margin:0;text-align:center;font:400 46px/1.15 Georgia,"Times New Roman",serif;letter-spacing:.05em;color:var(--sana-teal)}
 .certificate-sheet[dir="rtl"] .cert-title{font:700 42px/1.25 "IBM Plex Sans Arabic",sans-serif;letter-spacing:0}
-.cert-divider{top:182px;left:50%;width:300px;margin-left:-150px;height:9px;display:grid;place-items:center}
+.cert-divider{top:182px;left:50%;width:300px;margin-left:-152px;height:9px;display:grid;place-items:center}
 .cert-divider::before{content:"";position:absolute;inset:4px 0 auto;height:1px;background:linear-gradient(90deg,transparent,var(--sana-warning) 20%,var(--sana-warning) 80%,transparent)}
 .cert-divider i{position:relative;width:9px;height:9px;transform:rotate(45deg);background:var(--sana-warning);box-shadow:var(--sana-shadow)}
 .cert-lead{left:0;right:0;margin:0;text-align:center;color:var(--sana-teal);font-size:15px}
@@ -49,26 +49,26 @@
 .cert-lead-2{top:326px}
 .cert-program{top:352px;left:150px;right:150px;margin:0;text-align:center;font-family:"IBM Plex Sans Arabic",sans-serif;font-weight:700;line-height:1.25;color:var(--sana-teal-mid);display:flex;align-items:center;justify-content:center;min-height:38px;max-height:76px;overflow:hidden}
 
-.cert-facts{top:440px;left:150px;right:150px;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-block:1px solid var(--sana-mint)}
-.cert-facts div{padding:var(--sana-space-3) var(--sana-space-2) var(--sana-space-3);text-align:center;border-inline-start:1px solid var(--sana-mint-light)}
+.cert-facts{top:440px;left:150px;right:150px;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-block:1px solid var(--sana-line)}
+.cert-facts div{padding:var(--sana-space-3) var(--sana-space-2) var(--sana-space-3);text-align:center;border-inline-start:1px solid var(--sana-line)}
 .cert-facts div:first-child{border-inline-start:0}
-.cert-facts dt{margin:0 0 4px;color:var(--sana-teal-mid);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.cert-facts dt{margin:0 0 8px;color:var(--sana-teal-mid);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
 .certificate-sheet[dir="rtl"] .cert-facts dt{letter-spacing:0;font-size:12px}
 .cert-facts dd{margin:0;color:var(--sana-teal);font-size:15px;font-weight:600}
 
 .cert-signatures{top:540px;inset-inline-start:130px;width:690px;display:flex;justify-content:space-between;gap:var(--sana-space-8)}
 .cert-signatures div{flex:1;min-width:0;text-align:center}
-.cert-signatures i{display:block;height:1px;margin:0 6px 9px;background:var(--sana-teal)}
+.cert-signatures i{display:block;height:1px;margin:0 8px 8px;background:var(--sana-teal)}
 .cert-signatures b{display:block;font-size:15px;font-weight:700}
-.cert-signatures span{display:block;margin-top:2px;color:var(--sana-teal-mid);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.cert-signatures span{display:block;margin-top:0;color:var(--sana-teal-mid);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .certificate-sheet[dir="rtl"] .cert-signatures span{letter-spacing:0;font-size:12.5px}
 .cert-signatures div{padding-top:var(--sana-space-12)}
 
 .cert-seal{inset-inline-end:118px;bottom:42px;width:158px;height:198px;filter:drop-shadow(0 3px 5px color-mix(in srgb, var(--sana-teal) 20%, transparent))}
 
-.cert-foot{inset-inline-start:130px;bottom:46px;width:690px;display:flex;flex-wrap:wrap;gap:3px var(--sana-space-6);color:var(--sana-teal);font-size:11px}
+.cert-foot{inset-inline-start:130px;bottom:46px;width:690px;display:flex;flex-wrap:wrap;gap:0 var(--sana-space-6);color:var(--sana-teal);font-size:11px}
 .cert-foot b{color:var(--sana-teal);font-weight:700}
-.cert-foot p{flex:0 0 100%;margin:3px 0 0;padding-top:var(--sana-space-1);border-top:1px solid var(--sana-mint-light);color:var(--sana-mint);font-size:9.5px;line-height:1.5}
+.cert-foot p{flex:0 0 100%;margin:0 0 0;padding-top:var(--sana-space-1);border-top:1px solid var(--sana-line);color:var(--sana-teal-mid);font-size:9.5px;line-height:1.5}
 
 @media(max-width:640px){.certificate-portal{padding:var(--sana-space-2)}.certificate-toolbar{padding:var(--sana-space-2) var(--sana-space-2)}.certificate-toolbar>div:last-child{width:100%}.certificate-toolbar>div:last-child button{flex:1;justify-content:center}}
 

@@ -2,6 +2,8 @@ import { env } from "cloudflare:workers";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { withDatabase } from "../route-helpers";
 import { apiFailure, canAccessEmployee, enforceRateLimit, enforceWriteOrigin, requireActor } from "../api-security";
+import { assertEmployeeManager } from "../../employees/hr-assignment";
+import { LEAVE_REPORT_CATEGORY } from "../../leave/leave-report-policy";
 import { categoryApplies, documentState, normalizeFilename, safeDocumentObjectKey, validateDocumentFile } from "../../documents/document-policy";
 
 type Row=Record<string,unknown>;
@@ -34,7 +36,10 @@ export async function POST(request:Request){const db=createDatabase();let object
   const form=await request.formData(),employeeId=Number(form.get("employeeId")||actor.employeeId),categoryCode=String(form.get("category")||""),file=form.get("file");if(!employeeId||!(file instanceof File))throw new Response("Employee and file are required",{status:400});
   if(!(await canAccessEmployee(db,actor,employeeId)))throw new Response("Employee is outside your access scope",{status:403});
   const category=await db.prepare("SELECT * FROM document_categories WHERE code=? AND status='active'").bind(categoryCode).first<Row>(),employee=await db.prepare("SELECT country,employment_type FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();if(!category||!employee||!categoryApplies(category as never,employee as never))throw new Response("Document category is not applicable",{status:400});
-  const privileged=["Super Admin","HR Manager"].includes(actor.roleName),self=Number(actor.employeeId)===employeeId;if(!privileged&&!(self&&Number(category.employee_can_upload)))throw new Response("Uploading this document category is not allowed",{status:403});
+  const privileged=["Super Admin","HR Manager"].includes(actor.roleName),self=Number(actor.employeeId)===employeeId;
+  // A direct manager filing leave for an employee may attach that employee's medical report.
+  const managerLeaveReport=!privileged&&!self&&actor.roleName==="Department Manager"&&categoryCode===LEAVE_REPORT_CATEGORY;if(managerLeaveReport)await assertEmployeeManager(db,employeeId,actor.employeeId);
+  if(!privileged&&!managerLeaveReport&&!(self&&Number(category.employee_can_upload)))throw new Response("Uploading this document category is not allowed",{status:403});
   const expiryDate=String(form.get("expiryDate")||"")||null;if(Number(category.requires_expiry)&&!expiryDate)throw new Response("Expiry date is required for this category",{status:400});
   const bytes=new Uint8Array(await file.arrayBuffer()),name=normalizeFilename(file.name),allowed=String(category.allowed_mime_types).split(",").map(value=>value.trim());let mime:string;try{mime=validateDocumentFile({bytes,filename:name,declaredMime:file.type,allowedMimes:allowed,maxBytes:Number(category.max_size_bytes)});}catch(cause){throw new Response(cause instanceof Error?cause.message:"Invalid file",{status:400});}
   objectKey=safeDocumentObjectKey(employeeId,categoryCode,mime);await storage.put(objectKey,bytes,{httpMetadata:{contentType:mime},customMetadata:{employeeId:String(employeeId),category:categoryCode}});

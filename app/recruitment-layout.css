@@ -6,7 +6,7 @@
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; gap: var(--sana-space-2);
 }
 .ats-page .ats-nav { background: var(--sana-white); padding: var(--sana-space-1); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
-.ats-page .ats-nav button { padding: var(--sana-space-2) var(--sana-space-4); border-radius: var(--sana-radius-control); flex: 0 0 auto; min-height: 40px; }
+.ats-page .ats-nav button { padding: var(--sana-space-2) var(--sana-space-4); border-radius: var(--sana-radius-button); flex: 0 0 auto; min-height: 40px; }
 .ats-page .ats-nav button.active { background: var(--light-blue); color: var(--blue); }
 .ats-page .ats-nav button.active::after { display: none; }
 .ats-page .ats-inline-tabs button, .ats-page .ats-detail-tabs button { padding: var(--sana-space-3) var(--sana-space-3); flex-shrink: 0; }
@@ -43,7 +43,7 @@
 .ats-question-form :is(input, select, textarea) { min-width: 0; width: 100%; }
 .ats-drawer :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { min-width: 0; max-width: 100%; }
 .ats-drawer textarea { resize: vertical; }
-.ats-drawer-footer { background: var(--sana-white); padding-bottom: max(14px, env(safe-area-inset-bottom)); flex-wrap: wrap; }
+.ats-drawer-footer { background: var(--sana-white); padding-bottom: max(16px, env(safe-area-inset-bottom)); flex-wrap: wrap; }
 .ats-drawer-body .form-error { align-self: start; line-height: 1.8; }
 .ats-template-edit-form .ats-editor-actions:last-child { position: sticky; bottom: -20px; background: var(--sana-white); padding: var(--sana-space-3) 0; border-top: 1px solid var(--line); z-index: 2; }
 .ats-page button:disabled { cursor: not-allowed; }

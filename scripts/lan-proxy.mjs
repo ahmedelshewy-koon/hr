@@ -9,7 +9,7 @@ const lanHost = process.argv[2] || Object.values(os.networkInterfaces()).flat()
 if (!lanHost) throw new Error("No 192.168.1.x address found; pass one as the first argument");
 
 net.createServer((client) => {
-  const upstream = net.connect(port, "127.0.0.1");
+  const upstream = net.connect(port, "localhost");
   client.pipe(upstream).pipe(client);
   const close = () => { client.destroy(); upstream.destroy(); };
   client.on("error", close);

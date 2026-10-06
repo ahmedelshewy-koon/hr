@@ -6,7 +6,7 @@
 
 .ats-screening-fields > p,
 .ats-correction-form p {
-  margin: -4px 0 12px;
+  margin: -8px 0 16px;
   color: var(--muted);
   font-size: var(--type-label);
 }
@@ -33,7 +33,7 @@
   border-top: 1px solid var(--line);
 }
 .ats-correction-form {
-  margin: 14px;
+  margin: 16px;
 }
 .ats-correction-actions,
 .ats-editor-actions,
@@ -46,7 +46,7 @@
 }
 .ats-correction-actions,
 .ats-editor-actions {
-  margin-top: 12px;
+  margin-top: 16px;
 }
 .ats-requirement-actions strong {
   font-size: 24px;
@@ -61,7 +61,7 @@
   padding: var(--sana-space-3);
 }
 .ats-requirement-editor .ats-repeat-card + .ats-repeat-card {
-  margin-top: 9px;
+  margin-top: 8px;
 }
 .ats-interview-row {
   display: grid;
@@ -112,7 +112,7 @@
   color: var(--muted);
 }
 .ats-heading h1 {
-  margin: 5px 0 5px;
+  margin: 8px 0 8px;
   color: var(--navy);
   font-size: var(--type-page);
 }
@@ -134,7 +134,7 @@
 .ats-nav button {
   border: 0;
   background: transparent;
-  padding: var(--sana-space-3) 3px;
+  padding: var(--sana-space-3) 0;
   white-space: nowrap;
   color: var(--muted);
   font-size: var(--type-body);
@@ -190,7 +190,7 @@
   line-height: 1.1;
 }
 .ats-kpis small {
-  margin-top: 5px;
+  margin-top: 8px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -218,7 +218,7 @@
   border-bottom: 1px solid var(--line);
 }
 .ats-panel h2 {
-  margin: 0 0 4px;
+  margin: 0 0 8px;
   font-size: var(--type-component);
   color: var(--navy);
 }
@@ -275,7 +275,7 @@
 }
 .ats-table small {
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 0;
 }
 .ats-status {
   display: inline-flex;
@@ -431,7 +431,7 @@
     display: block;
   }
   .ats-actions {
-    margin-top: 12px;
+    margin-top: 16px;
   }
 }
 
@@ -505,7 +505,7 @@
 .ats-detail-tabs button {
   border: 0;
   background: transparent;
-  padding: var(--sana-space-3) 2px;
+  padding: var(--sana-space-3) 0;
   color: var(--muted);
   white-space: nowrap;
   position: relative;
@@ -525,7 +525,7 @@
   background: var(--blue);
 }
 .ats-setup-error {
-  margin: 14px 16px 0;
+  margin: 16px 16px 0;
 }
 .ats-detail-head {
   display: grid;
@@ -559,7 +559,7 @@
 }
 .ats-detail-head h1 {
   font-size: var(--type-page);
-  margin: 3px 0;
+  margin: 0 0;
   color: var(--navy);
 }
 .ats-detail-head p {
@@ -630,11 +630,11 @@
 .ats-facts h2,
 .ats-copy-panel h3 {
   color: var(--navy);
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-size: var(--type-component);
 }
 .ats-copy-panel h3 {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 .ats-copy-panel p {
   line-height: var(--leading-relaxed);
@@ -696,10 +696,10 @@
 }
 .ats-requirements article small {
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 0;
 }
 .ats-requirements article p {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
 }
 .ats-simple-list > header .primary {
@@ -747,7 +747,7 @@
 }
 .ats-person small,
 .ats-static-row small {
-  margin-top: 3px;
+  margin-top: 0;
   color: var(--muted);
 }
 .ats-plan {
@@ -776,7 +776,7 @@
   justify-content: space-between;
 }
 .ats-plan-main h2 {
-  margin: 0 0 4px;
+  margin: 0 0 8px;
   color: var(--navy);
   font-size: var(--type-component);
 }
@@ -785,7 +785,7 @@
   color: var(--muted);
 }
 .ats-plan-main > p {
-  margin: 10px 0;
+  margin: 8px 0;
 }
 .ats-plan-meta {
   display: flex;
@@ -822,7 +822,7 @@
 .ats-kanban > section > header {
   display: flex;
   justify-content: space-between;
-  padding: var(--sana-space-1) 3px var(--sana-space-2);
+  padding: var(--sana-space-1) 0 var(--sana-space-2);
   color: var(--navy);
 }
 .ats-kanban > section > button {
@@ -830,7 +830,7 @@
   display: block;
   text-align: start;
   border: 1px solid var(--line);
-  border-radius: var(--sana-radius-control);
+  border-radius: var(--sana-radius-button);
   background: var(--sana-white);
   padding: var(--sana-space-3);
   margin-bottom: 8px;
@@ -841,12 +841,12 @@
 }
 .ats-kanban small {
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: 8px;
 }
 .ats-kanban > section > button div {
   display: flex;
   justify-content: space-between;
-  margin-top: 12px;
+  margin-top: 16px;
   color: var(--muted);
 }
 .ats-kanban strong {
@@ -901,7 +901,7 @@
 }
 .ats-next-action h2,
 .ats-primary-actions h2 {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: var(--navy);
   font-size: var(--type-component);
 }
@@ -917,10 +917,10 @@
 }
 .ats-next-action small {
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 0;
 }
 .ats-offer-flow {
-  margin-top: 12px;
+  margin-top: 16px;
   padding-top: var(--sana-space-3);
   border-top: 1px solid var(--line);
   display: flex !important;
@@ -935,7 +935,7 @@
   background: var(--light-blue);
   color: var(--blue);
   height: 34px;
-  border-radius: var(--sana-radius-control);
+  border-radius: var(--sana-radius-button);
   padding: 0 var(--sana-space-2);
   font-weight: var(--weight-semibold);
 }
@@ -959,10 +959,10 @@
 }
 .ats-match-card > .wide {
   width: calc(100% - 28px);
-  margin: 0 14px 14px;
+  margin: 0 16px 16px;
 }
 .ats-stale {
-  margin: 0 14px 12px;
+  margin: 0 16px 16px;
   padding: var(--sana-space-2);
   border-radius: var(--sana-radius-control);
   background: var(--warning-bg);
@@ -978,14 +978,14 @@
   width: 100%;
   height: 39px;
   border: 0;
-  border-radius: var(--sana-radius-control);
+  border-radius: var(--sana-radius-button);
   background: var(--neutral-bg);
   color: var(--navy);
   display: flex;
   align-items: center;
   gap: var(--sana-space-2);
   padding: 0 var(--sana-space-3);
-  margin-top: 7px;
+  margin-top: 8px;
   text-align: start;
 }
 .ats-primary-actions > button svg {
@@ -1008,7 +1008,7 @@
 .ats-upload label {
   height: 42px;
   flex: 1;
-  border: 1px dashed var(--sana-mint);
+  border:1px dashed var(--sana-line);
   border-radius: var(--sana-radius-control);
   display: flex;
   align-items: center;
@@ -1039,13 +1039,13 @@
 }
 .ats-document small {
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 0;
 }
 .ats-document a svg {
   width: 15px;
 }
 .ats-extracted {
-  margin: 14px;
+  margin: 16px;
   max-height: 380px;
   overflow: auto;
   padding: var(--sana-space-3);
@@ -1086,15 +1086,15 @@
   height: 5px;
   background: var(--neutral-bg);
   border-radius: var(--sana-radius-detail);
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .ats-breakdown-score span {
   display: block;
   height: 5px;
   background: var(--blue);
   border-radius: var(--sana-radius-detail);
-  margin-top: 6px;
-  margin-bottom: -11px;
+  margin-top: 8px;
+  margin-bottom: -8px;
   position: relative;
   z-index: 1;
 }
@@ -1125,14 +1125,14 @@
   padding: var(--sana-space-3);
 }
 .ats-match-notes h2 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--navy);
   font-size: var(--type-component);
 }
 .ats-match-notes span {
   display: flex;
   gap: var(--sana-space-2);
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--muted);
 }
 .ats-match-notes span svg {
@@ -1186,7 +1186,7 @@
   color: var(--muted);
 }
 .ats-formula {
-  margin: 0 14px 10px;
+  margin: 0 16px 8px;
   background: var(--light-blue);
   color: var(--sana-teal-mid);
   padding: var(--sana-space-2);
@@ -1243,7 +1243,7 @@
   color: var(--muted);
 }
 .ats-interview-card:hover {
-  border-color: var(--sana-mint-light);
+  border-color:var(--sana-line);
   background: var(--sana-white);
 }
 .ats-interview-card > svg,
@@ -1303,7 +1303,7 @@
   color: var(--muted);
 }
 .ats-context dd {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   color: var(--navy);
   font-weight: var(--weight-semibold);
 }
@@ -1315,7 +1315,7 @@
 .ats-verify h2,
 .ats-questions h2,
 .ats-notes h2 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--navy);
   font-size: var(--type-component);
 }
@@ -1382,7 +1382,7 @@
 }
 .ats-recommend select {
   width: 100%;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .ats-submit-actions {
   display: flex;
@@ -1393,7 +1393,7 @@
   flex: 1;
 }
 .ats-privacy-note {
-  margin: 0 14px 14px;
+  margin: 0 16px 16px;
   padding: var(--sana-space-2);
   background: var(--neutral-bg);
   border-radius: var(--sana-radius-control);
@@ -1498,7 +1498,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: var(--sana-radius-control);
+  border-radius: var(--sana-radius-button);
   background: var(--sana-white);
   color: var(--muted);
 }
@@ -1533,14 +1533,14 @@
   color: var(--navy);
 }
 .ats-template-list p {
-  margin: 3px 0;
+  margin: 0 0;
   color: var(--muted);
 }
 .ats-template-list article > div {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sana-space-2);
-  margin-top: 12px;
+  margin-top: 16px;
 }
 .ats-template-list article > div > span {
   display: inline-flex;
@@ -1570,7 +1570,7 @@
   color: var(--blue);
 }
 .ats-timeline p {
-  margin: 3px 0;
+  margin: 0 0;
   color: var(--muted);
 }
 .ats-error {
@@ -1600,14 +1600,18 @@
   position: absolute;
   inset: 0;
   border: 0;
-  background: color-mix(in srgb, var(--sana-teal) 43.92%, transparent);
-  backdrop-filter: blur(2px);
+  background:var(--sana-overlay);
+  backdrop-filter:var(--sana-overlay-blur);
 }
 .ats-drawer {
   position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
-  width: min(760px, 95vw);
+  inset: 0;
+  margin: auto;
+  width: min(760px, calc(100vw - 48px));
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border-radius: var(--sana-radius-card);
   background: var(--sana-white);
   box-shadow: var(--sana-shadow);
   display: grid;
@@ -1626,7 +1630,7 @@
   color: var(--muted);
 }
 .ats-drawer > header h2 {
-  margin: 4px 0;
+  margin: 8px 0;
   color: var(--navy);
   font-size: var(--type-section);
 }
@@ -1656,7 +1660,7 @@
 }
 .ats-form-section > h3,
 .ats-section-title h3 {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: var(--navy);
   font-size: var(--type-component);
 }
@@ -1664,7 +1668,7 @@
   display: flex;
   justify-content: space-between;
   gap: var(--sana-space-3);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .ats-section-title p {
   margin: 0;
@@ -1711,7 +1715,7 @@
 .ats-repeat-list {
   display: grid;
   gap: var(--sana-space-2);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .ats-repeat-card {
   position: relative;
@@ -1751,7 +1755,7 @@
   color: var(--navy);
 }
 .ats-check-list > p {
-  margin: 4px 0 10px;
+  margin: 8px 0 8px;
   color: var(--muted);
 }
 .ats-check-list label {
@@ -1852,7 +1856,7 @@
     grid-column: 2;
   }
   .ats-drawer {
-    width: 100vw;
+    width: calc(100vw - 32px);
   }
   .ats-drawer-body {
     padding: var(--sana-space-3);
@@ -1866,31 +1870,31 @@
 .ats-template-editor { width: min(960px, 96vw); max-width: 96vw; }
 .ats-template-edit-form { overflow-y: auto; padding: var(--sana-space-6) var(--sana-space-6) var(--sana-space-8); min-height: 0; }
 .ats-template-edit-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.ats-template-edit-form fieldset > p { margin: 0 0 22px; color: var(--muted); line-height: var(--leading-relaxed); }
+.ats-template-edit-form fieldset > p { margin: 0 0 24px; color: var(--muted); line-height: var(--leading-relaxed); }
 .ats-template-edit-form .ats-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sana-space-4) var(--sana-space-4); }
 .ats-template-edit-form .ats-field { min-width: 0; gap: var(--sana-space-2); }
 .ats-template-edit-form .ats-field textarea { line-height: var(--leading-relaxed); }
-.ats-template-stage-editor { border: 1px solid var(--line); border-radius: var(--sana-radius-control); padding: var(--sana-space-6); margin: 28px 0 0; background: var(--sana-white); }
-.ats-template-stage-editor > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sana-space-3); margin-bottom: 22px; padding-bottom: var(--sana-space-4); border-bottom: 1px solid var(--line); }
+.ats-template-stage-editor { border: 1px solid var(--line); border-radius: var(--sana-radius-control); padding: var(--sana-space-6); margin: 32px 0 0; background: var(--sana-white); }
+.ats-template-stage-editor > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sana-space-3); margin-bottom: 24px; padding-bottom: var(--sana-space-4); border-bottom: 1px solid var(--line); }
 .ats-template-stage-editor > header h3 { margin: 0; color: var(--navy); font-size: var(--type-section); }
 .ats-template-stage-editor > header .ats-editor-actions { margin-top: 0; }
-.ats-stage-toggles { display: flex; flex-wrap: wrap; gap: var(--sana-space-3) var(--sana-space-8); margin-top: 22px; }
+.ats-stage-toggles { display: flex; flex-wrap: wrap; gap: var(--sana-space-3) var(--sana-space-8); margin-top: 24px; }
 .ats-stage-toggles label,
 .ats-criterion-actions label,
 .ats-template-assignment > label { display: inline-flex; align-items: center; gap: var(--sana-space-2); color: var(--sana-teal); font-size: var(--type-label); font-weight: var(--weight-semibold); }
-.ats-stage-subsection { margin-top: 28px; padding-top: var(--sana-space-6); border-top: 1px solid var(--line); }
+.ats-stage-subsection { margin-top: 32px; padding-top: var(--sana-space-6); border-top: 1px solid var(--line); }
 .ats-stage-subsection > h4 { margin: 0 0 16px; color: var(--navy); font-size: var(--type-component); font-weight: var(--weight-bold); }
-.ats-template-assignment { display: flex; align-items: end; gap: var(--sana-space-4); margin-bottom: 14px; flex-wrap: wrap; padding: var(--sana-space-4) var(--sana-space-4); background: var(--sana-white); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
+.ats-template-assignment { display: flex; align-items: end; gap: var(--sana-space-4); margin-bottom: 16px; flex-wrap: wrap; padding: var(--sana-space-4) var(--sana-space-4); background: var(--sana-white); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
 .ats-template-assignment .ats-field { flex: 1; min-width: 180px; }
 .ats-template-assignment > label { min-height: 40px; }
 .ats-template-criterion { background: var(--sana-white); padding: var(--sana-space-4); border: 1px solid var(--line); border-radius: var(--sana-radius-control); margin-bottom: 16px; }
-.ats-criterion-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sana-space-3); margin-top: 18px; padding-top: var(--sana-space-4); border-top: 1px dashed var(--line); }
-.ats-template-editor .ats-editor-actions { flex-wrap: wrap; margin-top: 12px; }
+.ats-criterion-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sana-space-3); margin-top: 16px; padding-top: var(--sana-space-4); border-top: 1px dashed var(--line); }
+.ats-template-editor .ats-editor-actions { flex-wrap: wrap; margin-top: 16px; }
 .ats-template-edit-form fieldset > button.outline { margin-top: 24px; }
-.ats-template-edit-form .form-error { margin-top: 20px; }
-.ats-template-edit-form fieldset > .ats-editor-actions { margin-top: 28px; padding-top: var(--sana-space-6); border-top: 1px solid var(--line); }
+.ats-template-edit-form .form-error { margin-top: 24px; }
+.ats-template-edit-form fieldset > .ats-editor-actions { margin-top: 32px; padding-top: var(--sana-space-6); border-top: 1px solid var(--line); }
 .ats-template-editor .ats-check-list { max-height: 340px; padding: var(--sana-space-1) var(--sana-space-4); background: var(--sana-white); border-radius: var(--sana-radius-control); }
-.ats-template-editor .ats-check-list label { display: flex; align-items: flex-start; gap: var(--sana-space-3); padding: var(--sana-space-3) 2px; line-height: 1.6; }
+.ats-template-editor .ats-check-list label { display: flex; align-items: flex-start; gap: var(--sana-space-3); padding: var(--sana-space-3) 0; line-height: 1.6; }
 .ats-template-editor .ats-check-list label:first-child { border-top: 0; }
-.ats-template-editor .ats-check-list input { margin-top: 4px; flex-shrink: 0; }
+.ats-template-editor .ats-check-list input { margin-top: 8px; flex-shrink: 0; }
 @media (max-width: 600px) { .ats-template-edit-form .ats-form-grid { grid-template-columns: 1fr; } .ats-template-edit-form { padding: var(--sana-space-3); } .ats-template-stage-editor { padding: var(--sana-space-4); } .ats-template-assignment, .ats-template-criterion { padding: var(--sana-space-3); } }

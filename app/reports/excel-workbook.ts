@@ -3,7 +3,7 @@
 const encoder = new TextEncoder();
 // XML 1.0 disallows these control characters in text nodes.
 // eslint-disable-next-line no-control-regex
-const xml = (value: unknown) => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, "").slice(0, 32767).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+export const xml = (value: unknown) => String(value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, "").slice(0, 32767).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const crcTable = Array.from({ length: 256 }, (_, index) => {
   let crc = index;
   for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
@@ -14,7 +14,7 @@ function crc32(data: Uint8Array) {
   for (const byte of data) crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 255];
   return (crc ^ 0xffffffff) >>> 0;
 }
-function zip(files: Record<string, string>): Uint8Array<ArrayBuffer> {
+export function zip(files: Record<string, string>): Uint8Array<ArrayBuffer> {
   const chunks: Uint8Array[] = [], directory: Uint8Array[] = [];
   let offset = 0;
   for (const [path, source] of Object.entries(files)) {
@@ -35,7 +35,7 @@ function zip(files: Record<string, string>): Uint8Array<ArrayBuffer> {
   for (const chunk of [...chunks, ...directory, end]) { result.set(chunk, cursor); cursor += chunk.length; }
   return result;
 }
-function columnName(index: number): string {
+export function columnName(index: number): string {
   let name = "";
   for (let value = index + 1; value; value = Math.floor((value - 1) / 26)) name = String.fromCharCode(65 + (value - 1) % 26) + name;
   return name;

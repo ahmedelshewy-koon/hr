@@ -30,7 +30,8 @@ before(async () => {
         "export * from './app/settings/organization/work-locations.tsx';",
         "export * from './app/settings/organization/hr-responsibility.tsx';",
         "export * from './app/settings/organization/simple-hr-responsibility.tsx';",
-        "export { OrganizationSettings } from './app/organization-settings.tsx';",
+        "export * from './app/organization-settings.tsx';",
+        "export { HrSettings } from './app/hr-settings.tsx';",
         "export { OrganizationAssignmentFields } from './app/organization-assignment-fields.tsx';",
       ].join('\n'),
       resolveDir: root, loader: 'ts', sourcefile: 'entry.ts',
@@ -106,13 +107,49 @@ test('shell renders right-to-left with Arabic navigation, and left-to-right in E
   const props = { access: manager, employees: [], hrResponsibles: [], hrCandidates: [], onSaveJobTitle: noop, onSaveHrResponsible: noop, onChanged: noop, notify() {} };
   const arabic = renderToStaticMarkup(h(ui.OrganizationSettings, { rtl: true, ...props }));
   assert.match(arabic, /class="panel settings-panel" dir="rtl"/);
-  for (const label of ['الهيكل التنظيمي', 'الشركات والفروع', 'الإدارات', 'الوظائف', 'مقار العمل', 'مسؤولية الموارد البشرية']) assert.ok(arabic.includes(label), label);
+  for (const label of ['الهيكل التنظيمي', 'الشركات والفروع', 'الإدارات', 'الوظائف', 'مقار العمل']) assert.ok(arabic.includes(label), label);
+  assert.ok(!arabic.includes('مسؤولية الموارد البشرية') && !arabic.includes('مسؤولو الموارد البشرية'), 'HR responsibility belongs to HR Settings');
   assert.ok(!arabic.includes('الوظائف والدرجات') && !arabic.includes('الأقسام والفرق'));
   const english = renderToStaticMarkup(h(ui.OrganizationSettings, { rtl: false, ...props }));
   assert.match(english, /class="panel settings-panel" dir="ltr"/);
-  for (const label of ['Organizational Structure', 'Companies &amp; Branches', 'Departments', 'Positions', 'Work Locations', 'HR Responsibility']) assert.ok(english.includes(label), label);
+  for (const label of ['Organizational Structure', 'Companies &amp; Branches', 'Departments', 'Positions', 'Work Locations']) assert.ok(english.includes(label), label);
+  assert.ok(!english.includes('HR Responsibility') && !english.includes('HR Responsibles'), 'HR responsibility is absent from organization navigation');
   assert.equal((english.match(/settings-subnav-primary/g) || []).length, 1, 'one grouped navigation, not nine top-level tabs');
-  assert.equal((english.match(/<button type="button"/g) || []).length, 5);
+  assert.equal((english.match(/<button type="button"/g) || []).length, 4);
+});
+
+test('HR settings keeps all four catalogs and adds the responsibility tab when its content is available', () => {
+  for (const rtl of [false, true]) {
+    const html = renderToStaticMarkup(h(ui.HrSettings, { rtl, notify() {}, hrResponsibility: h('p', { 'data-testid': 'responsibility-content' }, 'Assignment content') }));
+    assert.match(html, new RegExp(`class="panel settings-panel" dir="${rtl ? 'rtl' : 'ltr'}"`));
+    const labels = rtl
+      ? ['أنواع المستندات', 'قواعد الخصم والعمل الإضافي', 'خطط التأمين الطبي', 'أنواع الحضور', 'مسؤولو الموارد البشرية']
+      : ['Document Types', 'Deduction &amp; Overtime Rules', 'Medical Insurance Plans', 'Attendance Types', 'HR Responsibles'];
+    for (const label of labels) assert.ok(html.includes(`<span>${label}</span>`), label);
+    assert.equal((html.match(/<button type="button"/g) || []).length, 5);
+    assert.equal((html.match(/settings-subnav-primary/g) || []).length, 1, 'one navigation for the HR catalogs and responsibility');
+    assert.ok(!html.includes('responsibility-content'), 'responsibility content is only rendered in its own selected tab');
+  }
+});
+
+test('HR settings omits the responsibility tab when no responsibility content is provided', () => {
+  for (const rtl of [false, true]) {
+    const html = renderToStaticMarkup(h(ui.HrSettings, { rtl, notify() {} }));
+    assert.equal((html.match(/<button type="button"/g) || []).length, 4);
+    assert.ok(!html.includes('HR Responsibles') && !html.includes('مسؤولو الموارد البشرية'));
+  }
+});
+
+test('the standalone HR responsibility settings has no nested organization header, panel or navigation', () => {
+  assert.equal(typeof ui.HrResponsibilitySettings, 'function', 'a dedicated responsibility wrapper is exported');
+  const props = { access: manager, employees: [], hrResponsibles: [], hrCandidates: [], onSaveJobTitle: noop, onSaveHrResponsible: noop, onChanged: noop, notify() {} };
+  for (const rtl of [false, true]) {
+    const html = renderToStaticMarkup(h(ui.HrResponsibilitySettings, { rtl, ...props }));
+    assert.match(html, /role="status"/);
+    assert.ok(html.includes(rtl ? 'جارٍ تحميل الإعدادات...' : 'Loading settings...'));
+    assert.doesNotMatch(html, /org-settings-title|settings-subnav|settings-panel-head|class="panel settings-panel"/);
+    assert.doesNotMatch(html, /Organizational Structure|الهيكل التنظيمي/);
+  }
 });
 
 test('read-only viewers see a badge, no add/edit controls, and View instead of Edit', () => {

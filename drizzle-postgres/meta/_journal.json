@@ -246,6 +246,90 @@
       "when": 1790955849915,
       "tag": "0034_employee_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791099091334,
+      "tag": "0035_hr_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791100818319,
+      "tag": "0036_approval_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791101562999,
+      "tag": "0037_deduction_rule_reference_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791114688970,
+      "tag": "0038_approval_workflow_department",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791120000000,
+      "tag": "0039_workforce_planning",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791130000000,
+      "tag": "0040_workforce_position_hierarchy",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791211863187,
+      "tag": "0041_employee_profile_and_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791220000000,
+      "tag": "0042_staffing_blueprint",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791230000000,
+      "tag": "0043_cost_centers",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791240000000,
+      "tag": "0044_fingerprint_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791250000000,
+      "tag": "0045_employee_remote_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791260000000,
+      "tag": "0046_cost_center_debit_optional",
+      "breakpoints": true
     }
   ]
 }

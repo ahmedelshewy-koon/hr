@@ -321,11 +321,14 @@ test('workflows: routing, queues, notifications and reports use the effective re
   assert.match(assignment, /JOIN users u ON u\.id=\$\{hrSql\}/);
   assert.match(assignment, /\$\{HR_ELIGIBLE_SQL\} AND u\.employee_id<>e\.id/);
   for (const file of ['../app/leave/leave-service.ts', '../app/attendance/attendance-service.ts']) assert.match(source(file), /requireEmployeeHr\(/, file);
-  for (const file of ['../app/approvals/approval-aggregation.ts', '../app/notifications/notification-service.ts', '../app/api/dashboard/route.ts', '../app/api/reports/route.ts']) {
+  for (const file of ['../app/approvals/approval-aggregation.ts', '../app/notifications/notification-service.ts', '../app/api/reports/route.ts']) {
     const text = source(file);
     assert.match(text, /effectiveHrSql\(/, file);
     assert.doesNotMatch(text, /employee_id IS NULL OR/, `${file}: unlinked accounts are never eligible`);
   }
+  // The dashboard queue is built by aggregateApprovals (asserted above to use effectiveHrSql) instead of its own HR SQL.
+  assert.match(source('../app/api/dashboard/route.ts'), /aggregateApprovals\(/, 'dashboard approvals come from the shared effective-HR aggregation');
+  assert.doesNotMatch(source('../app/api/dashboard/route.ts'), /employee_id IS NULL OR/, 'unlinked accounts are never eligible');
   assert.match(source('../app/api/reports/route.ts'), /\["hrUserId",`\(\$\{hrSql\}\)`\]/, 'report HR filter matches the effective HR');
   assert.match(source('../app/api/hr/route.ts'), /LEFT JOIN users hu ON hu\.id=\$\{hrSql\}/, 'employee list shows the effective HR');
   assert.match(source('../app/api/employees/[id]/route.ts'), /resolveEmployeeHrFromDb\(db,employeeId\)/, 'profile API uses the shared resolver');

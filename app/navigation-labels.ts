@@ -9,7 +9,7 @@
 export type PageId =
   | "dashboard" | "portal" | "approvals" | "employees" | "leave" | "attendance"
   | "recruitment" | "lifecycle" | "assets" | "learning" | "org"
-  | "users" | "reports" | "payroll" | "settings";
+  | "blueprint" | "decisions" | "users" | "reports" | "payroll" | "cost_centers" | "hr_settings" | "settings";
 
 export const PAGE_LABELS: Record<PageId, { en: string; ar: string }> = {
   dashboard: { en: "Dashboard", ar: "لوحة التحكم" },
@@ -23,9 +23,13 @@ export const PAGE_LABELS: Record<PageId, { en: string; ar: string }> = {
   assets: { en: "Assets", ar: "العهد والأصول" },
   learning: { en: "Learning & Development", ar: "التعلم والتطوير" },
   org: { en: "Organization Chart", ar: "الهيكل التنظيمي" },
+  blueprint: { en: "Company Staffing Blueprint", ar: "مخطط هيكل الشركة" },
+  decisions: { en: "Administrative Decisions", ar: "القرارات الإدارية" },
   users: { en: "Users", ar: "المستخدمون" },
   reports: { en: "Reports & Exports", ar: "التقارير والتصدير" },
   payroll: { en: "Payroll", ar: "الرواتب" },
+  cost_centers: { en: "Cost Centers", ar: "مراكز التكلفة" },
+  hr_settings: { en: "HR Settings", ar: "إعدادات الموارد البشرية" },
   settings: { en: "Settings", ar: "الإعدادات" },
 };
 

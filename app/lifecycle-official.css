@@ -1,20 +1,20 @@
 /* Shared official A4 template for onboarding and offboarding records. */
 .lifecycle-report.hr-record{width:min(210mm,100%);min-height:297mm;padding:12mm 13mm 11mm;border-radius:0;color:var(--sana-teal);font-family:"IBM Plex Sans Arabic",Arial,sans-serif;background:var(--sana-white);counter-reset:record-section}
-.hr-record .report-controls{margin-bottom:14px}
+.hr-record .report-controls{margin-bottom:16px}
 .hr-record .record-header{display:grid;grid-template-columns:112px minmax(0,1fr);gap:var(--sana-space-4);align-items:center;padding:0 0 var(--sana-space-3);border-bottom:2px solid var(--sana-teal)}
 .hr-record .record-header>img{width:108px;height:58px;display:block;object-fit:contain;object-position:center}
 .hr-record .record-title{min-width:0}
 .hr-record .record-title h1{margin:0;color:var(--sana-teal);font-size:var(--type-section)!important;line-height:var(--leading-heading)!important;font-weight:var(--weight-semibold)!important;white-space:nowrap}
-.hr-record .record-header dl{margin:9px 0 0;display:grid;grid-template-columns:repeat(3,max-content);gap:var(--sana-space-6);align-items:start}
-.hr-record .record-header dl>div{display:grid;grid-template-columns:1fr;gap:1px}
+.hr-record .record-header dl{margin:8px 0 0;display:grid;grid-template-columns:repeat(3,max-content);gap:var(--sana-space-6);align-items:start}
+.hr-record .record-header dl>div{display:grid;grid-template-columns:1fr;gap:0}
 .hr-record dt,.hr-record .record-footer span{color:var(--sana-teal-mid);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .hr-record dd{margin:0;color:var(--sana-teal);font-size:10.5px;font-weight:600;overflow-wrap:anywhere}
 .hr-record dd.approved{color:var(--sana-success)}.hr-record dd.withheld{color:var(--sana-danger)}
-.hr-record .record-section{margin-top:15px;break-inside:auto;counter-increment:record-section}
+.hr-record .record-section{margin-top:16px;break-inside:auto;counter-increment:record-section}
 .hr-record .record-section>h2{display:flex;align-items:center;gap:var(--sana-space-2);margin:0;padding:0 0 var(--sana-space-1);border:0;border-bottom:2px solid var(--sana-teal);background:transparent;color:var(--sana-teal);font-size:var(--type-label);font-weight:var(--weight-semibold)}
 .hr-record .record-section>h2::before{content:counter(record-section,decimal-leading-zero);display:inline-grid;place-items:center;min-width:25px;height:21px;padding:0 var(--sana-space-1);background:var(--sana-teal);color:var(--sana-white);font-size:10px;font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
 .hr-record .record-fields{width:100%;margin:0;border-collapse:collapse;table-layout:fixed;background:var(--sana-white)}
-.hr-record .record-fields th,.hr-record .record-fields td{height:39px;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-disabled);text-align:start;vertical-align:middle}
+.hr-record .record-fields th,.hr-record .record-fields td{height:39px;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-line);text-align:start;vertical-align:middle}
 .hr-record .record-fields th{width:17%;background:var(--sana-canvas);color:var(--sana-teal);font-size:var(--type-label)!important;font-weight:var(--weight-medium)!important}
 .hr-record .record-fields td{width:33%;background:var(--sana-white);color:var(--sana-teal);font-size:var(--type-secondary)!important;font-weight:var(--weight-semibold)}
 .hr-record .record-fields td.email,.hr-record .record-fields td.code{font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1,"lnum" 1;text-align:start}
@@ -23,10 +23,10 @@
 .hr-record .clearance-result.outstanding{border-color:var(--sana-danger);background:var(--sana-canvas);color:var(--sana-danger)}
 .hr-record .record-table-wrap{max-width:100%;overflow:auto}
 .hr-record .record-table{width:100%;border-collapse:collapse;table-layout:auto}
-.hr-record .record-table th{padding:var(--sana-space-1) var(--sana-space-2);border-bottom:1px solid var(--sana-mint);background:var(--sana-canvas);color:var(--sana-teal);font-size:9px;font-weight:700;text-align:start;vertical-align:bottom}
+.hr-record .record-table th{padding:var(--sana-space-1) var(--sana-space-2);border-bottom:1px solid var(--sana-line);background:var(--sana-canvas);color:var(--sana-teal);font-size:9px;font-weight:700;text-align:start;vertical-align:bottom}
 .hr-record .record-table td{padding:var(--sana-space-1) var(--sana-space-2);border-bottom:1px solid var(--sana-line);color:var(--sana-teal);font-size:9.5px;line-height:1.35;text-align:start;vertical-align:top;overflow-wrap:anywhere}
 .hr-record .record-table tbody tr:nth-child(even) td{background:var(--sana-white)}
-.hr-record .record-status{display:inline-block;padding:2px var(--sana-space-1);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-teal);font-size:8.5px;font-weight:700;white-space:nowrap}
+.hr-record .record-status{display:inline-block;padding:0 var(--sana-space-1);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-teal);font-size:8.5px;font-weight:700;white-space:nowrap}
 .hr-record .record-status.completed{background:var(--sana-line);color:var(--sana-success)}.hr-record .record-status.blocked{background:var(--sana-canvas);color:var(--sana-danger)}.hr-record .record-status.in_progress{background:var(--sana-canvas);color:var(--sana-teal-mid)}
 .hr-record .record-empty{margin:0;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-line);background:var(--sana-white);color:var(--sana-teal);font-size:10px}
 .hr-record .access-clearance{display:grid;grid-template-columns:minmax(180px,.8fr) 1.2fr;gap:var(--sana-space-3);align-items:center;margin-top:8px;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-line)}
@@ -34,17 +34,17 @@
 .hr-record .record-approvals{break-inside:avoid}
 .hr-record .record-signatures-section{break-inside:avoid}
 .hr-record .record-signatures{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--sana-white)}
-.hr-record .record-signatures th,.hr-record .record-signatures td{width:25%;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-mint);text-align:start;vertical-align:top}
+.hr-record .record-signatures th,.hr-record .record-signatures td{width:25%;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-line);text-align:start;vertical-align:top}
 .hr-record .record-signatures th{background:var(--sana-canvas);color:var(--sana-teal);font-size:var(--type-label)!important;font-weight:var(--weight-semibold)!important;text-align:center}
 .hr-record .record-signatures td>span{display:block;color:var(--sana-teal-mid);font-size:10px;font-weight:var(--weight-medium)}
-.hr-record .record-signatures td>b{display:block;margin-top:4px;color:var(--sana-teal);font-size:var(--type-label);font-weight:var(--weight-semibold)}
+.hr-record .record-signatures td>b{display:block;margin-top:8px;color:var(--sana-teal);font-size:var(--type-label);font-weight:var(--weight-semibold)}
 .hr-record .record-signatures .signature-lines td{height:56px}
 .hr-record .record-signatures .signature-lines i{display:block;height:29px;border-bottom:1px solid var(--sana-teal-mid)}
 .hr-record .record-signatures .signature-dates td{padding-top:var(--sana-space-1);padding-bottom:var(--sana-space-1)}
 .hr-record .record-signatures .signature-dates b{font-variant-numeric:tabular-nums;direction:ltr;text-align:start}
-.hr-record .record-footer{display:grid;grid-template-columns:1fr 1fr;gap:var(--sana-space-4);align-items:end;margin-top:20px;padding-top:var(--sana-space-2);border-top:1px solid var(--sana-mint)}
+.hr-record .record-footer{display:grid;grid-template-columns:1fr 1fr;gap:var(--sana-space-4);align-items:end;margin-top:24px;padding-top:var(--sana-space-2);border-top:1px solid var(--sana-line)}
 .hr-record .record-footer div:last-child{text-align:end}.hr-record .record-footer span,.hr-record .record-footer b{display:block}
-.hr-record .record-footer b{margin-top:2px;font-size:9.5px}.hr-record .record-footer p{margin:0;color:var(--sana-teal-mid);font-size:8.5px;line-height:1.4;text-align:center}
+.hr-record .record-footer b{margin-top:0;font-size:9.5px}.hr-record .record-footer p{margin:0;color:var(--sana-teal-mid);font-size:8.5px;line-height:1.4;text-align:center}
 [dir="rtl"].hr-record .record-header,[dir="rtl"].hr-record .record-fields,[dir="rtl"].hr-record .record-table,[dir="rtl"].hr-record .record-footer{text-align:right}
 
 @media(max-width:760px){.lifecycle-report.hr-record{min-height:0;padding:var(--sana-space-4)}.hr-record .record-header{grid-template-columns:90px 1fr}.hr-record .record-title h1{white-space:normal}.hr-record .record-header dl{grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sana-space-2)}.hr-record .record-fields th{width:20%}.hr-record .record-fields td{width:30%}.hr-record .record-table{min-width:680px}}
@@ -55,12 +55,12 @@
   .hr-record .record-header{break-inside:avoid}
   .hr-record .record-header>img{width:95px;height:50px}
   .hr-record .record-title h1{font-size:15pt!important;white-space:nowrap}
-  .hr-record .record-section{margin-top:11px}
+  .hr-record .record-section{margin-top:8px}
   .hr-record .record-section>h2{font-size:10pt}
   .hr-record .record-fields,.hr-record .record-table,.hr-record .record-signatures,.hr-record .clearance-result,.hr-record .access-clearance{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .hr-record .record-table-wrap{overflow:visible}
   .hr-record .record-table{min-width:0!important}
   .hr-record .record-table thead{display:table-header-group}
   .hr-record .record-table tr,.hr-record .record-fields tr{break-inside:avoid}
-  .hr-record .record-footer{break-inside:avoid;margin-top:14px}
+  .hr-record .record-footer{break-inside:avoid;margin-top:16px}
 }

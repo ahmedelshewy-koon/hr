@@ -20,6 +20,14 @@ test("unset availability leaves existing access unchanged", () => {
   assert.deepEqual(filterAvailablePages(["portal", "learning"], "Employee", {}), ["portal", "learning"]);
 });
 
+test("HR settings sidebar preserves role, scope and availability restrictions", () => {
+  assert.deepEqual(filterAvailablePages(["hr_settings"], "HR Manager", {}, "all"), ["hr_settings"]);
+  assert.deepEqual(filterAvailablePages(["settings", "hr_settings"], "HR Manager", {}, "assigned"), ["settings"]);
+  assert.deepEqual(filterAvailablePages(["hr_settings"], "Employee", {}, "all"), []);
+  assert.deepEqual(filterAvailablePages(["hr_settings"], "Super Admin", { hr_settings: false }), []);
+  assert.deepEqual(filterAvailablePages([], "HR Manager", { hr_settings: true }, "all"), []);
+});
+
 test("only Super Admin may change availability, even for roles with settings rights", () => {
   for (const role of ["HR Manager", "Department Manager", "Employee", "Custom administrator"]) {
     assert.throws(() => validatePageToggle(role, "dashboard", false), error => error instanceof Response && error.status === 403);

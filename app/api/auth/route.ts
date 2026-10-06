@@ -4,17 +4,20 @@ import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPa
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
 import { PAGE_MODULES, filterAvailablePages } from "../../page-availability";
-import { readPageAvailability } from "../../page-availability-store";
+import { readPageAvailability, readPageOrder } from "../../page-availability-store";
+import { orderPages } from '../../page-order';
+import { hasWorkflowAssignments } from '../../approvals/workflow-service';
 
 type LoginUser = { id:number; email:string; password_hash:string|null; password_changed_at?:string|null; status:string; session_version:number; failed_login_attempts:number; locked_until:string|null; must_change_password:number; role_name:string; employee_id:number|null; employee_status:string|null };
 
 async function allowedPagesForUser(d1:PostgresDatabase,userId:number,roleName:string){
-  const availability=await readPageAvailability(d1);
-  if(roleName==="Super Admin")return filterAvailablePages(Object.keys(PAGE_MODULES),roleName,availability);
-  const rows=(await d1.prepare("SELECT p.module FROM users u JOIN permissions p ON p.role_id=u.role_id WHERE u.id=? AND p.action='view' AND p.allowed=1").bind(userId).all()).results as {module:string}[];
+  const [availability,order]=await Promise.all([readPageAvailability(d1),readPageOrder(d1)]);
+  if(roleName==="Super Admin")return orderPages(filterAvailablePages(Object.keys(PAGE_MODULES),roleName,availability),order);
+  const rows=(await d1.prepare("SELECT p.module,u.hr_data_scope FROM users u JOIN permissions p ON p.role_id=u.role_id WHERE u.id=? AND p.action='view' AND p.allowed=1").bind(userId).all()).results as {module:string;hr_data_scope?:string|null}[];
   const modules=new Set(rows.map(row=>row.module));
   const granted=Object.entries(PAGE_MODULES).filter(([,required])=>required.some(module=>modules.has(module))).map(([page])=>page);
-  return filterAvailablePages(granted,roleName,availability);
+  if(!granted.includes('approvals')&&await hasWorkflowAssignments(d1,userId))granted.push('approvals');
+  return orderPages(filterAvailablePages(granted,roleName,availability,rows[0]?.hr_data_scope),order);
 }
 
 async function requirePlatformAccess(request: Request) {

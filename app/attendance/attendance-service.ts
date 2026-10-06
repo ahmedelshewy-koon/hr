@@ -1,6 +1,7 @@
 import { requireEmployeeHr, assertEmployeeHr, assertEmployeeManager } from "../employees/hr-assignment.ts";
+import { attachWorkflow, decideWorkflow, isWorkflowStage, resolveWorkflow } from '../approvals/workflow-service.ts';
 import type { PostgresDatabase, TransactionDatabase } from "../../db/postgres";
-import { calculateDailyAttendance, isScheduledWorkDay } from "./attendance-calculation.ts";
+import { calculateDailyAttendance, isScheduledWorkDay, scheduledWorkMode } from "./attendance-calculation.ts";
 import { CORRECTION_TYPES, correctionFields, decideCorrectionTransition, type CorrectionDecision, type CorrectionType } from "./attendance-workflow.ts";
 import { isHolidayDate } from "../leave/holiday-calendar.ts";
 import { loadCalendarHolidays } from "../leave/holiday-store.ts";
@@ -19,7 +20,7 @@ async function writeAudit(db:DB,request:Request,actor:Actor,action:string,record
 }
 
 async function attendanceContext(db:DB,employeeId:number,attendanceDate:string,overrides:Row={}){
-  const employee=await db.prepare("SELECT id,work_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,country FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();
+  const employee=await db.prepare("SELECT id,work_days,remote_days,check_in_time,check_out_time,grace_minutes,required_daily_minutes,country,fingerprint_required FROM employees WHERE id=? AND employment_status!='deleted'").bind(employeeId).first<Row>();
   if(!employee)throw new Response("Employee not found",{status:404});
   const record=await db.prepare("SELECT * FROM daily_attendance WHERE employee_id=? AND work_date=?").bind(employeeId,attendanceDate).first<Row>();
   const holiday=isHolidayDate(await loadCalendarHolidays(db,String(employee.country)),attendanceDate,String(employee.country));
@@ -28,8 +29,10 @@ async function attendanceContext(db:DB,employeeId:number,attendanceDate:string,o
   const actualIn=overrides.actual_in!==undefined?overrides.actual_in:record?.actual_in;
   const actualOut=overrides.actual_out!==undefined?overrides.actual_out:record?.actual_out;
   // "holiday" and "leave" are results of an earlier calculation, not a working mode to carry into the next one.
-  const storedType=record?.attendance_type==="holiday"||record?.attendance_type==="leave"?null:record?.attendance_type;
-  const attendanceType=String(overrides.attendance_type??storedType??"office");
+  // A day with no punch or check-in yet follows the schedule (office or remote weekday); once someone checks in, the way they did it wins.
+  const hasEvent=Boolean(record?.actual_in||record?.actual_out);
+  const storedType=!hasEvent||record?.attendance_type==="holiday"||record?.attendance_type==="leave"?null:record?.attendance_type;
+  const attendanceType=String(overrides.attendance_type??storedType??scheduledWorkMode(attendanceDate,String(employee.remote_days||"")));
   let dayComplete=typeof overrides.day_complete==="boolean"?overrides.day_complete:attendanceDate<new Date().toISOString().slice(0,10);
   // A fingerprint employee's day closes only after their device has synced past it; an offline device must not create early-departure/absence exceptions.
   if(dayComplete){
@@ -38,7 +41,7 @@ async function attendanceContext(db:DB,employeeId:number,attendanceDate:string,o
     const device=await db.prepare("SELECT count(*)::integer AS devices,max(to_char(d.last_sync_at AT TIME ZONE d.timezone,'YYYY-MM-DD HH24:MI')) AS synced_at FROM attendance_device_users du JOIN attendance_devices d ON d.id=du.device_id WHERE du.employee_id=? AND du.enabled=1 AND d.enabled=1").bind(employeeId).first<Row>();
     if(Number(device?.devices)>0&&(!device?.synced_at||String(device.synced_at)<`${closesOn} ${checkOut.slice(0,5)}`))dayComplete=false;
   }
-  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:holiday,isApprovedLeave:Boolean(leave),dayComplete});
+  const calculation=calculateDailyAttendance({scheduledIn:String(record?.scheduled_in??employee.check_in_time??"09:00"),scheduledOut:String(record?.scheduled_out??employee.check_out_time??"17:00"),actualIn:actualIn?String(actualIn):null,actualOut:actualOut?String(actualOut):null,requiredMinutes:Number(record?.required_minutes??employee.required_daily_minutes??480),graceMinutes:Number(employee.grace_minutes??0),attendanceType,isWorkingDay:isScheduledWorkDay(attendanceDate,String(employee.work_days||"0,1,2,3,4")),isHoliday:holiday,isApprovedLeave:Boolean(leave),dayComplete,fingerprintRequired:Number(employee.fingerprint_required??1)!==0});
   return {employee,record,calculation,actualIn,actualOut,attendanceType};
 }
 
@@ -68,7 +71,8 @@ export async function submitAttendanceCorrection(input:{db:PostgresDatabase;requ
   const original={actual_in:context.record?.actual_in??null,actual_out:context.record?.actual_out??null,worked_minutes:context.record?.worked_minutes??0,late_minutes:context.record?.late_minutes??0,early_minutes:context.record?.early_minutes??0,status:context.record?.status??null};
   return db.transaction(async tx=>{
     await tx.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(employeeId,Number(attendanceDate.replaceAll("-",""))).run();
-    await requireEmployeeHr(tx,employeeId);
+    const workflow=await resolveWorkflow(tx,employeeId,'attendance_correction');
+    if(!workflow)await requireEmployeeHr(tx,employeeId);
     const duplicate=await tx.prepare("SELECT id FROM attendance_corrections WHERE employee_id=? AND attendance_date=? AND correction_type=? AND status IN ('pending_manager','pending_hr') LIMIT 1").bind(employeeId,attendanceDate,type).first<Row>();
     if(duplicate)throw new Response("An active correction already exists for this issue and date",{status:409});
     const result=await tx.prepare("INSERT INTO attendance_corrections (employee_id,daily_attendance_id,attendance_date,correction_type,original_values,requested_values,reason,notes,status,current_stage,requested_by_user_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?, 'pending_manager','manager',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id").bind(employeeId,context.record?.id??null,attendanceDate,type,JSON.stringify(original),JSON.stringify(requested),reason,clean(input.notes)||null,actor.id).first<Row>();
@@ -76,11 +80,12 @@ export async function submitAttendanceCorrection(input:{db:PostgresDatabase;requ
     const related=exceptionTypesForCorrection(type),exceptionFilter=related.length?` AND exception_type IN (${related.map(()=>"?").join(",")})`:"";
     await tx.prepare(`UPDATE attendance_exceptions SET correction_id=?,status='correction_requested',updated_at=CURRENT_TIMESTAMP WHERE employee_id=? AND attendance_date=? AND status='open'${exceptionFilter}`).bind(result!.id,employeeId,attendanceDate,...related).run();
     await writeAudit(tx,request,actor,"correction_requested","attendance_correction",String(result!.id),original,requested);
-    return {ok:true,id:Number(result!.id),status:"pending_manager"};
+    if(workflow)await attachWorkflow(tx,'attendance_correction',Number(result!.id),workflow);
+    return {ok:true,id:Number(result!.id),status:workflow?'pending_hr':'pending_manager'};
   });
 }
 
-export async function processAttendanceCorrection(input:{db:PostgresDatabase;request:Request;actor:Actor;correctionId:number;decision:CorrectionDecision;reason?:unknown}){
+export async function processAttendanceCorrection(input:{db:PostgresDatabase;request:Request;actor:Actor;correctionId:number;decision:CorrectionDecision;reason?:unknown;expectedStage?:string}){
   const reason=clean(input.reason);if(input.decision==="reject"&&!reason)throw new Response("Rejection reason is required",{status:400});
   return input.db.transaction(async tx=>{
     await tx.prepare("SELECT pg_advisory_xact_lock(?)").bind(input.correctionId).run();
@@ -89,8 +94,8 @@ export async function processAttendanceCorrection(input:{db:PostgresDatabase;req
     if(before.current_stage==="hr")await assertEmployeeHr(tx,Number(before.employee_id),input.actor.id);
     if(before.current_stage==="manager"&&input.decision==="approve")await requireEmployeeHr(tx,Number(before.employee_id));
     let transition:ReturnType<typeof decideCorrectionTransition>;
-    try{transition=decideCorrectionTransition({status:String(before.status),stage:String(before.current_stage),decision:input.decision});}
-    catch(cause){throw new Response(cause instanceof Error?cause.message:"This correction has already been processed",{status:409});}
+    try{transition=isWorkflowStage(before.current_stage)?await decideWorkflow(tx,'attendance_correction',input.correctionId,input.actor.id,input.expectedStage||'',input.decision,reason):decideCorrectionTransition({status:String(before.status),stage:String(before.current_stage),decision:input.decision});}
+    catch(cause){if(cause instanceof Response)throw cause;throw new Response(cause instanceof Error?cause.message:"This correction has already been processed",{status:409});}
     const update=await tx.prepare("UPDATE attendance_corrections SET status=?,current_stage=?,resolved_at=CASE WHEN ?='completed' THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status=? AND current_stage=? RETURNING id").bind(transition.status,transition.currentStage,transition.currentStage,input.correctionId,before.status,before.current_stage).first<Row>();
     if(!update)throw new Response("This correction stage has already been processed",{status:409});
     let applied:unknown=null;

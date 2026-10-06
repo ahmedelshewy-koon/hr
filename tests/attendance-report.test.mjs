@@ -23,13 +23,14 @@ test("attendance report rejects bad dates, reversed and oversized periods, and b
   assert.doesNotThrow(() => parse("from=2026-01-01&to=2026-12-31"));
 });
 
-test("attendance report is HR-only, audited when exported, and reachable from the biometric tabs", async () => {
+test("attendance report is HR-only, audited when exported, and reachable from the attendance tab", async () => {
   const read = file => readFile(new URL(file, import.meta.url), "utf8");
-  const [route, service, workspace] = await Promise.all([read("../app/api/attendance-report/route.ts"), read("../app/attendance/attendance-report.ts"), read("../app/biometric-workspace.tsx")]);
+  const [route, service, workspace] = await Promise.all([read("../app/api/attendance-report/route.ts"), read("../app/attendance/attendance-report.ts"), read("../app/attendance-workspace.tsx")]);
   assert.match(route, /\["Super Admin", "HR Manager"\]\.includes\(actor\.roleName\)/);
   assert.match(route, /attendance_report_exported/);
   assert.match(service, /overtime_minutes/);
   assert.match(service, /late_minutes/);
   assert.match(service, /\^\[=\+\\-@/);
+  assert.match(workspace, /isHR&&<button className={showReport/);
   assert.match(workspace, /<AttendanceReportPanel/);
 });

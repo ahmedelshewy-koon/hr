@@ -5,15 +5,15 @@
   --sana-white:#FFFFFF;
   --sana-canvas:#F4F3EF;
   --sana-canvas-warm:#F0EDE8;
-  --sana-line:#E7E7E7;
+  --sana-line:#F5F5F5;
   --sana-disabled:#A8A8A8;
   --sana-muted:#6D6D6D;
-  --sana-ink:#111B1B;
+  --sana-ink:#031212;
   --sana-teal:#0B4237;
-  --sana-teal-mid:#1C7861;
-  --sana-mint:#79CBAA;
-  --sana-mint-light:#95E0D1;
-  --sana-mint-soft:#D9FBF3;
+  --sana-teal-mid:#1C7B61;
+
+
+
   --sana-success:#02B847;
   --sana-success-bg:color-mix(in srgb, var(--sana-success) 16%, white);
   --sana-warning:#E28B0C;
@@ -22,17 +22,27 @@
   --sana-danger-bg:color-mix(in srgb, var(--sana-danger) 16%, white);
   --sana-info:#137FEC;
   --sana-info-bg:color-mix(in srgb, var(--sana-info) 16%, white);
-  --sana-space-1:4px; --sana-space-2:8px; --sana-space-3:12px;
-  --sana-space-4:16px; --sana-space-6:24px; --sana-space-8:32px;
+  --sana-space-1:8px; --sana-space-2:8px; --sana-space-3:16px;
+  --sana-space-4:16px; --sana-space-5:24px; --sana-space-6:24px; --sana-space-8:32px;
   --sana-space-12:48px; --sana-space-16:64px;
-  --sana-radius-detail:4px;
+  --sana-radius-detail:16px;
   --sana-radius-control:24px;
   --sana-radius-card:24px;
   --sana-radius-large:32px;
-  --sana-radius-pill:999px;
-  --sana-shadow:0 2px 8px #00000014,0 0 16px #9AEDDD14;
-  --sana-shadow-popover:0 4px 16px #00000016;
-  --sana-button:linear-gradient(100deg,#1C7861,#0B4237);
-  --sana-sidebar:linear-gradient(180deg,#001617,#0B4237);
-  --sana-chart-1:#0B4237; --sana-chart-2:#79CBAA; --sana-chart-3:#95E0D1;
+  --sana-overlay:rgba(0,0,0,.48);
+  --sana-overlay-blur:blur(8px);
+  --sana-radius-shell:16px;
+  --sana-radius-button:32px;
+  --sana-radius-nav:16px;
+  --sana-radius-pill:32px;
+  --sana-shadow:0 0 8px 0 rgba(0,204,161,.16);
+  --sana-shadow-popover:0 0 8px 0 rgba(0,204,161,.16);
+  --sana-button:linear-gradient(100deg,#1C7B61,#0B4237);
+  --sana-sidebar:linear-gradient(180deg,#031212,#083934);
+  --sana-page-start:#031212;
+  --sana-page-end:#083934;
+  --sana-page-bg:linear-gradient(180deg,var(--sana-page-start),var(--sana-page-end));
+  --sana-shell:#EBEBEB;
+  --sana-hover:#0B4237;
+  --sana-chart-1:#0B4237; --sana-chart-2:#1C7B61; --sana-chart-3:color-mix(in srgb,#1C7B61 45%,#FFFFFF);
 }

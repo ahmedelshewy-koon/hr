@@ -58,14 +58,15 @@ export function ProfileMenu({ initials, name, nameIsEmail, email, role, departme
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={label}
-        title={label}
+        aria-label={`${label}: ${name}`}
+        title={name}
         onClick={() => {
           if (!open) onOpen?.();
           setOpen(value => !value);
         }}
       >
         <span className="avatar small blue">{initials}</span>
+        <span className="profile-trigger-name" dir={nameIsEmail ? "ltr" : "auto"}>{name}</span>
       </button>
       {open && (
         <div className="profile-pop" id={menuId} role="dialog" aria-label={label}>

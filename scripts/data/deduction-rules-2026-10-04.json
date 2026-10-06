@@ -1,0 +1,13 @@
+{
+  "source": "codex-clipboard-c538b029-bbf1-454d-8361-110cc7326252.png",
+  "rules": [
+    { "name_ar": "غياب بدون أذن", "type_ar": "غياب", "notice_ar": "بدون إشعار", "min_minutes": null, "max_minutes": null, "deduction_type_ar": "نسبة مئوية", "value": 200, "overtime_multiplier": null, "active": true },
+    { "name_ar": "غياب بأذن", "type_ar": "غياب", "notice_ar": "بإشعار", "min_minutes": null, "max_minutes": null, "deduction_type_ar": "نسبة مئوية", "value": 100, "overtime_multiplier": null, "active": true },
+    { "name_ar": "تأخير 1-15 دقيقة", "type_ar": "تأخير", "min_minutes": 1, "max_minutes": 15, "deduction_type_ar": "مبلغ ثابت", "value": 0, "overtime_multiplier": null, "active": true },
+    { "name_ar": "تأخير 16-30 دقيقة", "type_ar": "تأخير", "min_minutes": 16, "max_minutes": 30, "deduction_type_ar": "نسبة مئوية", "value": 0, "overtime_multiplier": null, "active": true },
+    { "name_ar": "سماح", "type_ar": "تأخير", "min_minutes": 60, "max_minutes": 60, "deduction_type_ar": "نسبة مئوية", "value": 0, "overtime_multiplier": null, "active": true },
+    { "name_ar": "تأخير أكثر من 60 دقيقة", "type_ar": "تأخير", "min_minutes": 61, "max_minutes": null, "deduction_type_ar": "نسبة مئوية", "value": 0, "overtime_multiplier": null, "active": true },
+    { "name_ar": "تأخير 31-60 دقيقة", "type_ar": "تأخير", "min_minutes": 61, "max_minutes": 90, "deduction_type_ar": "نسبة مئوية", "value": 0, "overtime_multiplier": null, "active": true },
+    { "name_ar": "العمل الإضافي", "type_ar": "إضافي", "min_minutes": null, "max_minutes": null, "deduction_type_ar": "بالساعة", "value": 1, "overtime_multiplier": 1.5, "active": true }
+  ]
+}

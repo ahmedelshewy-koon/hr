@@ -5,8 +5,8 @@ import { buildApprovalChain, type ApprovalStep } from "./approvals/approval-chai
 import type { Row } from "./ui-types";
 import "./approval-chain.css";
 
-const stageLabel = (stage: ApprovalStep["stage"], rtl: boolean) => stage === "manager" ? (rtl ? "مدير القسم" : "Department manager") : (rtl ? "الموارد البشرية" : "HR");
-const stateLabel: Record<ApprovalStep["state"], [string, string]> = { approved: ["Approved", "اعتمد"], rejected: ["Rejected", "رفض"], pending: ["Waiting for approval", "بانتظار اعتماده"], upcoming: ["Next after the manager", "التالي بعد المدير"], stopped: ["Not required", "لم يعد مطلوبًا"] };
+const stageLabel = (stage: ApprovalStep["stage"], rtl: boolean) => stage.startsWith('workflow:')?(rtl?`المرحلة ${Number(stage.split(':')[1])+1}`:`Stage ${Number(stage.split(':')[1])+1}`):stage === "manager" ? (rtl ? "مدير القسم" : "Department manager") : (rtl ? "الموارد البشرية" : "HR");
+const stateLabel: Record<ApprovalStep["state"], [string, string]> = { approved: ["Approved", "اعتمد"], rejected: ["Rejected", "رفض"], pending: ["Waiting for approval", "بانتظار اعتماده"], upcoming: ["Waiting for previous stage", "بعد المرحلة السابقة"], stopped: ["Not required", "لم يعد مطلوبًا"] };
 const missingLabel = (stage: ApprovalStep["stage"], rtl: boolean) => stage === "manager" ? (rtl ? "لم يتم تحديد مدير للموظف" : "No manager assigned") : (rtl ? "لم يتم تعيين مسؤول موارد بشرية" : "No HR responsible assigned");
 const stepName = (step: ApprovalStep, rtl: boolean) => (rtl ? step.nameAr || step.name : step.name || step.nameAr) || "";
 const when = (value: unknown, rtl: boolean) => new Intl.DateTimeFormat(rtl ? "ar-SA-u-nu-arab" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(String(value)));
@@ -22,6 +22,7 @@ export function ApprovalChain({ rtl, request, history }: { rtl: boolean; request
       <div>
         <small>{stageLabel(step.stage, rtl)}</small>
         <b>{name || (waiting ? missingLabel(step.stage, rtl) : "—")}</b>
+        {step.state==='pending'&&request.workflow_unavailable&&<span role="status">{rtl?'الموافق غير متاح — تواصل مع مسؤول النظام':'Approver unavailable — contact your administrator'}</span>}
         <span className="approval-chain-state">{stateLabel[step.state][rtl ? 1 : 0]}{step.at ? ` · ${when(step.at, rtl)}` : ""}</span>
         {step.reason && <p>{rtl ? "السبب: " : "Reason: "}{step.reason}</p>}
       </div>

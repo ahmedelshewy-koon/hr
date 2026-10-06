@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { PwaRegistration } from "./pwa-registration";
 
-export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0B4237" };
+export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#031212" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: "A bilingual employee experience and HR operations platform.",
     manifest: "/manifest.webmanifest",
     appleWebApp: { capable: true, title: "HR", statusBarStyle: "default" },
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg", apple: "/hr-icon-192.png" },
+    icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/hr-icon-192.png" },
     openGraph: {
       title: "HR — People, simply managed",
       description: "A modern bilingual employee experience and HR operations platform.",

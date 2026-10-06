@@ -1,4 +1,5 @@
 import type { TransactionDatabase } from '../../db/postgres';
+import { recordJobHistory } from '../employees/job-history.ts';
 import type { Row } from '../ui-types';
 import { assignmentFields, assignmentFromPayload, validateAssignmentDate, validateAssignmentGroup, type OrganizationCatalog } from './assignment-policy.ts';
 import { validateReportingManager } from './reporting-line.ts';
@@ -57,4 +58,6 @@ export async function persistAssignment(db:TransactionDatabase,employeeId:number
   const effective=payload.assignmentEffectiveDate===undefined?before.assignment_effective_date:payload.assignmentEffectiveDate;
   try{validateAssignmentDate(effective);}catch(error){throw asResponse(error,400);}
   await db.prepare(`UPDATE employees SET ${columns.map(c=>`${c}=?`).join(',')},assignment_effective_date=? WHERE id=?`).bind(...columns.map(c=>next[c]),effective||null,employeeId).run();
+  // Job history follows every assignment write (profile edit, new hire, team transfer) in the same transaction.
+  await recordJobHistory(db,employeeId,before,next,effective,typeof payload.assignmentChangeReason==='string'?payload.assignmentChangeReason.trim().slice(0,500)||null:null);
 }

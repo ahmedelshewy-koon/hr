@@ -1,13 +1,13 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { localizeApiMessage } from "./api-messages";
 import { PAGE_LABELS } from "./navigation-labels";
 import { ApprovalsTab, AttendanceTab, DocumentsTab, LeaveTab, OverviewTab, TalentTab, WorkforceTab } from "./reports-sections";
 import { Badge, ExportButton, Panel, makeDateLabel, makeNumberFormat, type ReportContext } from "./reports-widgets";
 import { buildHighlights, type ReportTab } from "./reports/report-highlights";
-import { REPORT_MAX_DAYS, cairoToday, daysBetween, periodPreset } from "./reports/report-period";
+import { REPORT_MAX_DAYS, cairoToday, daysBetween, periodPreset, presetOf } from "./reports/report-period";
 import type { ReportOverview } from "./reports/report-types";
 import { statusLabel } from "./reports/report-labels";
 import "./reports-workspace.css";
@@ -37,6 +37,8 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
   const [error, setError] = useState("");
   const [loadedKey, setLoadedKey] = useState("");
   const [nonce, setNonce] = useState(0);
+  const [selectedExport, setSelectedExport] = useState("attendance");
+  const [customPeriod, setCustomPeriod] = useState(false);
   const [exporting, setExporting] = useState("");
   const [missingFilters, setMissingFilters] = useState({ companyId: "", country: "", workLocation: "", status: "" });
   const [filterCatalog, setFilterCatalog] = useState<{ companies: { id: number; name: string }[]; countries: string[]; locations: string[]; statuses: string[] } | null>(null);
@@ -122,6 +124,10 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
     ...(hasTalent ? [{ id: "talent" as const, label: t("التوظيف", "Recruitment") }] : []),
     { id: "exports", label: t("تصدير الملفات", "File exports") },
   ];
+  const today = cairoToday();
+  const activePreset = customPeriod ? null : presetOf(from, to, today);
+  const availableExports = data ? EXPORTS.filter(item => item.available(data)) : [];
+  const exportItem = availableExports.find(item => item.type === selectedExport) ?? availableExports[0];
   const activeTab = tabs.some(item => item.id === tab) ? tab : "overview";
 
   return <div className="reports-workspace">
@@ -129,29 +135,37 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
       <div>
         <span className="eyebrow">{t("تقارير وتحليلات", "REPORTS & INSIGHTS")}</span>
         <h1>{PAGE_LABELS.reports[rtl ? "ar" : "en"]}</h1>
-        <p>{t("أرقام ومؤشرات جاهزة للقراءة، وليست مجرد ملفات للتنزيل. اختر الفترة ثم تنقّل بين الأقسام.", "Readable figures and signals, not just files to download. Pick a period, then move between the sections.")}</p>
+        <p>{t("تابع مؤشرات فريقك، اعرف ما يحتاج إجراء، وحمّل التقرير المناسب.", "Track your team, see what needs action, and download the report you need.")}</p>
       </div>
+      <button type="button" className="outline rp-export" onClick={() => setTab("exports")}><Download size={16}/>{t("تصدير تقرير", "Export report")}</button>
     </header>
 
     <section className="rp-toolbar" aria-label={t("أقسام التقارير والفترة", "Report sections and period")}>
+      <div className="rp-presets" role="group" aria-label={t("فترة التقرير", "Report period")}>
+        <button type="button" className={activePreset === "this_month" ? "active" : ""} aria-pressed={activePreset === "this_month"} onClick={() => { setCustomPeriod(false); setRange(periodPreset("this_month", cairoToday())); }}>{t("الشهر الحالي", "This month")}</button>
+        <button type="button" className={activePreset === "last_month" ? "active" : ""} aria-pressed={activePreset === "last_month"} onClick={() => { setCustomPeriod(false); setRange(periodPreset("last_month", cairoToday())); }}>{t("الشهر السابق", "Last month")}</button>
+        <button type="button" className={!activePreset ? "active" : ""} aria-pressed={!activePreset} onClick={() => setCustomPeriod(true)}>{t("فترة مخصصة", "Custom period")}</button>
+      </div>
+      <div className="rp-dates">
+        <label><span>{t("من", "From")}</span><input type="date" value={from} max={to || undefined} onChange={event => { setCustomPeriod(true); setRange(current => ({ ...current, from: event.target.value })); }}/></label>
+        <label><span>{t("إلى", "To")}</span><input type="date" value={to} min={from || undefined} onChange={event => { setCustomPeriod(true); setRange(current => ({ ...current, to: event.target.value })); }}/></label>
+      </div>
+      <button type="button" className="outline rp-refresh" disabled={loading || Boolean(problem)} onClick={() => setNonce(value => value + 1)}><RefreshCw size={16} className={loading ? "rp-spin" : ""}/>{t("تحديث", "Refresh")}</button>
+    </section>
+    {data && <p className="rp-scope">{t("البيانات المعروضة:", "Showing:")} <span dir="ltr">{data.period.from} — {data.period.to}</span> · {t("الحضور حتى", "Attendance through")} <span dir="ltr">{data.attendance.through}</span>{loading && <span role="status"> · {t("جارٍ التحديث…", "Updating…")}</span>}</p>}
       {data && <div className="rp-tabs" role="tablist" aria-label={t("أقسام التقارير", "Report sections")}>
         {tabs.map(item => <button key={item.id} type="button" role="tab" aria-selected={activeTab === item.id} className={activeTab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>
           {item.label}{item.count ? <em>{fmt(item.count)}</em> : null}
         </button>)}
       </div>}
-      <div className="rp-dates">
-        <label><span>{t("من", "From")}</span><input type="date" value={from} max={to || undefined} onChange={event => setRange(current => ({ ...current, from: event.target.value }))}/></label>
-        <label><span>{t("إلى", "To")}</span><input type="date" value={to} min={from || undefined} onChange={event => setRange(current => ({ ...current, to: event.target.value }))}/></label>
-      </div>
-    </section>
 
     {problem === "order" && <div className="error-banner" role="alert">{t("تاريخ البداية يجب ألا يكون بعد تاريخ النهاية.", "The start date must not be after the end date.")}</div>}
     {problem === "long" && <div className="error-banner" role="alert">{t("لا يمكن أن تتجاوز الفترة 366 يومًا.", "The period cannot exceed 366 days.")}</div>}
     {error && !problem && <div className="error-banner rp-error" role="alert"><AlertTriangle size={16}/><span>{error}</span><button type="button" className="outline" onClick={() => setNonce(value => value + 1)}>{t("إعادة المحاولة", "Try again")}</button></div>}
 
-    {!data && !problem && !error && <div className="rp-skeleton" aria-busy="true" aria-label={t("جارٍ تحميل التقارير", "Loading the reports")}>{Array.from({ length: 8 }, (_, index) => <i key={index}/>)}</div>}
+    {!data && !problem && !error && <div className="rp-skeleton" aria-busy="true" aria-label={t("جارٍ تحميل التقارير", "Loading the reports")}>{Array.from({ length: 4 }, (_, index) => <i key={index}/>)}</div>}
 
-    {data && <>
+    {data && !problem && !error && <>
       <div className={`rp-body${loading ? " loading" : ""}`} aria-busy={loading}>
         {activeTab === "overview" && <OverviewTab data={data} ctx={ctx} highlights={highlights} goTo={setTab}/>}
         {activeTab === "workforce" && <WorkforceTab data={data} ctx={ctx}/>}
@@ -161,7 +175,8 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
         {activeTab === "documents" && <DocumentsTab data={data} ctx={ctx}/>}
         {activeTab === "talent" && <TalentTab data={data} ctx={ctx}/>}
         {activeTab === "exports" && <Panel title={t("تصدير الملفات", "File exports")} note={t("تقرير البيانات الناقصة بصيغة Excel، وبقية الملفات بصيغة CSV. الملفات المعلَّمة «حسب الفترة» تلتزم بالتاريخين المختارين أعلاه.", "Missing employee data exports as Excel; other files use CSV. Files marked “by period” follow the two dates chosen above.")}>
-          <ul className="rp-exports">{EXPORTS.filter(item => item.available(data)).map(item => <li key={item.type}>
+          <label className="rp-export-choice"><span>{t("اختر التقرير", "Choose a report")}</span><select value={exportItem?.type ?? ""} onChange={event => setSelectedExport(event.target.value)}>{availableExports.map(item => <option key={item.type} value={item.type}>{rtl ? item.ar : item.en}</option>)}</select></label>
+          <ul className="rp-exports">{(exportItem ? [exportItem] : []).map(item => <li key={item.type}>
             <div><b>{rtl ? item.ar : item.en}</b><p>{rtl ? item.arNote : item.enNote}</p><Badge tone={item.byPeriod ? "info" : "neutral"}>{item.byPeriod ? t("حسب الفترة", "By period") : t("الوضع الحالي", "Current state")}</Badge>
               {item.type === "missing_employee_data" && <>
                 <div className="rp-missing-filters" role="group" aria-label={t("تصفية تقرير البيانات الناقصة", "Missing employee data filters")}>
@@ -173,7 +188,7 @@ export function ReportsWorkspace({ rtl, notify }: { rtl: boolean; notify: (messa
                 {filterError && <p role="alert">{filterError}</p>}
               </>}
             </div>
-            <ExportButton primary label={t("تصدير", "Export")} busy={exporting === item.type} onClick={() => void exportCsv(item.type)}/>
+            <ExportButton primary label={item.type === "missing_employee_data" ? t("تحميل Excel", "Download Excel") : t("تحميل CSV", "Download CSV")} busy={Boolean(exporting)} onClick={() => void exportCsv(item.type)}/>
           </li>)}</ul>
         </Panel>}
       </div>

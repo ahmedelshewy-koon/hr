@@ -1,10 +1,13 @@
+import type { WorkflowRun } from './workflow-policy';
 type Row = Record<string, unknown>;
 
 export type ApprovalStepState = "approved" | "rejected" | "pending" | "upcoming" | "stopped";
-export type ApprovalStep = { stage: "manager" | "hr"; state: ApprovalStepState; name: string | null; nameAr: string | null; at: unknown; reason: string | null };
+export type ApprovalStep = { stage: "manager" | "hr" | `workflow:${number}`; state: ApprovalStepState; name: string | null; nameAr: string | null; at: unknown; reason: string | null };
 
 /** Manager then HR, each with the person who decided or the person it is waiting on. */
 export function buildApprovalChain(request: Row, history: Row[]): ApprovalStep[] {
+  const workflow=request.approval_workflow as WorkflowRun|undefined;
+  if(workflow)return workflow.steps.map((step,index)=>({stage:`workflow:${index}`,state:step.decision==='approve'?'approved':step.decision==='reject'?'rejected':workflow.state!=='pending'?'stopped':index===workflow.currentStep?'pending':'upcoming',name:step.name,nameAr:step.nameAr,at:step.at||null,reason:step.reason||null}));
   const status = String(request.status ?? "");
   const decided = (stage: string) => history.filter(action => String(action.stage) === stage && ["approve", "reject"].includes(String(action.action))).at(-1);
   const step = (stage: "manager" | "hr", waitingState: ApprovalStepState | null): ApprovalStep => {

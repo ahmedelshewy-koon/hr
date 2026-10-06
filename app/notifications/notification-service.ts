@@ -1,3 +1,4 @@
+import { workflowsReady } from '../approvals/workflow-service';
 import type { PostgresDatabase } from "../../db/postgres";
 import { CONTRACT_EXPIRY_WARNING_DAYS } from "../employees/contract-policy";
 
@@ -15,6 +16,10 @@ export async function createNotification(db:PostgresDatabase,input:{userId:numbe
 
 export async function syncOperationalNotifications(db:PostgresDatabase){
   const hrSql=await effectiveHrSql(db);
+  if(await workflowsReady(db))await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
+    SELECT w.current_user_id,'approval','workflow_needs_approval','request_waiting',CASE WHEN w.source_type='employee_request' THEN 'request' ELSE 'attendance_correction' END,w.source_id::text,'approvals',concat('workflow:',w.id,':',w.current_step),w.updated_at
+    FROM approval_workflow_runs w JOIN users u ON u.id=w.current_user_id AND u.status='active' WHERE w.state='pending'
+    ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
   await db.prepare(`DELETE FROM notifications n WHERE n.title_key IN ('request_needs_manager_approval','correction_needs_manager_approval')
     AND NOT EXISTS (SELECT 1 FROM employees e JOIN users u ON u.employee_id=(${EMPLOYEE_MANAGER_SQL}) AND u.status='active'
       JOIN roles r ON r.id=u.role_id AND r.name='Department Manager'
@@ -37,7 +42,7 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
   await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT u.id,'approval','request_needs_hr_approval','request_waiting','request',q.id::text,'approvals',concat('request:',q.id,':pending_hr')::text,q.updated_at
     FROM requests q JOIN employees e ON e.id=q.employee_id JOIN users u ON u.id=${hrSql} AND u.status='active' JOIN hr_responsibles h ON h.user_id=u.id AND h.status='active' AND (u.employee_id<>e.id AND EXISTS (SELECT 1 FROM employees he WHERE he.id=u.employee_id AND he.employment_status IN ('active','probation','notice_period'))) JOIN roles r ON r.id=u.role_id AND r.name IN ('Super Admin','HR Manager')
-    WHERE q.status='pending_hr' ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
+    WHERE q.status='pending_hr' AND q.current_stage='hr' ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
   await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT u.id,'request_result',CASE WHEN q.status IN ('hr_approved','approved') THEN 'request_approved' ELSE 'request_rejected' END,q.status,'request',q.id::text,'portal',concat('request:',q.id,':',q.status)::text,q.updated_at
     FROM requests q JOIN users u ON u.employee_id=q.employee_id AND u.status='active'
@@ -45,7 +50,7 @@ export async function syncOperationalNotifications(db:PostgresDatabase){
   await db.prepare(`${MANAGER_NOTIFICATION_SCOPE} INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT u.id,'attendance_approval',CASE WHEN c.current_stage='manager' THEN 'correction_needs_manager_approval' ELSE 'correction_needs_hr_approval' END,c.status,'attendance_correction',c.id::text,'approvals',concat('correction:',c.id,':',c.status)::text,c.updated_at
     FROM attendance_corrections c JOIN employees e ON e.id=c.employee_id JOIN users u ON u.status='active' LEFT JOIN roles r ON r.id=u.role_id
-    WHERE (c.status='pending_manager' AND EXISTS (SELECT 1 FROM manager_scope m WHERE m.user_id=u.id AND m.target_employee_id=e.id AND m.employee_id<>e.id)) OR (c.status='pending_hr' AND u.id=${hrSql} AND r.name IN ('Super Admin','HR Manager') AND EXISTS (SELECT 1 FROM hr_responsibles h WHERE h.user_id=u.id AND h.status='active' AND (u.employee_id<>e.id AND EXISTS (SELECT 1 FROM employees he WHERE he.id=u.employee_id AND he.employment_status IN ('active','probation','notice_period')))))
+    WHERE (c.status='pending_manager' AND EXISTS (SELECT 1 FROM manager_scope m WHERE m.user_id=u.id AND m.target_employee_id=e.id AND m.employee_id<>e.id)) OR (c.status='pending_hr' AND c.current_stage='hr' AND u.id=${hrSql} AND r.name IN ('Super Admin','HR Manager') AND EXISTS (SELECT 1 FROM hr_responsibles h WHERE h.user_id=u.id AND h.status='active' AND (u.employee_id<>e.id AND EXISTS (SELECT 1 FROM employees he WHERE he.id=u.employee_id AND he.employment_status IN ('active','probation','notice_period')))))
     ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`).run();
   await db.prepare(`INSERT INTO notifications (user_id,type,title_key,message_key,entity_type,entity_id,target_path,dedupe_key,created_at)
     SELECT u.id,'attendance_result',CASE WHEN c.status='resolved' THEN 'correction_approved' ELSE 'correction_rejected' END,c.status,'attendance_correction',c.id::text,'portal',concat('correction:',c.id,':',c.status)::text,c.updated_at

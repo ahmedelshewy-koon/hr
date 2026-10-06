@@ -151,7 +151,7 @@ export function positionOccupantsImpact(ctx: ImpactContext, positionId: number):
 /* ------------------------------------------------------------------ unit managers */
 
 /** Any existing, non-deleted employee can be assigned as a unit manager. */
-export function unitManagerIssue(employee: Row | null | undefined, _companyId: number | null, _companies?: Row[]): OrganizationIssue | null {
+export function unitManagerIssue(employee: Row | null | undefined): OrganizationIssue | null {
   if (!employee) return issueOf(orgError('INVALID_UNIT_MANAGER', 'manager_employee_id', 'الموظف المختار غير موجود', 'The selected employee does not exist'));
   if (employee.employment_status === 'deleted') return issueOf(orgError('INVALID_UNIT_MANAGER', 'manager_employee_id', 'الموظف المختار محذوف', 'The selected employee is deleted', { blocking: { type: 'employee', id: employee.id } }));
   return null;

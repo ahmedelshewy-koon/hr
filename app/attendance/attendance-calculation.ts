@@ -8,6 +8,8 @@ export type AttendanceCalculationInput = {
   requiredMinutes?: number | null; graceMinutes?: number | null;
   attendanceType?: string | null; isWorkingDay?: boolean;
   isHoliday?: boolean; isApprovedLeave?: boolean; dayComplete?: boolean;
+  /** false = employee is not required to punch; a working day counts as attended with no late/absence. */
+  fingerprintRequired?: boolean;
 };
 
 export type AttendanceCalculation = {
@@ -31,6 +33,7 @@ export function calculateDailyAttendance(input: AttendanceCalculationInput): Att
     return {workedMinutes:0,lateMinutes:0,earlyMinutes:0,overtimeMinutes:0,status:"leave",attendanceType:"leave",exceptions};
   }
   if(input.isWorkingDay===false)return {workedMinutes:0,lateMinutes:0,earlyMinutes:0,overtimeMinutes:0,status:"non_working_day",attendanceType:type,exceptions};
+  if(input.fingerprintRequired===false)return {workedMinutes:required,lateMinutes:0,earlyMinutes:0,overtimeMinutes:0,status:type==="remote"?"remote":"present",attendanceType:type,exceptions};
   if(!input.actualIn){
     if(input.actualOut)exceptions.push("attendance_conflict");
     if(input.dayComplete!==false)exceptions.push("missing_check_in","absent");
@@ -65,4 +68,23 @@ export function isScheduledWorkDay(workDate:string,workDays:string|null|undefine
   const date=new Date(`${workDate}T12:00:00Z`);
   if(Number.isNaN(date.getTime()))throw new Error("Invalid attendance date");
   return String(workDays||"0,1,2,3,4").split(",").map(Number).includes(date.getUTCDay());
+}
+
+/** Keeps only valid weekdays (0–6) that are also working days, sorted, e.g. "4,2,9" with work days "0,1,2,3,4" → "2,4". */
+export function normalizeRemoteDays(remoteDays:unknown,workDays:string|null|undefined){
+  const working=new Set(String(workDays||"0,1,2,3,4").split(",").filter(Boolean));
+  return [...new Set(String(remoteDays??"").split(",").map(value=>value.trim()).filter(value=>/^[0-6]$/.test(value)&&working.has(value)))].sort().join(",");
+}
+
+/** The work mode an employee's schedule expects on a date: "remote" on their remote weekdays, otherwise "office". */
+export function scheduledWorkMode(workDate:string,remoteDays:string|null|undefined):"office"|"remote"{
+  const date=new Date(`${workDate}T12:00:00Z`);
+  if(Number.isNaN(date.getTime()))throw new Error("Invalid attendance date");
+  return String(remoteDays||"").split(",").includes(String(date.getUTCDay()))?"remote":"office";
+}
+
+/** An employee who punches on a device checks in remotely only on their remote weekdays or a rest day; office days come from the device. */
+export function remoteCheckInAllowed(input:{workDate:string;workDays:string|null|undefined;remoteDays:string|null|undefined;punchesOnDevice:boolean}){
+  if(!input.punchesOnDevice||!isScheduledWorkDay(input.workDate,input.workDays))return true;
+  return scheduledWorkMode(input.workDate,input.remoteDays)==="remote";
 }

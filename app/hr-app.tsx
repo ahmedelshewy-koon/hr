@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
+  CircleHelp, Home, Landmark, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleUserRound,
   Clock3, Download, Eye, FileText, Globe2, GripVertical, KeyRound,
   Languages, LayoutDashboard, LayoutGrid, List, Lock, Menu, Minus, MoreHorizontal, Network, PanelLeftClose, PanelLeftOpen,
   Pencil, Plus, Printer, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
-  Trash2, Unlock, Users, Wallet, X, UserRoundSearch, Workflow, Laptop, GraduationCap,
+  Trash2, Unlock, Users, ScrollText, Wallet, X, UserRoundSearch, Workflow, Laptop, GraduationCap,
 } from "lucide-react";
 import { reportingOrder } from "./organization/reporting-line";
 import { BankExportLayoutDrawer, EmployeeDetailsDrawer, EmployeeDrawer, HolidayDrawer, HolidayPostponeDrawer, InsuranceRateDrawer, LoanDrawer, OrganizationEntityDrawer, PayrollRunDrawer, SalaryStructureDrawer, TaxBracketDrawer } from "./employee-drawer";
@@ -55,7 +55,11 @@ import "./mobile-experience.css";
 import { CompanyHrSettings } from "./company-hr-settings";
 import { ProfileMenu } from "./profile-menu";
 import { DashboardCardDetails, type DashboardDetailRow } from "./dashboard-card-details";
+import { DashboardMyTasks } from "./dashboard-my-tasks";
+import { DashboardInsights } from "./dashboard-insights";
+import { DashboardTeamTasks } from "./dashboard-team-tasks";
 import "./sana-theme.css";
+import "./employee-portal-dashboard.css";
 import type { Row } from "./ui-types";
 
 type Lang = "en" | "ar";
@@ -63,11 +67,12 @@ type Page = PageId;
 /** Sidebar sections; a subtle divider is drawn wherever the section changes. */
 const NAV_GROUP: Record<Page, number> = {
   dashboard: 0, portal: 0, approvals: 0,
-  employees: 1, leave: 1, attendance: 1, recruitment: 1, lifecycle: 1,
-  assets: 2, learning: 2, org: 2,
-  users: 3, reports: 3, payroll: 3, settings: 3,
+  employees: 1, leave: 1, attendance: 1, decisions: 1, recruitment: 1, lifecycle: 1,
+  assets: 2, learning: 2, org: 2, blueprint: 2,
+  users: 3, reports: 3, payroll: 3, cost_centers: 3, hr_settings: 3, settings: 3,
 };
-type RoleId = "hr_manager" | "department_manager" | "employee" | "super_admin";
+const NAV_GROUP_LABELS = { ar: ["الرئيسية", "شؤون الموظفين", "التنظيم والتطوير", "المالية والإدارة"], en: ["Main", "People", "Organization & growth", "Finance & admin"] };
+type RoleId ="hr_manager" | "department_manager" | "employee" | "super_admin";
 type AuthUser = { id:number;email:string;role_name:string;role_name_en?:string|null;role_name_ar?:string|null;allowed_pages?:Page[];employee_id?:number|null;employee_name?:string|null;employee_name_ar?:string|null;department_name?:string|null;department_name_ar?:string|null;must_change_password?:number };
 
 const localeFor = (rtl: boolean) => rtl ? "ar-SA-u-nu-arab" : "en-GB";
@@ -102,28 +107,35 @@ const roleLabel=(role:Row|undefined,rtl:boolean)=>role?(rtl?(role.name_ar||role.
 const copy = {
   en: {
     dashboard: PAGE_LABELS.dashboard.en, portal: PAGE_LABELS.portal.en, approvals: PAGE_LABELS.approvals.en,
-    employees: PAGE_LABELS.employees.en, leave: PAGE_LABELS.leave.en, attendance: PAGE_LABELS.attendance.en,
-    recruitment:PAGE_LABELS.recruitment.en,lifecycle:PAGE_LABELS.lifecycle.en,assets:PAGE_LABELS.assets.en,learning:PAGE_LABELS.learning.en,org: PAGE_LABELS.org.en, users: PAGE_LABELS.users.en, reports:PAGE_LABELS.reports.en, payroll: PAGE_LABELS.payroll.en, settings: PAGE_LABELS.settings.en,
+    employees: PAGE_LABELS.employees.en, leave: PAGE_LABELS.leave.en, attendance: PAGE_LABELS.attendance.en, decisions: PAGE_LABELS.decisions.en,
+    recruitment:PAGE_LABELS.recruitment.en,lifecycle:PAGE_LABELS.lifecycle.en,assets:PAGE_LABELS.assets.en,learning:PAGE_LABELS.learning.en,org: PAGE_LABELS.org.en, blueprint: PAGE_LABELS.blueprint.en, users: PAGE_LABELS.users.en, reports:PAGE_LABELS.reports.en, payroll: PAGE_LABELS.payroll.en, cost_centers: PAGE_LABELS.cost_centers.en, hr_settings: PAGE_LABELS.hr_settings.en, settings: PAGE_LABELS.settings.en,
     search: "Search anything...", greeting: "Good morning", subtitle: "Here’s what’s happening with your team today.",
     newRequest: "New request", viewAll: "View all", pending: "Pending approvals",
   },
   ar: {
     dashboard: PAGE_LABELS.dashboard.ar, portal: PAGE_LABELS.portal.ar, approvals: PAGE_LABELS.approvals.ar,
-    employees: PAGE_LABELS.employees.ar, leave: PAGE_LABELS.leave.ar, attendance: PAGE_LABELS.attendance.ar,
-    recruitment:PAGE_LABELS.recruitment.ar,lifecycle:PAGE_LABELS.lifecycle.ar,assets:PAGE_LABELS.assets.ar,learning:PAGE_LABELS.learning.ar,org: PAGE_LABELS.org.ar, users: PAGE_LABELS.users.ar, reports:PAGE_LABELS.reports.ar, payroll: PAGE_LABELS.payroll.ar, settings: PAGE_LABELS.settings.ar,
+    employees: PAGE_LABELS.employees.ar, leave: PAGE_LABELS.leave.ar, attendance: PAGE_LABELS.attendance.ar, decisions: PAGE_LABELS.decisions.ar,
+    recruitment:PAGE_LABELS.recruitment.ar,lifecycle:PAGE_LABELS.lifecycle.ar,assets:PAGE_LABELS.assets.ar,learning:PAGE_LABELS.learning.ar,org: PAGE_LABELS.org.ar, blueprint: PAGE_LABELS.blueprint.ar, users: PAGE_LABELS.users.ar, reports:PAGE_LABELS.reports.ar, payroll: PAGE_LABELS.payroll.ar, cost_centers: PAGE_LABELS.cost_centers.ar, hr_settings: PAGE_LABELS.hr_settings.ar, settings: PAGE_LABELS.settings.ar,
     search: "ابحث في النظام...", greeting: "صباح الخير", subtitle: "إليك ملخص فريقك لهذا اليوم.",
     newRequest: "طلب جديد", viewAll: "عرض الكل", pending: "طلبات بانتظار الاعتماد",
   },
 };
 
-import { OrganizationSettings } from './organization-settings';
-import { hasRequestedOrganizationSection, requestOrganizationSection, useOrganizationAccess } from './settings/use-organization-snapshot';
+import { OrganizationSettings, ORGANIZATION_SECTIONS, HrResponsibilitySettings } from './organization-settings';
+import { SettingsSubnav } from './settings/settings-ui';
+import { HrSettings } from './hr-settings';
+import { DecisionPrompt, DecisionsPage } from "./decisions-page";
+import { ApprovalWorkflowSettings } from './approval-workflow-settings';
+import { BlueprintWorkspace } from './blueprint-workspace';
+import { CostCentersWorkspace } from './cost-centers-workspace';
+import { useOrganizationAccess } from './settings/use-organization-snapshot';
 import { OrganizationChart } from './organization-chart';
 import { createLatestLoader, onHrDataChanged } from './organization/latest-loader';
 import type { OrganizationCatalog } from './organization/assignment-policy';
 type HRData = {
   organization?:OrganizationCatalog|null;
   employeeScope?:'full'|'limited';
+  hrDataScope?:'all'|'assigned';
   demoDataEnabled?: boolean;
   companies?: Row[]; hrResponsibles?: Row[]; hrCandidates?: Row[];
   employees: Row[]; departments: Row[]; jobTitles: Row[];
@@ -238,6 +250,7 @@ export function HRApp() {
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestPreset,setRequestPreset]=useState("");
+  const [portalProfileOpen,setPortalProfileOpen]=useState(false);
   const [employeeSection,setEmployeeSection]=useState<EmployeeSection>("home");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dashboardCountries,setDashboardCountries]=useState<string[]>([]);
@@ -304,9 +317,9 @@ export function HRApp() {
 
   const role=roleIdFromName(authUser?.role_name);
   const rolePages:Record<RoleId,Page[]>={
-    super_admin:["dashboard","portal","approvals","employees","leave","attendance","recruitment","lifecycle","assets","learning","org","users","reports","payroll","settings"],
-    hr_manager:["dashboard","portal","approvals","employees","leave","attendance","recruitment","lifecycle","assets","learning","org","users","reports","payroll"],
-    department_manager:["dashboard","portal","approvals","employees","leave","attendance","recruitment","lifecycle","assets","learning","org","reports"],
+    super_admin:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","blueprint","users","reports","payroll","cost_centers","hr_settings","settings"],
+    hr_manager:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","blueprint","users","reports","payroll","cost_centers"],
+    department_manager:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","reports"],
     employee:["dashboard","portal","lifecycle","learning"],
   };
 
@@ -322,15 +335,26 @@ export function HRApp() {
     { id: "assets" as Page, label: t.assets, icon: Laptop },
     { id: "learning" as Page, label: t.learning, icon: GraduationCap },
     { id: "org" as Page, label: t.org, icon: Network },
+    { id: "blueprint" as Page, label: t.blueprint, icon: Building2 },
+    { id: "decisions" as Page, label: t.decisions, icon: ScrollText },
     { id: "users" as Page, label: t.users, icon: ShieldCheck },
     { id: "reports" as Page, label: t.reports, icon: Download },
     { id: "payroll" as Page, label: t.payroll, icon: Wallet },
+    { id: "cost_centers" as Page, label: t.cost_centers, icon: Landmark },
+    { id: "hr_settings" as Page, label: t.hr_settings, icon: SlidersHorizontal },
     { id: "settings" as Page, label: t.settings, icon: Settings },
-  ].filter(item=>(Array.isArray(authUser?.allowed_pages)?authUser.allowed_pages:rolePages[role]).includes(item.id));
+  ].filter(item=>(Array.isArray(authUser?.allowed_pages)?authUser.allowed_pages:rolePages[role]).includes(item.id))
+    .sort((a,b)=>{const order=authUser?.allowed_pages??rolePages[role];return NAV_GROUP[a.id]-NAV_GROUP[b.id]||order.indexOf(a.id)-order.indexOf(b.id);});
 
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
   const canOpen=(target:Page)=>nav.some(item=>item.id===target);
   const goTo=(target:Page,employeeId?:number)=>{setFocusEmployeeId(employeeId??null);setPage(target);setMobileOpen(false);};
+  // Employee shortcuts remain available across pages, without duplicating the management menu.
+  const openPortalSection=(section:EmployeeSection,target:string)=>{
+    setEmployeeSection(section);
+    goTo("portal");
+    window.requestAnimationFrame(()=>document.getElementById(target)?.scrollIntoView({block:"nearest"}));
+  };
   // Notifications only ever navigate to a page this user can open; otherwise they explain instead of landing somewhere unrelated.
   const openNotificationTarget=(targetPath:unknown)=>{
     const destination=resolveNotificationDestination(targetPath,nav.map(item=>item.id));
@@ -342,16 +366,29 @@ export function HRApp() {
   const sidebarToggle = <button type="button" className="sidebar-collapse" aria-expanded={!sidebarCollapsed} aria-controls="main-sidebar" onClick={()=>setSidebarCollapsed(value=>{const next=!value;window.localStorage.setItem("hr-sidebar-collapsed",String(next));return next;})} aria-label={sidebarCollapsed?(rtl?"فتح القائمة الجانبية":"Expand sidebar"):(rtl?"طي القائمة الجانبية":"Collapse sidebar")} title={sidebarCollapsed?(rtl?"فتح القائمة":"Expand sidebar"):(rtl?"طي القائمة":"Collapse sidebar")}>{sidebarCollapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</button>;
 
   return (
-    <div className={`app ${canOpen("portal")?"has-employee-nav":""} ${sidebarCollapsed?"sidebar-collapsed":""}`} dir={rtl ? "rtl" : "ltr"} data-lang={lang}>
+    <div className={`app ${visiblePage==="portal"?"portal-shell":""} ${canOpen("portal")?"has-employee-nav":""} ${sidebarCollapsed?"sidebar-collapsed":""}`} dir={rtl ? "rtl" : "ltr"} data-lang={lang}>
       <aside id="main-sidebar" className={`sidebar ${mobileOpen ? "open" : ""}`}>
-        <div className="brand">{sidebarToggle}<span className="brand-symbol"><img src="/hr-logo-glass.png" alt="HR"/></span><SanaBrand className="sana-wordmark" /><button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label={rtl?"إغلاق القائمة":"Close menu"}><X size={20} /></button></div>
+        <div className="brand">{sidebarToggle}<span className="brand-symbol"><img src="/sana-mark.png" alt="SANA HR"/></span><SanaBrand className="sana-wordmark" /><button className="mobile-close" onClick={() => setMobileOpen(false)} aria-label={rtl?"إغلاق القائمة":"Close menu"}><X size={20} /></button></div>
         <nav>
           {nav.map(({ id, label, icon: Icon }, index) => (
-            <button key={id} className={`${visiblePage === id ? "active" : ""} ${index>0&&NAV_GROUP[id]!==NAV_GROUP[nav[index-1].id]?"nav-group-start":""}`.trim()} aria-label={label} title={sidebarCollapsed?label:undefined} onClick={() => goTo(id)}>
-              <Icon size={20} /><span>{label}</span>{id==="approvals"&&<ApprovalsBadge/>}
-            </button>
+            <Fragment key={id}>
+              {(index===0||NAV_GROUP[id]!==NAV_GROUP[nav[index-1].id])&&<div className="nav-group-label" role="presentation">{(rtl?NAV_GROUP_LABELS.ar:NAV_GROUP_LABELS.en)[NAV_GROUP[id]]}</div>}
+              <button className={visiblePage === id ? "active" : ""} aria-label={label} title={sidebarCollapsed?label:undefined} onClick={() => goTo(id)}>
+                <Icon size={20} /><span>{label}</span>{id==="approvals"&&<ApprovalsBadge/>}
+              </button>
+            </Fragment>
           ))}
+          {role==="employee"&&canOpen("portal")&&<>
+            <button onClick={()=>{openPortalSection("requests","portal-requests");}}><FileText size={20}/><span>{rtl?"طلباتي":"My requests"}</span></button>
+            <button onClick={()=>{openPortalSection("home","portal-attendance");}}><Clock3 size={20}/><span>{rtl?"الحضور والانصراف":"Attendance"}</span></button>
+            <button onClick={()=>{openPortalSection("leave","portal-balances");}}><CalendarDays size={20}/><span>{rtl?"الإجازات":"My leave"}</span></button>
+            <button onClick={()=>{setRequestPreset("request:Work from home");setRequestOpen(true);setMobileOpen(false);}}><Home size={20}/><span>{rtl?"العمل من المنزل":"Work from home"}</span></button>
+            {authUser?.employee_id&&<button onClick={()=>{setPortalProfileOpen(true);setMobileOpen(false);}}><CircleUserRound size={20}/><span>{rtl?"البيانات الشخصية":"Personal details"}</span></button>}
+            <button onClick={()=>{openPortalSection("home","portal-services");}}><LayoutGrid size={20}/><span>{rtl?"الخدمات":"Services"}</span></button>
+            <button onClick={()=>{setMobileOpen(false);(document.getElementById("portal-help") as HTMLDialogElement)?.showModal();}}><CircleHelp size={20}/><span>{rtl?"الدعم والمساعدة":"Help & support"}</span></button>
+          </>}
         </nav>
+        {canOpen("portal")&&<div className="sidebar-bottom"><button onClick={()=>void logout()}><LogOut size={20}/><span>{rtl?"تسجيل الخروج":"Sign out"}</span></button></div>}
       </aside>
       {mobileOpen && <button className="scrim" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
 
@@ -364,6 +401,7 @@ export function HRApp() {
             <button className="language" onClick={() => {const next=lang === "en" ? "ar" : "en";setLang(next);window.localStorage.setItem("hr-language",next);}}><Languages size={16} />{lang === "en" ? "العربية" : "English"}</button>
             {visiblePage==="dashboard"&&<CountryFlagFilter rtl={rtl} selected={dashboardCountries} available={dashboardAvailableCountries} onChange={setDashboardCountries} onOpen={()=>setNotificationsOpen(false)}/>}
             <NotificationButton rtl={rtl} open={notificationsOpen} toggle={()=>setNotificationsOpen(value=>!value)}/>
+            {visiblePage==="portal"&&<span className="portal-header-email" dir="ltr">{authUser?.email}</span>}
             <ProfileMenu
               initials={personInitials(authUser?.employee_name||authUser?.email)}
               name={String((rtl?(authUser?.employee_name_ar||authUser?.employee_name):authUser?.employee_name)||authUser?.email||"")}
@@ -384,7 +422,7 @@ export function HRApp() {
           {visiblePage === "dashboard" && <Dashboard sidebarToggle={null} rtl={rtl} t={t} setPage={target=>goTo(target)} canOpen={canOpen} countries={dashboardCountries} onCountriesChange={setDashboardAvailableCountries} />}
           {visiblePage === "portal" && <EmployeePortalWorkspace mobileSection={employeeSection} rtl={rtl} openRequest={preset=>{setRequestPreset(preset);setRequestOpen(true);}} notify={notify}/>}
           {visiblePage === "approvals" && <ApprovalsCenter rtl={rtl} notify={notify} />}
-          {visiblePage === "employees" && <EmployeesPage key={focusEmployeeId??"list"} rtl={rtl} notify={notify} initialEmployeeId={focusEmployeeId??undefined} openOrganizationSettings={()=>goTo("settings")} />}
+          {visiblePage === "employees" && <EmployeesPage key={focusEmployeeId??"list"} rtl={rtl} notify={notify} initialEmployeeId={focusEmployeeId??undefined} />}
           {visiblePage === "leave" && <LeavePage rtl={rtl} notify={notify} />}
           {visiblePage === "attendance" && <AttendanceWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "recruitment" && <RecruitmentWorkspace rtl={rtl} notify={notify} />}
@@ -392,16 +430,23 @@ export function HRApp() {
           {visiblePage === "assets" && <AssetsWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "learning" && <LearningWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "org" && <OrgPage rtl={rtl} notify={notify} />}
+          {visiblePage === "blueprint" && <BlueprintWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "decisions" && <DecisionsPage rtl={rtl} notify={notify} />}
           {visiblePage === "users" && <UsersPage rtl={rtl} notify={notify} />}
           {visiblePage === "reports" && <ReportsWorkspace rtl={rtl} notify={notify}/>}
           {visiblePage === "payroll" && <PayrollPage rtl={rtl} notify={notify} />}
+          {visiblePage === "cost_centers" && <CostCentersWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "hr_settings" && <HrSettingsPage rtl={rtl} notify={notify} />}
           {visiblePage === "settings" && <SettingsPage rtl={rtl} notify={notify} />}
         </div>
       </main>
       {canOpen("portal") && <EmployeeMobileNav rtl={rtl} active={visiblePage==="portal"?employeeSection:null} onMenu={()=>setMobileOpen(true)} onSelect={section=>{setEmployeeSection(section);goTo("portal");window.scrollTo({top:0,behavior:"instant"});}}/>}
-      {requestOpen && <EmployeeRequestDrawer rtl={rtl} preset={requestPreset} close={() => {setRequestOpen(false);setRequestPreset("");}} submit={async payload => { await hrApi({action:"create_request",...payload}); window.dispatchEvent(new Event("hr-data-changed")); setRequestOpen(false);setRequestPreset(""); notify(rtl?"تم إرسال الطلب وحجز الرصيد بنجاح":"Request submitted and balance reserved successfully"); }} />}
+      {requestOpen && <EmployeeRequestDrawer rtl={rtl} preset={requestPreset} close={() => {setRequestOpen(false);setRequestPreset("");}} submit={async (payload) => { const result=await hrApi({action:"create_request",...payload}); window.dispatchEvent(new Event("hr-data-changed")); setRequestOpen(false);setRequestPreset(""); notify(result.status==="hr_approved"?(rtl?"تم تسجيل الإجازة واعتمادها للموظف":"Leave recorded and approved for the employee"):(rtl?"تم إرسال الطلب وحجز الرصيد بنجاح":"Request submitted and balance reserved successfully")); }} />}
       {Boolean(authUser?.must_change_password)&&<PasswordChange rtl={rtl} forced onChanged={()=>setAuthUser(current=>current?{...current,must_change_password:0}:current)}/>}
+      {portalProfileOpen&&authUser?.employee_id&&<EmployeeProfile360 rtl={rtl} employeeId={authUser.employee_id} close={()=>setPortalProfileOpen(false)} onEdit={()=>{setPortalProfileOpen(false);if(canOpen("employees"))goTo("employees",authUser.employee_id!);}}/>}
+      {canOpen("portal")&&<dialog id="portal-help" className="portal-help" dir={rtl?"rtl":"ltr"}><h2>{rtl?"الدعم والمساعدة":"Help & support"}</h2><p>{rtl?"لمراجعة طلبك ومسار اعتماده، افتح الطلب من بطاقة الأحدث وحالاتها.":"Open a recent request to review its details and approval timeline."}</p><p>{rtl?"إذا كانت بصمة الحضور ناقصة أو غير صحيحة، استخدم «مشكلة في الحضور» لإرسال طلب تصحيح.":"For a missing or incorrect punch, use Attendance issue to submit a correction."}</p><p>{rtl?"للاستفسارات المتعلقة ببياناتك أو أرصدتك، تواصل مع مسؤول الموارد البشرية في شركتك.":"For questions about your details or balances, contact your company's HR representative."}</p><form method="dialog"><button className="primary">{rtl?"فهمت":"Got it"}</button></form></dialog>}
       {toast && <div className="toast"><CheckCircle2 size={20} />{toast}</div>}
+      <DecisionPrompt rtl={rtl} />
     </div>
   );
 }
@@ -505,10 +550,13 @@ function Dashboard({ rtl, t, setPage, canOpen, countries, onCountriesChange, sid
     <div className="dashboard-heading"><div className="dashboard-heading-start">{sidebarToggle}<h1 className="dashboard-title">{rtl?"لوحة التحكم":"Dashboard"}</h1></div></div>
     {error&&<div className="error-banner">{error}</div>}
     {showPersonal&&<section className="panel personal-dashboard-summary"><div className="panel-head"><div><span className="eyebrow">{rtl?"بياناتي":"MY OVERVIEW"}</span><h2>{rtl?"ملخصي الشخصي":"My personal summary"}</h2><p>{rtl?(selfEmployee?.name_ar||selfEmployee?.name_en||"بيانات الموظف"):(selfEmployee?.name_en||selfEmployee?.name_ar||"Employee details")}</p></div></div><div className="personal-dashboard-metrics"><span><small>{rtl?"حالة اليوم":"Today's status"}</small><b>{ownAttendance?localizedStatus(ownAttendance.status,rtl):(rtl?"لم يسجل بعد":"Not recorded yet")}</b></span><span><small>{rtl?"وقت الحضور":"Check-in"}</small><b dir="ltr">{ownAttendance?.actual_in||"—"}</b></span><span><small>{rtl?"طلبات قيد الانتظار":"Pending requests"}</small><b>{formatNumber(ownPendingRequests,rtl)}</b></span><span><small>{rtl?"رصيد الإجازات المتاح":"Available leave balance"}</small><b>{formatNumber(ownAvailableLeave,rtl)}</b></span></div></section>}
+    {data?.currentUser && <DashboardMyTasks key={String(data.currentUser.id)} rtl={rtl}/>}
+    {isManager && data?.currentUser && <DashboardTeamTasks key={`team-${data.currentUser.id}`} rtl={rtl}/>}
     {isManager&&<div className="dashboard-section-heading"><div><span className="eyebrow">{rtl?"فريقي":"MY TEAM"}</span><h2>{rtl?"ملخص الموظفين التابعين لي":"My reporting team overview"}</h2></div><span>{rtl?`${formatNumber(totalEmployees,rtl)} موظف دوام كامل`:`${totalEmployees} full-time employees`}</span></div>}
     {!isEmployee&&totalEmployees>0&&<div className="attendance-kpis sana-dashboard-kpis"><button type="button" className="on-time" aria-label={detailOptions[1].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(1)}><span><CheckCircle2 size={17}/></span><b>{formatNumber(onTimeToday.length,rtl)}</b><small>{rtl?"في الموعد":"On time"}</small></button><button type="button" className="late" aria-label={detailOptions[2].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(2)}><span><Clock3 size={17}/></span><b>{formatNumber(lateToday.length,rtl)}</b><small>{rtl?"متأخر":"Late"}</small></button><button type="button" className="remote" aria-label={detailOptions[3].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(3)}><span><Globe2 size={17}/></span><b>{formatNumber(remoteToday.length,rtl)}</b><small>{rtl?"عن بُعد":"Remote"}</small></button><button type="button" className="away" aria-label={detailOptions[4].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(4)}><span><CalendarDays size={17}/></span><b>{formatNumber(awayToday.length,rtl)}</b><small>{rtl?"غياب أو إجازة":"Absent / leave"}</small></button></div>}
+    {!isEmployee&&totalEmployees>0&&<DashboardInsights rtl={rtl} requests={(data?.requests??[]).filter(row=>dashboardEmployeeIds.has(Number(row.employee_id)))} typeLabel={type=>localizedRequestType(type,rtl)} onOpenRequests={linkTo("approvals")?()=>setPage(linkTo("approvals")!):undefined}/>}
     <section className="dashboard-grid single">
-      <div className="panel attendance-overview"><div className="panel-head"><div><h2>{isManager?(rtl?"حضور فريقي":"My team attendance"):(isEmployee?(rtl?"حضوري اليوم":"My attendance today"):(rtl?"ملخص الحضور":"Attendance overview"))}</h2><p>{isManager?(rtl?"حالة الموظفين التابعين لك اليوم":"Today's status for everyone reporting to you"):(isEmployee?(rtl?"بيانات الحضور المسجلة لك اليوم":"Your recorded attendance for today"):(rtl?"صورة واضحة ومحدّثة لحالة فريق العمل اليوم":"A clear, live view of today's workforce status"))}</p></div>{linkTo(isEmployee?"portal":"attendance")&&<button className="select-button" onClick={()=>setPage(linkTo(isEmployee?"portal":"attendance")!)} aria-label={rtl?"فتح سجل حضور اليوم":"Open today's attendance records"}>{rtl ? "اليوم" : "Today"}<ChevronRight size={16} /></button>}</div>{isEmployee?<div className={`own-attendance-card ${ownState}`}><span className="own-attendance-icon"><OwnStateIcon size={22}/></span><div className="own-attendance-main"><small>{rtl?"حالة الحضور":"Attendance status"}</small><b>{ownStateLabel}</b></div>{ownCheckedIn&&<dl className="own-attendance-times"><div><dt>{rtl?"الحضور":"Check-in"}</dt><dd dir="ltr">{ownAttendance?.actual_in||"—"}</dd></div><div><dt>{rtl?"الانصراف":"Check-out"}</dt><dd dir="ltr">{ownAttendance?.actual_out||"—"}</dd></div><div><dt>{rtl?"ساعات العمل":"Worked"}</dt><dd>{ownWorkedMinutes>0?(rtl?`${formatNumber(Math.floor(ownWorkedMinutes/60),rtl)} س ${formatNumber(ownWorkedMinutes%60,rtl)} د`:`${Math.floor(ownWorkedMinutes/60)}h ${ownWorkedMinutes%60}m`):"—"}</dd></div></dl>}</div>:totalEmployees?<div className="attendance-summary"><div className="attendance-rate-block"><button type="button" className="attendance-rate-ring" aria-label={detailOptions[0].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(0)} style={{background:`conic-gradient(var(--sana-chart-1) 0 ${attendanceRate}%,var(--sana-mint-soft) ${attendanceRate}% 100%)`}}><div><strong>{formatNumber(attendanceRate,rtl)}٪</strong><span>{rtl?"نسبة الحضور":"Attendance rate"}</span></div></button><div className="attendance-rate-copy"><button type="button" className="attendance-detail-link" aria-label={detailOptions[6].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(6)}><b>{rtl?`${formatNumber(presentToday,rtl)} من ${formatNumber(totalEmployees,rtl)} موظف`:`${presentToday} of ${totalEmployees} employees`}</b></button><p>{rtl?"سجّلوا حضورهم حتى الآن":"have checked in so far"}</p><span className={attendanceRate>=90?"healthy":attendanceRate>=70?"watch":"low"}>{attendanceRate>=90?(rtl?"الحضور ممتاز":"Excellent attendance"):attendanceRate>=70?(rtl?"الحضور جيد":"Good attendance"):(rtl?"يحتاج متابعة":"Needs attention")}</span></div></div><div className="attendance-distribution"><div className="attendance-distribution-head"><span>{isManager?(rtl?"توزيع حالة الفريق":"Team status distribution"):(rtl?"حالة الحضور":"Attendance status")}</span><button type="button" className="attendance-detail-link" aria-label={detailOptions[5].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(5)}><b>{rtl?`${formatNumber(unrecordedToday,rtl)} لم يسجلوا بعد`:`${unrecordedToday} not recorded yet`}</b></button></div><div className="attendance-progress" role="img" aria-label={rtl?`نسبة الحضور ${attendanceRate} بالمائة`:`Attendance rate ${attendanceRate} percent`}><span className="on-time" style={{width:`${(onTimeToday.length/totalEmployees)*100}%`}}/><span className="late" style={{width:`${(lateToday.length/totalEmployees)*100}%`}}/><span className="away" style={{width:`${(awayToday.length/totalEmployees)*100}%`}}/><span className="unrecorded" style={{width:`${(unrecordedToday/totalEmployees)*100}%`}}/></div><div className="attendance-insight"><span>{rtl?"متوسط التأخير":"Average delay"}</span><b>{averageLateMinutes?`${formatNumber(averageLateMinutes,rtl)} ${rtl?"دقيقة":"min"}`:(rtl?"لا يوجد تأخير مسجل":"No delays recorded")}</b></div></div></div>:<Empty icon={Users} title={isManager?(rtl?"لا يوجد موظفون تابعون لك":"No reporting employees"):(rtl?"لا توجد بيانات موظفين":"No employee data")} text={isManager?(rtl?"سيظهر الموظفون هنا عند ربطهم بك في الهيكل التنظيمي.":"Employees will appear here when they are linked to you in the organization structure."):(rtl?"أضف الموظفين لعرض مؤشرات الحضور اليومية.":"Add employees to see daily attendance insights.")}/>}
+      <div className="panel attendance-overview"><div className="panel-head"><div><h2>{isManager?(rtl?"حضور فريقي":"My team attendance"):(isEmployee?(rtl?"حضوري اليوم":"My attendance today"):(rtl?"ملخص الحضور":"Attendance overview"))}</h2><p>{isManager?(rtl?"حالة الموظفين التابعين لك اليوم":"Today's status for everyone reporting to you"):(isEmployee?(rtl?"بيانات الحضور المسجلة لك اليوم":"Your recorded attendance for today"):(rtl?"صورة واضحة ومحدّثة لحالة فريق العمل اليوم":"A clear, live view of today's workforce status"))}</p></div>{linkTo(isEmployee?"portal":"attendance")&&<button className="select-button" onClick={()=>setPage(linkTo(isEmployee?"portal":"attendance")!)} aria-label={rtl?"فتح سجل حضور اليوم":"Open today's attendance records"}>{rtl ? "اليوم" : "Today"}<ChevronRight size={16} /></button>}</div>{isEmployee?<div className={`own-attendance-card ${ownState}`}><span className="own-attendance-icon"><OwnStateIcon size={22}/></span><div className="own-attendance-main"><small>{rtl?"حالة الحضور":"Attendance status"}</small><b>{ownStateLabel}</b></div>{ownCheckedIn&&<dl className="own-attendance-times"><div><dt>{rtl?"الحضور":"Check-in"}</dt><dd dir="ltr">{ownAttendance?.actual_in||"—"}</dd></div><div><dt>{rtl?"الانصراف":"Check-out"}</dt><dd dir="ltr">{ownAttendance?.actual_out||"—"}</dd></div><div><dt>{rtl?"ساعات العمل":"Worked"}</dt><dd>{ownWorkedMinutes>0?(rtl?`${formatNumber(Math.floor(ownWorkedMinutes/60),rtl)} س ${formatNumber(ownWorkedMinutes%60,rtl)} د`:`${Math.floor(ownWorkedMinutes/60)}h ${ownWorkedMinutes%60}m`):"—"}</dd></div></dl>}</div>:totalEmployees?<div className="attendance-summary"><div className="attendance-rate-block"><button type="button" className="attendance-rate-ring" aria-label={detailOptions[0].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(0)} style={{background:`conic-gradient(var(--sana-chart-1) 0 ${attendanceRate}%,var(--sana-canvas) ${attendanceRate}% 100%)`}}><div><strong>{formatNumber(attendanceRate,rtl)}٪</strong><span>{rtl?"نسبة الحضور":"Attendance rate"}</span></div></button><div className="attendance-rate-copy"><button type="button" className="attendance-detail-link" aria-label={detailOptions[6].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(6)}><b>{rtl?`${formatNumber(presentToday,rtl)} من ${formatNumber(totalEmployees,rtl)} موظف`:`${presentToday} of ${totalEmployees} employees`}</b></button><p>{rtl?"سجّلوا حضورهم حتى الآن":"have checked in so far"}</p><span className={attendanceRate>=90?"healthy":attendanceRate>=70?"watch":"low"}>{attendanceRate>=90?(rtl?"الحضور ممتاز":"Excellent attendance"):attendanceRate>=70?(rtl?"الحضور جيد":"Good attendance"):(rtl?"يحتاج متابعة":"Needs attention")}</span></div></div><div className="attendance-distribution"><div className="attendance-distribution-head"><span>{isManager?(rtl?"توزيع حالة الفريق":"Team status distribution"):(rtl?"حالة الحضور":"Attendance status")}</span><button type="button" className="attendance-detail-link" aria-label={detailOptions[5].title} aria-haspopup="dialog" onClick={()=>setSelectedStat(5)}><b>{rtl?`${formatNumber(unrecordedToday,rtl)} لم يسجلوا بعد`:`${unrecordedToday} not recorded yet`}</b></button></div><div className="attendance-progress" role="img" aria-label={rtl?`نسبة الحضور ${attendanceRate} بالمائة`:`Attendance rate ${attendanceRate} percent`}><span className="on-time" style={{width:`${(onTimeToday.length/totalEmployees)*100}%`}}/><span className="late" style={{width:`${(lateToday.length/totalEmployees)*100}%`}}/><span className="away" style={{width:`${(awayToday.length/totalEmployees)*100}%`}}/><span className="unrecorded" style={{width:`${(unrecordedToday/totalEmployees)*100}%`}}/></div><div className="attendance-insight"><span>{rtl?"متوسط التأخير":"Average delay"}</span><b>{averageLateMinutes?`${formatNumber(averageLateMinutes,rtl)} ${rtl?"دقيقة":"min"}`:(rtl?"لا يوجد تأخير مسجل":"No delays recorded")}</b></div></div></div>:<Empty icon={Users} title={isManager?(rtl?"لا يوجد موظفون تابعون لك":"No reporting employees"):(rtl?"لا توجد بيانات موظفين":"No employee data")} text={isManager?(rtl?"سيظهر الموظفون هنا عند ربطهم بك في الهيكل التنظيمي.":"Employees will appear here when they are linked to you in the organization structure."):(rtl?"أضف الموظفين لعرض مؤشرات الحضور اليومية.":"Add employees to see daily attendance insights.")}/>}
       </div>
     </section>
     <section className="dashboard-grid lower">
@@ -524,7 +572,7 @@ function PayslipCard({rtl,item,allowanceLines}:{rtl:boolean;item:Row;allowanceLi
   const monthLabel=new Intl.DateTimeFormat(rtl?"ar-SA-u-nu-arab":"en-GB",{month:"long",year:"numeric"}).format(new Date(Number(item.year),Number(item.month)-1,1));
   const deductions=[
     {label:rtl?"العمل الإضافي":"Overtime",value:Number(item.overtime_amount)||0},
-    {label:rtl?"خصم الغياب":"Absence deduction",value:-(Number(item.absence_deduction)||0)},
+    {label:rtl?"خصم الغياب والتأخير":"Absence & lateness deduction",value:-(Number(item.absence_deduction)||0)},
     {label:rtl?"خصم الإجازة بدون راتب":"Unpaid leave deduction",value:-(Number(item.unpaid_leave_deduction)||0)},
     {label:rtl?"خصم السلف":"Loan deduction",value:-(Number(item.loan_deduction)||0)},
     {label:rtl?"خصم التأمينات":"Insurance deduction",value:-(Number(item.insurance_deduction)||0)},
@@ -541,11 +589,14 @@ function PayslipCard({rtl,item,allowanceLines}:{rtl:boolean;item:Row;allowanceLi
   </div>;
 }
 
-function EmployeesPage({rtl,notify,initialEmployeeId,openOrganizationSettings}:{rtl:boolean;notify:(s:string)=>void;initialEmployeeId?:number;openOrganizationSettings?:()=>void}){
+function EmployeesPage({rtl,notify,initialEmployeeId}:{rtl:boolean;notify:(s:string)=>void;initialEmployeeId?:number}){
   // `initialEmployeeId` (from a notification) opens that employee's profile straight away; editing still goes through the loaded list row.
-  const [tab,setTab]=useState("employees"); const [employeeView,setEmployeeView]=useState<"cards"|"rows">("cards"); const [open,setOpen]=useState(false); const [selected,setSelected]=useState<{row:Row;edit:boolean}|null>(null);const [deepLinkedEmployeeId,setDeepLinkedEmployeeId]=useState(initialEmployeeId);const [entityEditor,setEntityEditor]=useState<{kind:"job_title"|"department";record?:Row}|null>(null); const {data,error,reload}=useHRData(rtl);
+  const [tab,setTab]=useState("employees"); const [employeeView,setEmployeeView]=useState<"cards"|"rows">("cards"); const [open,setOpen]=useState(false); const [selected,setSelected]=useState<{row:Row;edit:boolean;fromProfile?:boolean}|null>(null);const [deepLinkedEmployeeId,setDeepLinkedEmployeeId]=useState(initialEmployeeId);const [entityEditor,setEntityEditor]=useState<{kind:"job_title"|"department";record?:Row}|null>(null); const {data,error,reload}=useHRData(rtl);
   const filter=useRowFilter();
-  const orgAccess=useOrganizationAccess(data?.currentUser,data?.permissions);const manageInSettings=()=>{if(orgAccess.canView&&openOrganizationSettings){requestOrganizationSection("departments");openOrganizationSettings();}else notify(rtl?"تُدار الإدارات من إعدادات الهيكل التنظيمي بواسطة مسؤول مخول":"Departments are managed in Organizational Structure Settings by an authorized administrator");};
+  const orgAccess=useOrganizationAccess(data?.currentUser,data?.permissions);
+  const hasOrganizationTabs=orgAccess.canView&&Boolean(data?.organization);
+  const isOrganizationTab=hasOrganizationTabs&&ORGANIZATION_SECTIONS.some(item=>item.id!=="hr"&&item.id===tab);
+  const manageDepartments=()=>{if(hasOrganizationTabs)setTab("departments");else notify(rtl?"إدارة الإدارات متاحة لمسؤول مخول":"Department management requires an authorized administrator");};
   const [locationFilter,setLocationFilter]=useState<string|null>(null);
   const [departmentFilter,setDepartmentFilter]=useState<Row|null>(null);
   const locationCounts=workCountryCounts(data?.employees??[]), activeLocation=locationCounts.some(item=>item.country===locationFilter)?locationFilter:null;
@@ -556,15 +607,20 @@ function EmployeesPage({rtl,notify,initialEmployeeId,openOrganizationSettings}:{
   const total=data?.employees.length??0, active=data?.employees.filter(e=>e.employment_status==="active").length??0;
   const canDeleteEmployee=data?.currentUser?.role_name==="Super Admin"||(data?.permissions??[]).some(permission=>Number(permission.role_id)===Number(data?.currentUser?.role_id)&&permission.module==="employees"&&permission.action==="delete"&&Number(permission.allowed)===1);
   const deleteEmployee=async(employee:Row)=>{const name=rtl?(employee.name_ar||employee.name_en):(employee.name_en||employee.name_ar);if(!window.confirm(rtl?`هل تريد حذف الموظف «${name}»؟ سيتم تعطيل حسابه مع الاحتفاظ بسجلاته السابقة.`:`Delete “${name}”? Their account will be disabled while historical records are retained.`))return;try{await hrApi({action:"delete_employee",employeeId:employee.id});if(Number(selected?.row.id)===Number(employee.id))setSelected(null);await reload();notify(rtl?"تم حذف الموظف وتعطيل حسابه":"Employee deleted and account disabled");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر حذف الموظف":"Unable to delete employee"));}};
-  const employeeTabs=[{id:"employees",label:rtl?"الموظفون":"Employees"},{id:"jobs",label:rtl?"المسميات الوظيفية":"Job titles"},{id:"departments",label:rtl?"الأقسام":"Departments"}];const action=tab==="employees"?<div className="employee-header-actions"><div className="employee-view-switch" role="group" aria-label={rtl?"طريقة عرض الموظفين":"Employee view mode"}><button className={employeeView==="cards"?"active":""} onClick={()=>setEmployeeView("cards")} aria-label={rtl?"عرض كروت":"Card view"} title={rtl?"عرض كروت":"Card view"}><LayoutGrid size={17}/></button><button className={employeeView==="rows"?"active":""} onClick={()=>setEmployeeView("rows")} aria-label={rtl?"عرض صفوف":"Row view"} title={rtl?"عرض صفوف":"Row view"}><List size={18}/></button></div><button className="primary" onClick={()=>setOpen(true)}><Plus size={16}/>{rtl?"إضافة موظف":"Add employee"}</button></div>:tab==="jobs"?<button className="primary" onClick={()=>setEntityEditor({kind:"job_title"})}><Plus size={16}/>{rtl?"إضافة مسمى":"Add job title"}</button>:data?.organization?<button className="primary" disabled={!orgAccess.canView} title={orgAccess.canView?undefined:(rtl?"تُدار من إعدادات الهيكل التنظيمي":"Managed in Organizational Structure Settings")} onClick={manageInSettings}><Network size={16}/>{rtl?"إدارة الأقسام من الإعدادات":"Manage in Settings"}</button>:<button className="primary" onClick={()=>setEntityEditor({kind:"department"})}><Plus size={16}/>{rtl?"إضافة قسم":"Add department"}</button>;
+  const employeeTabs=[{id:"employees",label:rtl?"الموظفون":"Employees"},...(hasOrganizationTabs?ORGANIZATION_SECTIONS.filter(item=>item.id!=="hr").map(item=>({id:item.id,label:rtl?item.ar:item.en,icon:item.icon})):[]),{id:"jobs",label:rtl?"المسميات الوظيفية":"Job titles"},...(!hasOrganizationTabs?[{id:"departments",label:rtl?"الأقسام":"Departments"}]:[])];const action=tab==="employees"?<div className="employee-header-actions"><div className="employee-view-switch" role="group" aria-label={rtl?"طريقة عرض الموظفين":"Employee view mode"}><button className={employeeView==="cards"?"active":""} onClick={()=>setEmployeeView("cards")} aria-label={rtl?"عرض كروت":"Card view"} title={rtl?"عرض كروت":"Card view"}><LayoutGrid size={17}/></button><button className={employeeView==="rows"?"active":""} onClick={()=>setEmployeeView("rows")} aria-label={rtl?"عرض صفوف":"Row view"} title={rtl?"عرض صفوف":"Row view"}><List size={18}/></button></div><button className="primary" onClick={()=>setOpen(true)}><Plus size={16}/>{rtl?"إضافة موظف":"Add employee"}</button></div>:tab==="jobs"?<button className="primary" onClick={()=>setEntityEditor({kind:"job_title"})}><Plus size={16}/>{rtl?"إضافة مسمى":"Add job title"}</button>:data?.organization?<button className="primary" disabled={!orgAccess.canView} title={orgAccess.canView?undefined:(rtl?"إدارة الإدارات تتطلب صلاحية":"Department management requires permission")} onClick={manageDepartments}><Network size={16}/>{rtl?"إدارة الإدارات":"Manage departments"}</button>:<button className="primary" onClick={()=>setEntityEditor({kind:"department"})}><Plus size={16}/>{rtl?"إضافة قسم":"Add department"}</button>;
+  // Opening a profile replaces the directory inside the page (the sidebar stays beside it); editing still uses the drawer.
+  const profileEmployeeId=selected&&!selected.edit?Number(selected.row.id):(!selected&&deepLinkedEmployeeId?deepLinkedEmployeeId:null);
+  // Editing uses the same page layout as the profile view; back, cancel and save return to where the edit was opened (the profile or the list).
+  if(selected?.edit){const back=()=>setSelected(selected.fromProfile?{row:selected.row,edit:false}:null);return <section className="employees-page-shell employee-profile-page"><EmployeeDetailsDrawer page rtl={rtl} employee={selected.row} startInEdit data={data} close={back} submit={async form=>{await hrApi({action:"update_employee",...form});await reload();back();notify(rtl?"تم تحديث بيانات الموظف بنجاح":"Employee details updated successfully");}}/></section>;}
+  if(profileEmployeeId)return <section className="employees-page-shell employee-profile-page"><EmployeeProfile360 inline rtl={rtl} employeeId={profileEmployeeId} close={()=>{setSelected(null);setDeepLinkedEmployeeId(undefined);}} onEdit={()=>{const row=selected?.row??(data?.employees??[]).find(item=>Number(item.id)===profileEmployeeId);if(row){setDeepLinkedEmployeeId(undefined);setSelected({row,edit:true,fromProfile:true});}}}/></section>;
   return <section className="employees-page-shell"><PageHeader eyebrow="" title={rtl?"الموظفون":"Employees"} text=""/>
   {error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}
   <section className="mini-stats"><div><Users/><span><b>{total?formatNumber(total,rtl):"—"}</b>{rtl?"إجمالي الموظفين":"Total employees"}</span></div><div><CheckCircle2/><span><b>{active?formatNumber(active,rtl):"—"}</b>{rtl?"الموظفون النشطون":"Active employees"}</span></div><div className="location-stat"><Globe2/><span><small className="location-title">{rtl?"الموظفون حسب مقر العمل":"Employees by work location"}{activeLocation&&<button type="button" className="location-clear" onClick={()=>setLocationFilter(null)}>{rtl?"عرض الكل":"Show all"}</button>}</small>{locationCounts.length?<ul>{locationCounts.map(item=>{const name=countryName(item.country,rtl),selectedLocation=activeLocation===item.country;return <li key={item.country}><button type="button" className={selectedLocation?"active":""} aria-pressed={selectedLocation} title={rtl?`عرض موظفي ${name} (${formatNumber(item.count,rtl)})`:`Show ${name} employees (${item.count})`} onClick={()=>{setTab("employees");setLocationFilter(selectedLocation?null:item.country);}}><img src={`/flags/${item.code.toLowerCase()}.svg`} alt="" aria-hidden="true"/><em>{name}</em><strong>{formatNumber(item.count,rtl)}</strong></button></li>;})}</ul>:<b>—</b>}</span></div></section>
   {tab==="employees"&&departmentFilter&&<div className="employee-header-actions"><button className="outline" onClick={()=>setDepartmentFilter(null)} aria-label={rtl?"إلغاء تصفية القسم":"Clear department filter"}>{rtl?(departmentFilter.name_ar||departmentFilter.name_en):departmentFilter.name_en}<X size={16}/></button></div>}
-  <div className="panel table-panel employee-directory-panel"><FilterBar rtl={rtl} query={filter.query} setQuery={filter.setQuery} count={shownCount} placeholder={tab==="employees"?(rtl?"ابحث بالاسم أو الرقم الوظيفي أو البريد...":"Search by name, code or email..."):tab==="jobs"?(rtl?"ابحث بالمسمى الوظيفي...":"Search job titles..."):(rtl?"ابحث باسم القسم أو مديره...":"Search departments or managers...")} trailing={<div className="employee-section-switch" role="tablist" aria-label={rtl?"أقسام الموظفين":"Employee sections"}>{employeeTabs.map(item=><button key={item.id} role="tab" aria-selected={tab===item.id} className={tab===item.id?"active":""} onClick={()=>setTab(item.id)}>{item.label}</button>)}</div>} end={action}/><div className="employee-directory-scroll">{tab==="employees"?(employeeView==="cards"?<EmployeeCardGrid rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} canDelete={canDeleteEmployee} onDelete={deleteEmployee} onOpen={(row,edit)=>setSelected({row,edit})}/>:<EmployeeRowList onOpenProfile={data?.organization?row=>setSelected({row,edit:true}):undefined} rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} onSave={async form=>{await hrApi({action:"update_employee",...form});await reload();notify(rtl?"تم حفظ التعديل وتحديث كارت الموظف":"Employee row and card updated");}}/>):tab==="jobs"?<JobTitleTable rtl={rtl} rows={shownJobTitles} departments={data?.departments} onEdit={record=>setEntityEditor({kind:"job_title",record})}/>:<DepartmentGrid rtl={rtl} rows={shownDepartments} onOpen={department=>{setDepartmentFilter(department);setLocationFilter(null);filter.setQuery("");setTab("employees");}} jobs={data?.jobTitles} employees={data?.employees} reload={reload} notify={notify} onEdit={record=>data?.organization?manageInSettings():setEntityEditor({kind:"department",record})}/>}</div></div>
+  <div className="employee-workspace-nav"><SettingsSubnav level="primary" rtl={rtl} label={rtl?"أقسام الموظفين":"Employee sections"} items={employeeTabs} active={tab} onChange={setTab}/></div>
+  {isOrganizationTab&&data&&<div className="employee-organization-panel"><OrganizationSettings activeSection={tab} onSectionChange={setTab} rtl={rtl} access={orgAccess} employees={data.employees} hrResponsibles={data.hrResponsibles||[]} hrCandidates={data.hrCandidates||[]} notify={notify} onSaveJobTitle={async payload=>{await hrApi({action:"save_job_title",...payload});}} onSaveHrResponsible={async payload=>{await hrApi(payload);}} onChanged={()=>{window.dispatchEvent(new Event("hr-data-changed"));}}/></div>}
+  {!isOrganizationTab&&<div className="panel table-panel employee-directory-panel"><FilterBar rtl={rtl} query={filter.query} setQuery={filter.setQuery} count={shownCount} placeholder={tab==="employees"?(rtl?"ابحث بالاسم أو الرقم الوظيفي أو البريد...":"Search by name, code or email..."):tab==="jobs"?(rtl?"ابحث بالمسمى الوظيفي...":"Search job titles..."):(rtl?"ابحث باسم القسم أو مديره...":"Search departments or managers...")} end={action}/><div className="employee-directory-scroll">{tab==="employees"?(employeeView==="cards"?<EmployeeCardGrid rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} canDelete={canDeleteEmployee} onDelete={deleteEmployee} onOpen={(row,edit)=>setSelected({row,edit})}/>:<EmployeeRowList onOpenProfile={data?.organization?row=>setSelected({row,edit:true}):undefined} rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} onSave={async form=>{await hrApi({action:"update_employee",...form});await reload();notify(rtl?"تم حفظ التعديل وتحديث كارت الموظف":"Employee row and card updated");}}/>):tab==="jobs"?<JobTitleTable rtl={rtl} rows={shownJobTitles} departments={data?.departments} onEdit={record=>setEntityEditor({kind:"job_title",record})}/>:<DepartmentGrid rtl={rtl} rows={shownDepartments} onOpen={department=>{setDepartmentFilter(department);setLocationFilter(null);filter.setQuery("");setTab("employees");}} jobs={data?.jobTitles} employees={data?.employees} reload={reload} notify={notify} onEdit={record=>data?.organization?manageDepartments():setEntityEditor({kind:"department",record})}/>}</div></div>}
   {open&&<EmployeeDrawer rtl={rtl} data={data} close={()=>setOpen(false)} submit={async(form)=>{await hrApi({action:"create_employee",...form});setOpen(false);await reload();notify(rtl?"تم إنشاء الموظف وحساب المستخدم بنجاح":"Employee and user account created successfully");}}/>}
-  {selected&&(selected.edit?<EmployeeDetailsDrawer rtl={rtl} employee={selected.row} startInEdit data={data} close={()=>setSelected(null)} submit={async form=>{await hrApi({action:"update_employee",...form});await reload();setSelected(null);notify(rtl?"تم تحديث بيانات الموظف بنجاح":"Employee details updated successfully");}}/>:<EmployeeProfile360 rtl={rtl} employeeId={Number(selected.row.id)} close={()=>setSelected(null)} onEdit={()=>setSelected(current=>current?{...current,edit:true}:current)}/>)}
-  {!selected&&deepLinkedEmployeeId&&<EmployeeProfile360 rtl={rtl} employeeId={deepLinkedEmployeeId} close={()=>setDeepLinkedEmployeeId(undefined)} onEdit={()=>{const row=(data?.employees??[]).find(item=>Number(item.id)===deepLinkedEmployeeId);if(row){setDeepLinkedEmployeeId(undefined);setSelected({row,edit:true});}}}/>}
   {entityEditor&&<OrganizationEntityDrawer rtl={rtl} kind={entityEditor.kind} record={entityEditor.record} departments={data?.departments??[]} close={()=>setEntityEditor(null)} submit={async form=>{const editing=Boolean(entityEditor.record?.id);await hrApi({action:entityEditor.kind==="job_title"?"save_job_title":"save_department",...form});await reload();setEntityEditor(null);notify(entityEditor.kind==="job_title"?(editing?(rtl?"تم تعديل المسمى الوظيفي":"Job title updated"):(rtl?"تمت إضافة المسمى الوظيفي":"Job title added")):(editing?(rtl?"تم تعديل القسم":"Department updated"):(rtl?"تمت إضافة القسم":"Department added")));}}/>}</section>}
 
 function LeavePage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
@@ -823,7 +879,7 @@ function OrgDepartmentTreeNode({rtl,department,departments,employees,jobs,tone,d
       <div className="org-tree-department"><div><small>{isCompanyOrganizationUnit(department)?(rtl?"شركة":"COMPANY"):depth===0?(rtl?"قطاع رئيسي":"MAIN DIVISION"):(rtl?"قسم تابع":"DEPARTMENT")}</small><h3>{rtl?department.name_ar:department.name_en}</h3>{!rtl&&<p>{department.name_ar}</p>}</div></div>
       {manager&&<div className="org-tree-manager"><span className="org-tree-level-tag manager" title={rtl?"المستوى ٠ — المدير":"Level 0 — manager"}>{rtl?"مستوى":"Level"} {formatNumber(0,rtl)}</span><small>{organizationManagerLabel(department,rtl,true)}</small><b>{rtl?manager.name_ar:manager.name_en}</b><em>{localizedJobTitle(rtl,managerJob,{name_en:manager.job_title_name,name_ar:manager.job_title_name_ar})}</em></div>}
     </div>
-    {visibleMembers.length>0&&<div className="org-tree-employees">{visibleMembers.map(member=>{const job=jobById.get(Number(member.job_title_id));return <div className="org-tree-employee" key={member.id} style={{marginInlineStart:Math.min(displayLevel(member)-1,8)*12}}><span className="org-tree-level-tag" title={rtl?"مستوى الموظف في الهيكل — يوزع مهام على المستويات الأكبر فقط":"Structure level — assigns tasks to higher-numbered levels only"}>{rtl?"مستوى":"Level"} {formatNumber(displayLevel(member),rtl)}</span><b>{rtl?member.name_ar:member.name_en}</b><small>{localizedJobTitle(rtl,job,{name_en:member.job_title_name,name_ar:member.job_title_name_ar})}</small>{member.manager_id&&<small>{rtl?"المدير المباشر: ":"Reports to: "}{rtl?(member.manager_name_ar||member.manager_name):(member.manager_name||member.manager_name_ar)}</small>}</div>})}</div>}
+    {visibleMembers.length>0&&<div className="org-tree-employees">{visibleMembers.map(member=>{const job=jobById.get(Number(member.job_title_id));return <div className="org-tree-employee" key={member.id} style={{marginInlineStart:Math.min(displayLevel(member)-1,8)*16}}><span className="org-tree-level-tag" title={rtl?"مستوى الموظف في الهيكل — يوزع مهام على المستويات الأكبر فقط":"Structure level — assigns tasks to higher-numbered levels only"}>{rtl?"مستوى":"Level"} {formatNumber(displayLevel(member),rtl)}</span><b>{rtl?member.name_ar:member.name_en}</b><small>{localizedJobTitle(rtl,job,{name_en:member.job_title_name,name_ar:member.job_title_name_ar})}</small>{member.manager_id&&<small>{rtl?"المدير المباشر: ":"Reports to: "}{rtl?(member.manager_name_ar||member.manager_name):(member.manager_name||member.manager_name_ar)}</small>}</div>})}</div>}
     {visibleChildren.length>0&&<div className="org-tree-children">{visibleChildren.map(child=><OrgDepartmentTreeNode key={child.id} rtl={rtl} department={child} departments={departments} employees={employees} jobs={jobs} tone={tone} depth={depth+1} normalizedQuery={normalizedQuery} openDepartment={openDepartment}/>)}</div>}
   </section>
 }
@@ -1032,7 +1088,7 @@ function PayrollRunDetail({rtl,run,items,allowanceLines,canApprove,canLock,canRe
           {label:rtl?"الراتب الأساسي":"Basic salary",amount:totals.basic_salary},
           {label:rtl?"إجمالي البدلات":"Total allowances",amount:totals.total_allowances},
           {label:rtl?"العمل الإضافي":"Overtime",amount:totals.overtime_amount},
-          {label:rtl?"خصم الغياب":"Absence deduction",amount:totals.absence_deduction},
+          {label:rtl?"خصم الغياب والتأخير":"Absence & lateness deduction",amount:totals.absence_deduction},
           {label:rtl?"خصم الإجازة بدون راتب":"Unpaid leave deduction",amount:totals.unpaid_leave_deduction},
           {label:rtl?"خصم السلف":"Loan deduction",amount:totals.loan_deduction},
           {label:rtl?"خصم التأمينات":"Insurance deduction",amount:totals.insurance_deduction},
@@ -1071,16 +1127,30 @@ function PayrollRunDetail({rtl,run,items,allowanceLines,canApprove,canLock,canRe
   </div>;
 }
 
+function HrSettingsPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
+  const {data,error,reload}=useHRData(rtl);
+  const access=useOrganizationAccess(data?.currentUser,data?.permissions);
+  const canView=Boolean(data)&&access.canView&&data?.hrDataScope!=="assigned";
+  const hrResponsibility=access.canView&&data?.organization
+    ?<HrResponsibilitySettings rtl={rtl} access={access} employees={data.employees} hrResponsibles={data.hrResponsibles||[]} hrCandidates={data.hrCandidates||[]} notify={notify}
+      onSaveJobTitle={async payload=>{await hrApi({action:"save_job_title",...payload});}}
+      onSaveHrResponsible={async payload=>{await hrApi(payload);}}
+      onChanged={()=>{window.dispatchEvent(new Event("hr-data-changed"));}}/>
+    :access.canManage?<CompanyHrSettings showCompanies={false} rtl={rtl} companies={data?.companies??[]} hrResponsibles={data?.hrResponsibles??[]} hrCandidates={data?.hrCandidates??[]}
+      onSave={async payload=>{await hrApi(payload);await reload();window.dispatchEvent(new Event("hr-data-changed"));notify(rtl?"تم حفظ الإعدادات":"Settings saved");}}/>:null;
+  return <><PageHeader eyebrow="" title={pageLabel("hr_settings",rtl)} text=""/>
+    {error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}
+    {!data&&!error&&<p role="status">{rtl?"جارٍ التحميل...":"Loading..."}</p>}
+    {canView&&<HrSettings rtl={rtl} notify={notify} hrResponsibility={hrResponsibility} approvalWorkflows={<ApprovalWorkflowSettings rtl={rtl} notify={notify}/>}/>}
+    {data&&!canView&&<Empty icon={Lock} title={rtl?"غير مصرح بالوصول":"Access denied"} text={rtl?"هذه الصفحة متاحة لمسؤولي الموارد البشرية المصرح لهم.":"This page is available to authorized HR administrators."}/>}
+  </>;
+}
+
 function SettingsPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
   const [demoSaving,setDemoSaving]=useState(false);const {data,error,reload}=useHRData(rtl);
-  const access=useOrganizationAccess(data?.currentUser,data?.permissions);
   const demoEnabled=Boolean(data?.demoDataEnabled);
-  const [tab,setTab]=useState(()=>hasRequestedOrganizationSection()?"organization":"general");
-  const hasOrganizationTab=(access.canView&&Boolean(data?.organization))||(access.canManage&&!data?.organization);
-  const settingsTabs=[{id:"general",label:rtl?"الإعدادات":"Settings"},...(hasOrganizationTab?[{id:"organization",label:rtl?"الهيكل التنظيمي":"Organizational structure"}]:[])];
-  const activeTab=tab==="organization"&&!hasOrganizationTab?"general":tab;
   const toggleDemo=async()=>{try{setDemoSaving(true);await hrApi({action:"toggle_demo_data",enabled:!demoEnabled});await reload();notify(!demoEnabled?(rtl?"تم إنشاء بيانات اختبار للموظفين الحاليين وإظهارها":"Test data was created for current employees"):(rtl?"تم حذف كل بيانات الاختبار والعودة للبيانات الحقيقية":"All test data was removed"));}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر تغيير حالة البيانات التجريبية":"Unable to change test data"));}finally{setDemoSaving(false);}};
-  return <><PageHeader eyebrow={rtl?"إعداد النظام":"SYSTEM CONFIGURATION"} title={rtl?"الإعدادات":"Settings"} text={rtl?"خصّص إعدادات المنشأة والسياسات بما يناسب آلية العمل.":"Configure company settings and policies to match how your organization works."}/>{error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}<Tabs items={settingsTabs} active={activeTab} setActive={setTab}/>{activeTab==="general"&&<>{data?.currentUser?.role_name==="Super Admin"&&<PageAvailabilityPanel rtl={rtl} values={parseSetting(data.settings.find(row=>row.setting_key==="page_availability"))} onToggle={async(page,enabled)=>{await hrApi({action:"set_page_availability",page,enabled});window.dispatchEvent(new Event("hr-data-changed"));await reload();notify(rtl?"تم حفظ إتاحة الصفحة":"Page availability saved");}}/>}<section className="panel demo-data-setting"><span className="setting-icon violet"><SlidersHorizontal/></span><div><h3>{rtl?"بيانات تجريبية للوحة التحكم":"Dashboard test data"}</h3><p>{rtl?"أنشئ أرقام حضور وطلبات تجريبية باستخدام الموظفين الحقيقيين الموجودين في النظام فقط، دون إضافة أي موظفين جدد. الحذف يزيل الأرقام التجريبية وحدها.":"Create sample attendance and request figures using only the real employees already in the system. No extra employees are added, and removal deletes test figures only."}</p></div><Status tone={demoEnabled?"green":"gray"}>{demoEnabled?(rtl?"مفعّلة":"Enabled"):(rtl?"غير مفعّلة":"Disabled")}</Status><button className={demoEnabled?"outline remove-demo":"primary"} disabled={demoSaving} onClick={()=>void toggleDemo()}>{demoSaving?(rtl?"جارٍ التحديث...":"Updating..."):(demoEnabled?(rtl?"حذف البيانات التجريبية":"Remove test figures"):(rtl?"إنشاء بيانات تجريبية":"Create test figures"))}</button></section></>}{activeTab==="organization"&&<>{access.canView&&data?.organization&&<OrganizationSettings rtl={rtl} access={access} employees={data.employees} hrResponsibles={data.hrResponsibles||[]} hrCandidates={data.hrCandidates||[]} notify={notify} onSaveJobTitle={async payload=>{await hrApi({action:"save_job_title",...payload});}} onSaveHrResponsible={async payload=>{await hrApi(payload);}} onChanged={()=>{window.dispatchEvent(new Event("hr-data-changed"));}}/>}{access.canManage&&!data?.organization&&<CompanyHrSettings rtl={rtl} companies={data?.companies??[]} hrResponsibles={data?.hrResponsibles??[]} hrCandidates={data?.hrCandidates??[]} onSave={async payload=>{await hrApi(payload);await reload();window.dispatchEvent(new Event("hr-data-changed"));notify(rtl?"تم حفظ الإعدادات":"Settings saved");}}/>}</>}</>;
+  return <><PageHeader eyebrow={rtl?"إعداد النظام":"SYSTEM CONFIGURATION"} title={rtl?"الإعدادات":"Settings"} text={rtl?"خصّص إعدادات المنشأة والسياسات بما يناسب آلية العمل.":"Configure company settings and policies to match how your organization works."}/>{error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}{data?.currentUser?.role_name==="Super Admin"&&<PageAvailabilityPanel rtl={rtl} order={parseSetting(data.settings.find(row=>row.setting_key==="page_order")).pages} onReorder={async pages=>{await hrApi({action:"set_page_order",pages});window.dispatchEvent(new Event("hr-data-changed"));await reload();notify(rtl?"تم حفظ ترتيب القائمة الجانبية":"Sidebar order saved");}} values={parseSetting(data.settings.find(row=>row.setting_key==="page_availability"))} onToggle={async(page,enabled)=>{await hrApi({action:"set_page_availability",page,enabled});window.dispatchEvent(new Event("hr-data-changed"));await reload();notify(rtl?"تم حفظ إتاحة الصفحة":"Page availability saved");}}/>}<section className="panel demo-data-setting"><span className="setting-icon violet"><SlidersHorizontal/></span><div><h3>{rtl?"بيانات تجريبية للوحة التحكم":"Dashboard test data"}</h3><p>{rtl?"أنشئ أرقام حضور وطلبات تجريبية باستخدام الموظفين الحقيقيين الموجودين في النظام فقط، دون إضافة أي موظفين جدد. الحذف يزيل الأرقام التجريبية وحدها.":"Create sample attendance and request figures using only the real employees already in the system. No extra employees are added, and removal deletes test figures only."}</p></div><Status tone={demoEnabled?"green":"gray"}>{demoEnabled?(rtl?"مفعّلة":"Enabled"):(rtl?"غير مفعّلة":"Disabled")}</Status><button className={demoEnabled?"outline remove-demo":"primary"} disabled={demoSaving} onClick={()=>void toggleDemo()}>{demoSaving?(rtl?"جارٍ التحديث...":"Updating..."):(demoEnabled?(rtl?"حذف البيانات التجريبية":"Remove test figures"):(rtl?"إنشاء بيانات تجريبية":"Create test figures"))}</button></section></>;
 }
 
 
@@ -1216,6 +1286,8 @@ function PermissionEditor({rtl,notify,data,reload}:{rtl:boolean;notify:(s:string
     {id:"assets",label:pageLabel("assets",rtl),description:rtl?"إضافة العهد والأصول وإسنادها وإرجاعها":"Create, assign, and return assets",gate:["assets","view"],grants:[{module:"assets"}]},
     {id:"learning",label:pageLabel("learning",rtl),description:rtl?"البرامج التدريبية والتكليف والمتابعة":"Courses, enrollment, and tracking",gate:["learning","view"],grants:[{module:"learning"}]},
     {id:"org",label:pageLabel("org",rtl),description:rtl?"الأقسام والمديرون والتبعية":"Departments, managers, and reporting lines",gate:["organization_chart","view"],grants:[{module:"organization_chart"}]},
+    {id:"blueprint",label:pageLabel("blueprint",rtl),description:rtl?"اقتراح الهيكل والوظائف والأعداد حسب نوع الشركة وحجمها":"Recommended departments, positions and headcount by company type and size",gate:["staffing_blueprint","view"],grants:[{module:"staffing_blueprint",actions:["view"]}]},
+    {id:"decisions",label:pageLabel("decisions",rtl),description:rtl?"إرسال القرارات والتعاميم ومتابعة إقرار الموظفين بها":"Send decisions and circulars and track employee acknowledgements",gate:["administrative_decisions","view"],grants:[{module:"administrative_decisions",actions:["view","create"]}]},
     {id:"users",label:pageLabel("users",rtl),description:rtl?"الحسابات وقوالب أدوار المستخدمين":"Accounts and access-role templates",gate:["users","view"],grants:[{module:"users"},{module:"permissions"}]},
     {id:"reports",label:pageLabel("reports",rtl),description:rtl?"فتح التقارير وتنزيل الملفات":"Open reports and download files",gate:["reports","view"],grants:[{module:"reports"}]},
     {id:"payroll",label:pageLabel("payroll",rtl),description:rtl?"الدورات والهياكل والاعتماد والقفل":"Runs, structures, approval, and locking",gate:["payroll","view"],grants:[{module:"payroll"}]},
@@ -1257,9 +1329,11 @@ export function RequestDrawer({rtl,close,submit}:{rtl:boolean;close:()=>void;sub
 }
 /** Approved [English, Arabic] titles for every notification `title_key` the server emits. */
 const NOTIFICATION_TITLES:Record<string,[string,string]>={
+  workflow_needs_approval:["Request awaiting your approval","طلب بانتظار اعتمادك"],
   request_needs_manager_approval:["Request needs your approval","طلب يحتاج اعتمادك"],
   request_needs_hr_approval:["Request needs HR approval","طلب يحتاج اعتماد الموارد البشرية"],
   request_approved:["Request approved","تم اعتماد الطلب"],
+  administrative_decision_received:["New administrative decision","قرار إداري جديد"],
   request_rejected:["Request rejected","تم رفض الطلب"],
   correction_needs_manager_approval:["Attendance correction needs approval","تصحيح حضور يحتاج اعتمادك"],
   correction_needs_hr_approval:["Attendance correction needs HR approval","تصحيح حضور يحتاج اعتماد الموارد البشرية"],

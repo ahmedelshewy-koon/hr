@@ -1,3 +1,4 @@
+import { canReadWorkflowDocument } from '../../../approvals/workflow-service';
 import { env } from "cloudflare:workers";
 import { createDatabase, type PostgresDatabase } from "../../../../db/postgres";
 import { withDatabase } from "../../route-helpers";
@@ -14,7 +15,7 @@ const disposition=(name:string,inline:boolean)=>`${inline?"inline":"attachment"}
 
 export async function GET(request:Request,context:{params:Promise<{id:string}>}){
   return withDatabase("Unable to retrieve document", async db => {
-  const actor=await requireActor(request,db),id=Number((await context.params).id),row=await contextRow(db,id);if(!row||row.status==="archived")throw new Response("Document not found",{status:404});if(!(await allowed(db,actor,row)))throw new Response("Document access denied",{status:403});
+  const actor=await requireActor(request,db),id=Number((await context.params).id),row=await contextRow(db,id);if(!row||row.status==="archived")throw new Response("Document not found",{status:404});if(!(await allowed(db,actor,row))&&!await canReadWorkflowDocument(db,actor.id,id))throw new Response("Document access denied",{status:403});
   await enforceRateLimit(db,request,"document-download",120,3600,actor.id);const storage=bucket();if(!storage)throw new Response("Document storage is not configured",{status:503});const object=await storage.get(String(row.object_key));if(!object)throw new Response("Stored file not found",{status:404});
   await db.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'document_downloaded','documents','document',?,?,CURRENT_TIMESTAMP)").bind(actor.id,String(id),request.headers.get("cf-connecting-ip")).run();
   const inline=new URL(request.url).searchParams.get("download")!=="1";return new Response(object.body,{headers:{"content-type":String(row.content_type),"content-length":String(row.size_bytes),"content-disposition":disposition(String(row.name),inline),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; sandbox"}});

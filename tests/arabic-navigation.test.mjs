@@ -82,7 +82,8 @@ test("every notification title the server emits has an Arabic title in the bell"
   }
   // Operational alerts are inserted by SQL in the notification service: SELECT user,'type','title_key',...
   for (const match of service.matchAll(/SELECT [a-z_.]+,'[a-z_]+','([a-z_]+)'/g)) emitted.add(match[1]);
-  for (const match of service.matchAll(/THEN '([a-z_]+)' ELSE '([a-z_]+)'/g)) { emitted.add(match[1]); emitted.add(match[2]); }
+  // `CASE WHEN w.source_type=… THEN 'request' ELSE 'attendance_correction'` picks an entity_type, not a title.
+  for (const match of service.matchAll(/CASE WHEN (?!w.source_type)[^']*?THEN '([a-z_]+)' ELSE '([a-z_]+)'/g)) { emitted.add(match[1]); emitted.add(match[2]); }
   emitted.add("onboarding_started").add("offboarding_started"); // built from a template literal (`${type}_started`)
   emitted.add("training_completed").add("training_updated");     // chosen by a ternary
   assert.ok(emitted.size >= 20, `expected to discover the emitted titles, found ${emitted.size}`);

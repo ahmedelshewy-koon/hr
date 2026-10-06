@@ -5,11 +5,13 @@ import { validateEmployeeWrite, persistAssignment } from '../organization/assign
 import { asResponse, orgError } from '../organization/org-errors.ts';
 import { refreshReportingLevels } from '../organization/reporting-service.ts';
 import { scheduledDailyMinutes } from './schedule-policy.ts';
+import { normalizeRemoteDays } from '../attendance/attendance-calculation.ts';
 import { resolvedContractEndDate } from './contract-policy.ts';
 import { validateCompanyHr } from './company-hr-catalog.ts';
+import { resolveEmployeeCostCenter } from '../cost-centers/catalog.ts';
 import { assertEmployeeCodeFree, cleanEmployeeCode } from './employee-code.ts';
 
-const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',nationalityCountry:'nationality_country',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',employmentStatus:'employment_status',salaryCurrency:'salary_currency',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
+const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',nationalityCountry:'nationality_country',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',employmentStatus:'employment_status',salaryCurrency:'salary_currency',salaryCountry:'salary_country',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
 
 /** Called inside the authorized API transaction. Omitted fields are never rewritten. */
 export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:number,payload:Row,actor:{id:number;ip?:string|null;employeeId?:number|null;roleName?:string},afterSave?:(db:TransactionDatabase)=>Promise<void>) {
@@ -31,6 +33,9 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
     if(['nameEn','nameAr','workEmail','startDate','country'].includes(key)&&!value)throw new Response(`${key} is required`,{status:400});
     updates[column]=key==='workEmail'?value.toLowerCase():value||null;
   }
+  if(payload.salaryCountry!==undefined&&!['','Saudi Arabia','Egypt'].includes(String(payload.salaryCountry??'').trim()))throw new Response('Invalid payroll country',{status:400});
+  if(payload.fingerprintRequired!==undefined)updates.fingerprint_required=payload.fingerprintRequired===false||payload.fingerprintRequired==='false'||payload.fingerprintRequired===0||payload.fingerprintRequired==='0'?0:1;
+  if(payload.costCenterId!==undefined)updates.cost_center_id=await resolveEmployeeCostCenter(db,payload.costCenterId,before.cost_center_id);
   if(payload.employeeCode!==undefined){
     const code=cleanEmployeeCode(payload.employeeCode);
     if(code!==before.employee_code){await assertEmployeeCodeFree(db,code,employeeId);updates.employee_code=code;}
@@ -51,6 +56,8 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
     const type=updates.schedule_type??before.schedule_type;
     updates.work_days=type==='shift'?'0,1,2,3,4,5,6':String(payload.workDays??before.work_days??'0,1,2,3,4');
   }
+  // Remote days must stay inside the working week, so they are re-checked whenever either list changes.
+  if(payload.remoteDays!==undefined||updates.work_days!==undefined)updates.remote_days=normalizeRemoteDays(payload.remoteDays??before.remote_days,String(updates.work_days??before.work_days??''));
   if(payload.checkInTime!==undefined||payload.checkOutTime!==undefined){
     const minutes=scheduledDailyMinutes(String(updates.check_in_time??before.check_in_time??''),String(updates.check_out_time??before.check_out_time??''));
     if(minutes!==null)updates.required_daily_minutes=minutes;

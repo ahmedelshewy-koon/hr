@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
+  boolean,
   doublePrecision,
   foreignKey,
   index,
@@ -55,6 +57,8 @@ export const employees = pgTable(
     nameAr: text("name_ar").notNull(),
     workEmail: text("work_email").notNull(),
     fingerprintCode: text("fingerprint_code"),
+    // 0 = this employee is not required to punch: no absence/late deductions and hidden from biometric views.
+    fingerprintRequired: integer("fingerprint_required").notNull().default(1),
     personalPhone: text("personal_phone"),
     workPhone: text("work_phone"),
     nationality: text("nationality"),
@@ -83,11 +87,15 @@ export const employees = pgTable(
     employmentStatus: text("employment_status").notNull().default("active"),
     salary: doublePrecision("salary"),
     salaryCurrency: text("salary_currency").default("SAR"),
+    salaryCountry: text("salary_country"),
+    costCenterId: integer("cost_center_id").references((): AnyPgColumn => costCenters.id),
     country: text("country").notNull(),
     workLocation: text("work_location"),
     employmentType: text("employment_type").default("full_time"),
     scheduleType: text("schedule_type").default("fixed"),
     workDays: text("work_days").default("0,1,2,3,4"),
+    // Working days spent remotely (subset of work_days); the rest are office days punched on the biometric device.
+    remoteDays: text("remote_days").notNull().default(""),
     checkInTime: text("check_in_time").default("09:00"),
     checkOutTime: text("check_out_time").default("17:00"),
     graceMinutes: integer("grace_minutes").default(15),
@@ -96,6 +104,8 @@ export const employees = pgTable(
     bankAccountNumber: text("bank_account_number"),
     bankIban: text("bank_iban"),
     avatarUrl: text("avatar_url"),
+    maritalStatus: text("marital_status"),
+    profileNotes: text("profile_notes"),
     ...timestamps,
   },
   (t) => [
@@ -666,6 +676,7 @@ export const documentCategories = pgTable(
     maxSizeBytes: integer("max_size_bytes").notNull().default(10485760),
     country: text("country"),
     employmentType: text("employment_type"),
+    description: text("description"),
     status: text("status").notNull().default("active"),
     ...timestamps,
   },
@@ -1873,4 +1884,153 @@ export const insuranceRates = pgTable(
   ],
 );
 
+// HR Settings catalogs. Rule type, deduction type and coverage values are validated in app/hr-settings/catalog.ts.
+export const deductionRules = pgTable(
+  "deduction_rules",
+  {
+    id: serial("id").primaryKey(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    ruleType: text("rule_type").notNull(),
+    minMinutes: integer("min_minutes").default(0),
+    maxMinutes: integer("max_minutes"),
+    deductionType: text("deduction_type"),
+    value: doublePrecision("value"),
+    overtimeMultiplier: doublePrecision("overtime_multiplier"),
+    absenceNotice: text("absence_notice"),
+    status: text("status").notNull().default("active"),
+    ...timestamps,
+  },
+  (t) => [index("idx_deduction_rules_type_status").on(t.ruleType, t.status)],
+);
+
+export const medicalInsurancePlans = pgTable("medical_insurance_plans", {
+  id: serial("id").primaryKey(),
+  nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(),
+  provider: text("provider").notNull(),
+  coverageType: text("coverage_type").notNull(),
+  maxCoverage: doublePrecision("max_coverage").notNull(),
+  currency: text("currency").notNull().default("SAR"),
+  employeeContribution: doublePrecision("employee_contribution").notNull().default(0),
+  companyContribution: doublePrecision("company_contribution").notNull().default(100),
+  familyCoverage: integer("family_coverage").notNull().default(0),
+  description: text("description"),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+});
+
+/** Payroll cost centers (0043): each carries the debit account payroll posts to; employees point at one. */
+export const costCenters = pgTable("cost_centers", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(),
+  debitAccount: text("debit_account"),
+  companyId: integer("company_id").references(() => companies.id),
+  description: text("description"),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+});
+
+export const attendanceTypes = pgTable(
+  "attendance_types",
+  {
+    id: serial("id").primaryKey(),
+    code: text("code").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    shiftBased: integer("shift_based").notNull().default(0),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    lateAllowanceMinutes: integer("late_allowance_minutes").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("idx_attendance_types_code").on(sql`upper(${t.code})`)],
+);
+
+// Employee profile (0040): job history, emergency contacts and the employee's medical insurance plan.
+export const employeeJobHistory = pgTable("employee_job_history", {
+  id: serial("id").primaryKey(), employeeId: integer("employee_id").notNull().references(() => employees.id),
+  companyId: integer("company_id").references(() => companies.id), branchId: integer("branch_id").references(() => branches.id),
+  departmentId: integer("department_id").references(() => departments.id), sectionId: integer("section_id").references(() => departments.id),
+  jobTitleId: integer("job_title_id").references(() => jobTitles.id), positionId: integer("position_id").references(() => positions.id),
+  startDate: text("start_date").notNull(), endDate: text("end_date"), changeReason: text("change_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [index("idx_employee_job_history_employee").on(t.employeeId, t.startDate), uniqueIndex("idx_employee_job_history_open").on(t.employeeId).where(sql`${t.endDate} IS NULL`)]);
+export const employeeEmergencyContacts = pgTable("employee_emergency_contacts", {
+  id: serial("id").primaryKey(), employeeId: integer("employee_id").notNull().references(() => employees.id),
+  name: text("name").notNull(), relationship: text("relationship").notNull(), phone: text("phone").notNull(), alternatePhone: text("alternate_phone"),
+  isPrimary: integer("is_primary").notNull().default(0), ...timestamps,
+}, t => [index("idx_employee_emergency_contacts_employee").on(t.employeeId)]);
+export const employeeMedicalInsurance = pgTable("employee_medical_insurance", {
+  id: serial("id").primaryKey(), employeeId: integer("employee_id").notNull().references(() => employees.id),
+  planId: integer("plan_id").notNull().references(() => medicalInsurancePlans.id), cardNumber: text("card_number"),
+  startDate: text("start_date").notNull(), endDate: text("end_date"), dependents: integer("dependents").notNull().default(0), notes: text("notes"),
+  status: text("status").notNull().default("active"), ...timestamps,
+}, t => [uniqueIndex("idx_employee_medical_insurance_active").on(t.employeeId).where(sql`${t.status} = 'active'`)]);
+
+// Administrative decisions (0040): sent to an exact list of employees, each of whom must acknowledge it.
+export const administrativeDecisions = pgTable("administrative_decisions", {
+  id: serial("id").primaryKey(), decisionNumber: text("decision_number").notNull(), decisionType: text("decision_type").notNull(),
+  title: text("title").notNull(), body: text("body").notNull(), effectiveDate: text("effective_date"), status: text("status").notNull().default("active"),
+  createdByUserId: integer("created_by_user_id").notNull().references(() => users.id),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true, mode: "string" }), withdrawnByUserId: integer("withdrawn_by_user_id").references(() => users.id), ...timestamps,
+}, t => [uniqueIndex("idx_administrative_decisions_number").on(t.decisionNumber)]);
+export const administrativeDecisionRecipients = pgTable("administrative_decision_recipients", {
+  id: serial("id").primaryKey(), decisionId: integer("decision_id").notNull().references(() => administrativeDecisions.id),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true, mode: "string" }), acknowledgedByUserId: integer("acknowledged_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [unique("administrative_decision_recipients_pair").on(t.decisionId, t.employeeId), index("idx_decision_recipients_pending").on(t.employeeId, t.acknowledgedAt)]);
+
 export const postgresHealthcheck = sql`select 1`;
+
+
+// department_id NULL = company-wide default; a department or section workflow overrides it for that unit's employees.
+export const approvalWorkflows = pgTable('approval_workflows', {
+ id: serial('id').primaryKey(), companyId: integer('company_id').notNull().references(()=>companies.id), requestType: text('request_type').notNull(), departmentId: integer('department_id').references(()=>departments.id),
+ version: integer('version').notNull().default(1), active: boolean('active').notNull().default(true), stepsJson: text('steps_json').notNull(),
+ updatedBy: integer('updated_by').notNull().references(()=>users.id), updatedAt: timestamp('updated_at',{withTimezone:true,mode:'string'}).notNull().defaultNow(),
+},t=>[uniqueIndex('idx_approval_workflows_scope').on(t.companyId,t.requestType,sql`coalesce(${t.departmentId},0)`)]);
+export const approvalWorkflowVersions = pgTable('approval_workflow_versions', {
+ id: serial('id').primaryKey(), workflowId: integer('workflow_id').notNull().references(()=>approvalWorkflows.id),version:integer('version').notNull(),
+ active:boolean('active').notNull(),stepsJson:text('steps_json').notNull(),changedBy:integer('changed_by').notNull().references(()=>users.id),
+ createdAt:timestamp('created_at',{withTimezone:true,mode:'string'}).notNull().defaultNow(),
+},t=>[unique('approval_workflow_versions_workflow_id_version_key').on(t.workflowId,t.version)]);
+export const approvalWorkflowRuns = pgTable('approval_workflow_runs', {
+ id:serial('id').primaryKey(),sourceType:text('source_type').notNull(),sourceId:integer('source_id').notNull(),employeeId:integer('employee_id').notNull().references(()=>employees.id),
+ companyId:integer('company_id').notNull().references(()=>companies.id),workflowId:integer('workflow_id').notNull().references(()=>approvalWorkflows.id),version:integer('version').notNull(),requestType:text('request_type').notNull(),departmentId:integer('department_id').references(()=>departments.id),
+ stepsJson:text('steps_json').notNull(),currentStep:integer('current_step').notNull().default(0),state:text('state').notNull().default('pending'),currentUserId:integer('current_user_id').references(()=>users.id),...timestamps,
+},t=>[unique('approval_workflow_runs_source_type_source_id_key').on(t.sourceType,t.sourceId),index('idx_workflow_current_user').on(t.currentUserId,t.state)]);
+
+// Company Staffing Blueprint: recommended structure (departments, teams, positions, suggested headcount) per company type and size.
+// Templates (kind='template') are the editable library; a company blueprint (kind='company') is a generated, customised copy.
+// Nothing here stores employees: applying a blueprint only creates departments and job titles in the existing organization tables.
+export const blueprintCompanyTypes = pgTable('blueprint_company_types', {
+ id: serial('id').primaryKey(), code: text('code').notNull().unique(), nameEn: text('name_en').notNull(), nameAr: text('name_ar').notNull(),
+ sortOrder: integer('sort_order').notNull().default(0), isSystem: integer('is_system').notNull().default(0), status: text('status').notNull().default('active'), ...timestamps,
+});
+export const staffingBlueprints = pgTable('staffing_blueprints', {
+ id: serial('id').primaryKey(), kind: text('kind').notNull(), nameEn: text('name_en').notNull(), nameAr: text('name_ar').notNull(),
+ companyTypeId: integer('company_type_id').notNull().references(()=>blueprintCompanyTypes.id), size: text('size').notNull(), status: text('status').notNull().default('draft'),
+ descriptionEn: text('description_en'), descriptionAr: text('description_ar'), isDefault: integer('is_default').notNull().default(0),
+ companyId: integer('company_id').references(()=>companies.id), sourceBlueprintId: integer('source_blueprint_id').references((): AnyPgColumn=>staffingBlueprints.id,{onDelete:'set null'}),
+ expectedEmployees: integer('expected_employees'), branchesCount: integer('branches_count'), country: text('country'), businessModel: text('business_model'),
+ approvedAt: timestamp('approved_at',{withTimezone:true,mode:'string'}), appliedAt: timestamp('applied_at',{withTimezone:true,mode:'string'}),
+ createdBy: integer('created_by'), updatedBy: integer('updated_by'), ...timestamps,
+},t=>[index('idx_staffing_blueprints_kind').on(t.kind,t.status),index('idx_staffing_blueprints_company').on(t.companyId)]);
+export const blueprintDepartments = pgTable('blueprint_departments', {
+ id: serial('id').primaryKey(), blueprintId: integer('blueprint_id').notNull().references(()=>staffingBlueprints.id,{onDelete:'cascade'}),
+ parentId: integer('parent_id').references((): AnyPgColumn=>blueprintDepartments.id,{onDelete:'cascade'}), kind: text('kind').notNull().default('department'),
+ nameEn: text('name_en').notNull(), nameAr: text('name_ar').notNull(), required: integer('required').notNull().default(1), sortOrder: integer('sort_order').notNull().default(0), ...timestamps,
+},t=>[index('idx_blueprint_departments_blueprint').on(t.blueprintId)]);
+export const blueprintPositions = pgTable('blueprint_positions', {
+ id: serial('id').primaryKey(), blueprintId: integer('blueprint_id').notNull().references(()=>staffingBlueprints.id,{onDelete:'cascade'}),
+ departmentId: integer('department_id').notNull().references(()=>blueprintDepartments.id,{onDelete:'cascade'}),
+ parentPositionId: integer('parent_position_id').references((): AnyPgColumn=>blueprintPositions.id,{onDelete:'set null'}),
+ titleEn: text('title_en').notNull(), titleAr: text('title_ar').notNull(), headcount: integer('headcount').notNull().default(1), seniority: text('seniority').notNull().default('mid'),
+ required: integer('required').notNull().default(1), perBranch: integer('per_branch').notNull().default(0), descriptionEn: text('description_en'), descriptionAr: text('description_ar'),
+ sortOrder: integer('sort_order').notNull().default(0), ...timestamps,
+},t=>[index('idx_blueprint_positions_blueprint').on(t.blueprintId,t.departmentId)]);

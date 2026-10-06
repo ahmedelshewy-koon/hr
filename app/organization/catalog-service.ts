@@ -71,7 +71,7 @@ export async function prepareOrganizationEntity(db:TransactionDatabase,entity:st
     const seen=new Set(id?[id]:[]);let cursor=parent;while(cursor){if(seen.has(Number(cursor.id)))throw fail('HIERARCHY_CYCLE','parent_id','التسلسل الهرمي للوحدات يحتوي على حلقة','Unit hierarchy cycle',{blocking:{type:'unit',id:cursor.id}});seen.add(Number(cursor.id));cursor=catalog.departments.find(r=>Number(r.id)===Number(cursor?.parent_id));}
     if(values.manager_employee_id&&(changed('manager_employee_id')||!before||changed('company_id')||(values.status==='active'&&before?.status!=='active'))){
       const employee=await db.prepare('SELECT id,name_en,name_ar,employment_status,company_id FROM employees WHERE id=?').bind(values.manager_employee_id).first<Row>();
-      const issue=unitManagerIssue(employee,Number(values.company_id),catalog.companies);
+      const issue=unitManagerIssue(employee);
       if(issue)throw asResponse(new OrganizationError(issue),400);
     }
   }

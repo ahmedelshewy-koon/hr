@@ -48,9 +48,15 @@ export function UsageNotice({ usage, rtl }: { usage: OrganizationUsage; rtl: boo
 
 type FieldBase = { label: string; hint?: string; disabled?: boolean; required?: boolean };
 
-export function TextField({ label, value, onChange, hint, disabled, required, dir, lang, maxLength = 200, type = 'text', min, inputMode }: FieldBase & { value: unknown; onChange: (value: string) => void; dir?: 'ltr' | 'rtl'; lang?: string; maxLength?: number; type?: string; min?: number; inputMode?: 'numeric' | 'text' }) {
+export function TextField({ label, value, onChange, hint, disabled, required, dir, lang, maxLength = 200, type = 'text', min, max, step, inputMode }: FieldBase & { value: unknown; onChange: (value: string) => void; dir?: 'ltr' | 'rtl'; lang?: string; maxLength?: number; type?: string; min?: number; max?: number; step?: number | 'any'; inputMode?: 'numeric' | 'text' }) {
   return <label className="field settings-field"><span>{label}{required && <i aria-hidden="true"> *</i>}</span>
-    <input type={type} value={String(value ?? '')} onChange={event => onChange(event.target.value)} disabled={disabled} required={required} dir={dir} lang={lang} maxLength={maxLength} min={min} inputMode={inputMode} />
+    <input type={type} value={String(value ?? '')} onChange={event => onChange(event.target.value)} disabled={disabled} required={required} dir={dir} lang={lang} maxLength={maxLength} min={min} max={max} step={step} inputMode={inputMode} />
+    {hint && <small>{hint}</small>}</label>;
+}
+
+export function TextAreaField({ label, value, onChange, hint, disabled, required, maxLength = 1000 }: FieldBase & { value: unknown; onChange: (value: string) => void; maxLength?: number }) {
+  return <label className="field settings-field"><span>{label}{required && <i aria-hidden="true"> *</i>}</span>
+    <textarea value={String(value ?? '')} onChange={event => onChange(event.target.value)} disabled={disabled} required={required} maxLength={maxLength} dir="auto" />
     {hint && <small>{hint}</small>}</label>;
 }
 

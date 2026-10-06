@@ -72,3 +72,13 @@ test("persistence is transactional, guarded, scoped, audited, and never updates 
   assert.doesNotMatch(service,/UPDATE attendance_logs/);assert.match(route,/assertEmployeeManager\(d1,Number\(correction\.employee_id\),user\.employee_id\)/);
   assert.match(route,/You cannot approve your own attendance correction/);assert.match(route,/Duplicate \$\{eventType\} is not allowed/);assert.match(route,/There is no check-in recorded for today/);
 });
+
+test("an employee not required to punch is never absent or late, but holidays and leave still win",()=>{
+  const base={scheduledIn:"09:00",scheduledOut:"17:00",requiredMinutes:480,graceMinutes:0,isWorkingDay:true,dayComplete:true,fingerprintRequired:false};
+  const none=calculateDailyAttendance(base);
+  assert.deepEqual([none.status,none.lateMinutes,none.exceptions.length],["present",0,0]);
+  assert.equal(calculateDailyAttendance({...base,actualIn:"11:00",actualOut:"13:00"}).lateMinutes,0);
+  assert.equal(calculateDailyAttendance({...base,isHoliday:true}).status,"holiday");
+  assert.equal(calculateDailyAttendance({...base,isWorkingDay:false}).status,"non_working_day");
+  assert.equal(calculateDailyAttendance({...base,fingerprintRequired:true}).status,"absent");
+});

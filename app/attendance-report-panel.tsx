@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, CalendarCheck, CalendarDays, Clock3, Download, Hourglass, LogOut, Timer, TimerReset, UserX } from "lucide-react";
+import { Activity, BadgeMinus, CalendarCheck, CalendarDays, Clock3, Download, Hourglass, LogOut, Timer, TimerReset, UserX } from "lucide-react";
 import { localizeApiMessage } from "./api-messages";
 import { localizedDisplayValue } from "./localization";
 import type { Row } from "./ui-types";
 
-type Report = { summary: Record<string, number>; records: Row[]; page: number; pageSize: number; total: number };
+type Report = { mode?: "days" | "employees"; summary: Record<string, number>; records: Row[]; page: number; pageSize: number; total: number; rules?: number };
 type Props = { rtl: boolean; employees: Row[]; notify: (message: string) => void };
 
 const cairoToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -20,6 +20,11 @@ const COUNTRY_AR: Record<string, string> = { Egypt: "مصر", "Saudi Arabia": "�
 const COUNTRY_ORDER = ["Egypt", "Saudi Arabia"];
 const countryLabel = (country: string, rtl: boolean) => (rtl ? COUNTRY_AR[country] : "") || country;
 const cellDuration =(minutes: unknown, rtl: boolean) => (Number(minutes) > 0 ? duration(minutes, rtl) : "—");
+/** Deduction from Settings → HR Settings rules, in days of wage (salary-independent) plus any fixed amount. */
+const deductionText = (wageDays: unknown, fixed: unknown, rtl: boolean) => {
+  const days = Number(wageDays) || 0, amount = Number(fixed) || 0, format = (value: number) => new Intl.NumberFormat(rtl ? "ar-EG-u-nu-latn" : "en-GB", { maximumFractionDigits: 2 }).format(value);
+  return [days ? (rtl ? `${format(days)} يوم` : `${format(days)} day${days === 1 ? "" : "s"}`) : "", amount ? format(amount) : ""].filter(Boolean).join(" + ") || "0";
+};
 
 export function AttendanceReportPanel({ rtl, employees, notify }: Props) {
   const today = cairoToday();
@@ -61,14 +66,14 @@ export function AttendanceReportPanel({ rtl, employees, notify }: Props) {
   const exportReport = async () => {
     try {
       setExporting(true);
-      const params = new URLSearchParams({ employeeId, country, from, to, format: "csv", lang: rtl ? "ar" : "en" });
+      const params = new URLSearchParams({ employeeId, country, from, to, format: "xlsx", lang: rtl ? "ar" : "en" });
       const response = await fetch("/api/attendance-report?" + params, { cache: "no-store" });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(localizeApiMessage(body.error || (rtl ? "تعذر تصدير التقرير" : "Unable to export the report"), rtl));
       }
       const blob = await response.blob();
-      const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") || "")?.[1] || "attendance-report.csv";
+      const name = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") || "")?.[1] || "attendance-report.xlsx";
       const url = URL.createObjectURL(blob), link = document.createElement("a");
       link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
       notify(rtl ? "تم تصدير تقرير الحضور" : "Attendance report exported");
@@ -89,8 +94,11 @@ export function AttendanceReportPanel({ rtl, employees, notify }: Props) {
     { icon: Hourglass, label: rtl ? "إجمالي مدة التأخير" : "Total lateness", value: duration(summary.late_minutes, rtl), tone: Number(summary.late_minutes) > 0 ? "warn" : "" },
     { icon: LogOut, label: rtl ? "الانصراف المبكر" : "Early departure", value: duration(summary.early_minutes, rtl), tone: Number(summary.early_minutes) > 0 ? "warn" : "" },
     { icon: Timer, label: rtl ? "العمل الإضافي (أوفر تايم)" : "Overtime", value: duration(summary.overtime_minutes, rtl), tone: Number(summary.overtime_minutes) > 0 ? "good" : "" },
+    { icon: BadgeMinus, label: rtl ? "الخصومات (حسب قواعد الخصم)" : "Deductions (per deduction rules)", value: deductionText(summary.deduction_wage_days, summary.deduction_fixed_amount, rtl), tone: Number(summary.deduction_wage_days) > 0 || Number(summary.deduction_fixed_amount) > 0 ? "warn" : "" },
   ];
-  const header = [rtl ? "التاريخ" : "Date", ...(employeeId ? [] : [rtl ? "الموظف" : "Employee"]), rtl ? "الحضور" : "Check-in", rtl ? "الانصراف" : "Check-out", rtl ? "الساعات" : "Hours", rtl ? "التأخير" : "Late", rtl ? "انصراف مبكر" : "Early leave", rtl ? "أوفر تايم" : "Overtime", rtl ? "الحالة" : "Status"];
+  const perEmployee = !employeeId;
+  const employeeHeader = [rtl ? "الموظف" : "Employee", rtl ? "القسم" : "Department", rtl ? "أيام الحضور" : "Days attended", rtl ? "أيام الغياب" : "Absent", rtl ? "الإجازة" : "Leave", rtl ? "ساعات العمل" : "Hours worked", rtl ? "أيام التأخير" : "Late days", rtl ? "مدة التأخير" : "Total late", rtl ? "انصراف مبكر" : "Early leave", rtl ? "أوفر تايم" : "Overtime", rtl ? "الخصم" : "Deduction"];
+  const header = [rtl ? "التاريخ" : "Date", ...(employeeId ? [] : [rtl ? "الموظف" : "Employee"]), rtl ? "الحضور" : "Check-in", rtl ? "الانصراف" : "Check-out", rtl ? "الساعات" : "Hours", rtl ? "التأخير" : "Late", rtl ? "انصراف مبكر" : "Early leave", rtl ? "أوفر تايم" : "Overtime", rtl ? "الخصم" : "Deduction", rtl ? "الحالة" : "Status"];
   return <div className="attendance-report">
     <div className="biometric-filters">
       <label><span>{rtl ? "الدولة" : "Country"}</span><select value={country} onChange={event => { const next = event.target.value; setCountry(next); if (next && employeeId && String(employees.find(employee => String(employee.id) === employeeId)?.country || "") !== next) setEmployeeId(""); setPage(1); }}><option value="">{rtl ? "كل الدول" : "All countries"}</option>{countries.map(value => <option key={value} value={value}>{countryLabel(value, rtl)}</option>)}</select></label>
@@ -99,14 +107,26 @@ export function AttendanceReportPanel({ rtl, employees, notify }: Props) {
       <label><span>{rtl ? "إلى" : "To"}</span><input type="date" value={to} min={from} onChange={event => { setTo(event.target.value); setPage(1); }}/></label>
       <button className="outline" onClick={thisMonth}>{rtl ? "هذا الشهر" : "This month"}</button>
       <button className="outline" onClick={lastMonth}>{rtl ? "الشهر الماضي" : "Last month"}</button>
-      <button className="primary attendance-report-export" disabled={exporting || loading || rangeInvalid || !total} onClick={() => void exportReport()}><Download size={16}/>{exporting ? (rtl ? "جارٍ التصدير..." : "Exporting...") : (rtl ? "تصدير التقرير (CSV)" : "Export report (CSV)")}</button>
+      <button className="primary attendance-report-export" disabled={exporting || loading || rangeInvalid || !total} onClick={() => void exportReport()}><Download size={16}/>{exporting ? (rtl ? "جارٍ التصدير..." : "Exporting...") : (rtl ? "تصدير التقرير (Excel)" : "Export report (Excel)")}</button>
     </div>
     {rangeInvalid && <div className="error-banner" role="alert">{rtl ? "تاريخ البداية يجب ألا يكون بعد تاريخ النهاية." : "The start date must not be after the end date."}</div>}
     {error && !rangeInvalid && <div className="error-banner" role="alert">{error}</div>}
-    <div className="attendance-report-summary">{cards.map(({ icon: Icon, label, value, tone }) => <div key={label} className={tone || undefined}><Icon size={19}/><b>{value}</b><span>{label}</span></div>)}</div>
-    {total > 20000 && <p className="attendance-report-note">{rtl ? "التصدير يشمل أول 20000 سجل فقط. ضيّق الفترة أو اختر موظفًا لتصدير كل السجلات." : "The export includes the first 20,000 records only. Narrow the period or pick an employee to export everything."}</p>}
+    {!perEmployee && <div className="attendance-report-summary">{cards.map(({ icon: Icon, label, value, tone }) => <div key={label} className={tone || undefined}><Icon size={19}/><b>{value}</b><span>{label}</span></div>)}</div>}
+    {!perEmployee ? total > 20000 : false}{!perEmployee && total > 20000 && <p className="attendance-report-note">{rtl ? "التصدير يشمل أول 20000 سجل فقط. ضيّق الفترة أو اختر موظفًا لتصدير كل السجلات." : "The export includes the first 20,000 records only. Narrow the period or pick an employee to export everything."}</p>}
     {loading ? <div className="attendance-loading"><Activity/><span>{rtl ? "جارٍ تحميل التقرير..." : "Loading the report..."}</span></div> : <div className="biometric-table-scroll">
-      <table className="biometric-table"><thead><tr>{header.map(text => <th key={text}>{text}</th>)}</tr></thead><tbody>{(data?.records || []).map(row => <tr key={row.id}>
+      <table className="biometric-table"><thead><tr>{(perEmployee ? employeeHeader : header).map(text => <th key={text}>{text}</th>)}</tr></thead><tbody>{perEmployee ? (data?.records || []).map(row => <tr key={row.id}>
+        <td><b>{name(row)}</b><small>{row.employee_code}</small></td>
+        <td>{(rtl ? row.department_name_ar || row.department_name : row.department_name) || "—"}</td>
+        <td>{row.attended_days}</td>
+        <td className={Number(row.absent_days) > 0 ? "report-late" : ""}>{row.absent_days}</td>
+        <td>{row.leave_days}</td>
+        <td dir="ltr">{(Number(row.worked_minutes) / 60).toFixed(2)}</td>
+        <td className={Number(row.late_days) > 0 ? "report-late" : ""}>{row.late_days}</td>
+        <td className={Number(row.late_minutes) > 0 ? "report-late" : ""}>{cellDuration(row.late_minutes, rtl)}</td>
+        <td className={Number(row.early_minutes) > 0 ? "report-late" : ""}>{cellDuration(row.early_minutes, rtl)}</td>
+        <td className={Number(row.overtime_minutes) > 0 ? "report-overtime" : ""}>{cellDuration(row.overtime_minutes, rtl)}</td>
+        <td className={Number(row.deduction_wage_days) > 0 || Number(row.deduction_fixed_amount) > 0 ? "report-late" : ""}><b>{deductionText(row.deduction_wage_days, row.deduction_fixed_amount, rtl)}</b></td>
+      </tr>) : (data?.records || []).map(row => <tr key={row.id}>
         <td dir="ltr">{row.work_date}</td>
         {!employeeId && <td><b>{name(row)}</b><small>{row.employee_code}</small></td>}
         <td className="bio-in" dir="ltr">{row.actual_in || "—"}</td>
@@ -115,6 +135,7 @@ export function AttendanceReportPanel({ rtl, employees, notify }: Props) {
         <td className={Number(row.late_minutes) > 0 ? "report-late" : ""}>{cellDuration(row.late_minutes, rtl)}</td>
         <td className={Number(row.early_minutes) > 0 ? "report-late" : ""}>{cellDuration(row.early_minutes, rtl)}</td>
         <td className={Number(row.overtime_minutes) > 0 ? "report-overtime" : ""}>{cellDuration(row.overtime_minutes, rtl)}</td>
+        <td className={Number(row.deduction_wage_days) > 0 || Number(row.deduction_fixed_amount) > 0 ? "report-late" : ""}>{row.deduction_rule_id ? <><b>{deductionText(row.deduction_wage_days, row.deduction_fixed_amount, rtl)}</b><small>{rtl ? row.deduction_rule_ar || row.deduction_rule_en : row.deduction_rule_en}</small></> : "—"}</td>
         <td><span className={"attendance-status " + (["late", "needs_review", "absent"].includes(row.status) ? "amber" : "green")}>{localizedDisplayValue(row.status, rtl)}</span></td>
       </tr>)}</tbody></table>
       {!data?.records.length && !error && <div className="attendance-empty"><CalendarDays/><h3>{rtl ? "لا توجد سجلات في هذه الفترة" : "No records in this period"}</h3><p>{rtl ? "غيّر الموظف أو الفترة، أو تأكد من مزامنة جهاز البصمة." : "Change the employee or period, or make sure the biometric device is synchronized."}</p></div>}

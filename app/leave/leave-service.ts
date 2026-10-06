@@ -5,6 +5,7 @@ import { loadCalendarHolidays } from "./holiday-store";
 import { refreshLeaveAttendance } from "../attendance/attendance-service";
 import { decideLeaveTransition } from "./leave-workflow";
 import { LEAVE_REPORT_CATEGORY, leaveRequiresReport } from "./leave-report-policy";
+import { attachWorkflow, cancelWorkflow, decideWorkflow, isWorkflowStage, resolveWorkflow } from '../approvals/workflow-service';
 
 type Db = PostgresDatabase | TransactionDatabase;
 type Row = Record<string, unknown>;
@@ -51,14 +52,27 @@ export async function initializeCurrentLeaveBalances(db:PostgresDatabase,employe
     ON CONFLICT(employee_id,leave_type_id,year) DO NOTHING`).bind(year,...employeeIds).run();
 }
 
-export async function createLeaveRequest(input:{db:PostgresDatabase;request:Request;actor:LeaveActor;employeeId:number;leaveTypeId:number;fromDate:string;toDate:string;reason:string;notes?:string;attachmentDocumentId?:number|null}){
-  const year=Number(input.fromDate.slice(0,4));
+// onBehalf: "manager" = the employee's direct manager files it, so it is approved at once;
+// "hr" = HR files it, approved at once only when the actor is the employee's assigned HR.
+type CreateLeaveInput={request:Request;actor:LeaveActor;employeeId:number;leaveTypeId:number;fromDate:string;toDate:string;reason:string;notes?:string;attachmentDocumentId?:number|null;onBehalf?:"manager"|"hr"|null};
+export async function createLeaveRequest(input:CreateLeaveInput&{db:PostgresDatabase}){
   if(input.fromDate.slice(0,4)!==input.toDate.slice(0,4)) response("Leave requests must stay within one calendar year",400);
-  return input.db.transaction(async tx=>{
+  return input.db.transaction(tx=>createLeaveInTx(tx,input));
+}
+/** The whole leave submission inside the caller's transaction (used by create and by edit). */
+async function createLeaveInTx(tx:TransactionDatabase,input:CreateLeaveInput){
+    const year=Number(input.fromDate.slice(0,4));
+    if(input.fromDate.slice(0,4)!==input.toDate.slice(0,4)) response("Leave requests must stay within one calendar year",400);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(input.fromDate)||!/^\d{4}-\d{2}-\d{2}$/.test(input.toDate)) response("Invalid end date",400);
+    if(input.fromDate>input.toDate) response("The start date must not be after the end date",400);
     await tx.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(input.employeeId,year).run();
     const employee=await tx.prepare("SELECT id,country,start_date,employment_status,work_days FROM employees WHERE id=? FOR UPDATE").bind(input.employeeId).first<Employee>();
     if(!employee||!["active","probation","notice_period"].includes(employee.employment_status)) response("Employee is not active",409);
-    await requireEmployeeHr(tx, employee.id);
+    const workflow=await resolveWorkflow(tx,employee.id,`leave:${input.leaveTypeId}`);
+    const hrUserId=workflow?null:await requireEmployeeHr(tx, employee.id);
+    if(input.onBehalf&&employee.id===Number(input.actor.employeeId)) response("Use your own request form for your own leave",400);
+    if(input.onBehalf==="manager")await assertEmployeeManager(tx,employee.id,input.actor.employeeId);
+    const directApproval=!workflow&&(input.onBehalf==="manager"||(input.onBehalf==="hr"&&hrUserId===input.actor.id));
     const leaveType=await tx.prepare("SELECT * FROM leave_types WHERE id=? AND status='active'").bind(input.leaveTypeId).first<LeaveType>();
     if(!leaveType) response("Leave type is not active",404);
     if(leaveType.code==="OFFICIAL") response("Official holidays cannot be requested as employee leave",400);
@@ -77,8 +91,8 @@ export async function createLeaveRequest(input:{db:PostgresDatabase;request:Requ
     const controlled=Number(leaveType.default_days)>0;
     if(controlled&&availableLeaveBalance(balance)<duration.chargeableDays) response(`Insufficient leave balance. Available: ${availableLeaveBalance(balance)} day(s)`,409);
     const managerApproval=true,hrApproval=true;
-    const status=managerApproval?"pending_manager":hrApproval?"pending_hr":"hr_approved";
-    const stage=managerApproval?"manager":hrApproval?"hr":"completed";
+    const status=workflow?"pending_hr":directApproval?"hr_approved":managerApproval?"pending_manager":hrApproval?"pending_hr":"hr_approved";
+    const stage=workflow?"workflow:0":directApproval?"completed":managerApproval?"manager":hrApproval?"hr":"completed";
     const effect=controlled?(stage==="completed"?"consumed":"reserved"):"none";
     if(controlled){
       const update=stage==="completed"
@@ -89,17 +103,18 @@ export async function createLeaveRequest(input:{db:PostgresDatabase;request:Requ
     }
     const sequence=await tx.prepare("SELECT nextval(pg_get_serial_sequence('requests','id'))::int AS id").first<{id:number}>();
     const id=Number(sequence!.id),code=`REQ-${1000+id}`;
-    const details={leave:{balanceId:balance.id,leaveTypeId:leaveType.id,requestedDays:duration.chargeableDays,balanceYear:year,managerApproval,hrApproval,chargeableDates:duration.chargeableDates,excludedWeekends:duration.excludedWeekends,excludedHolidays:duration.excludedHolidays},attachmentName:report?.name??null,attachment:report?{documentId:report.id,name:report.name}:null};
+    const details={leave:{balanceId:balance.id,leaveTypeId:leaveType.id,requestedDays:duration.chargeableDays,balanceYear:year,managerApproval,hrApproval,createdOnBehalfBy:input.onBehalf?{userId:input.actor.id,role:input.onBehalf}:null,chargeableDates:duration.chargeableDates,excludedWeekends:duration.excludedWeekends,excludedHolidays:duration.excludedHolidays},attachmentName:report?.name??null,attachment:report?{documentId:report.id,name:report.name}:null};
     await tx.prepare("INSERT INTO requests (id,request_code,employee_id,type,leave_type_id,requested_days,balance_year,balance_effect,from_date,to_date,reason,notes,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
       .bind(id,code,employee.id,leaveType.name_en,leaveType.id,duration.chargeableDays,year,effect,input.fromDate,input.toDate,input.reason,input.notes||null,JSON.stringify(details),status,stage).run();
-    await writeAudit(tx,{request:input.request,actor:input.actor,action:"leave_request_created",recordType:"request",recordId:String(id),next:{code,employeeId:employee.id,leaveTypeId:leaveType.id,days:duration.chargeableDays,status,stage,reportDocumentId:report?.id??null}});
+    await writeAudit(tx,{request:input.request,actor:input.actor,action:input.onBehalf?"leave_request_created_on_behalf":"leave_request_created",recordType:"request",recordId:String(id),next:{code,employeeId:employee.id,leaveTypeId:leaveType.id,days:duration.chargeableDays,status,stage,onBehalf:input.onBehalf??null,reportDocumentId:report?.id??null}});
+    if(workflow)await attachWorkflow(tx,'employee_request',id,workflow);
+    if(directApproval)await tx.prepare("INSERT INTO approvals (request_id,stage,actor_user_id,action,reason,created_at) VALUES (?,?,?,'approve',?,CURRENT_TIMESTAMP)").bind(id,input.onBehalf==="manager"?"manager":"hr",input.actor.id,"Created and approved on behalf of the employee").run();
     if(effect!=="none")await writeAudit(tx,{request:input.request,actor:input.actor,action:effect==="reserved"?"leave_balance_reserved":"leave_balance_consumed",recordType:"leave_balance",recordId:String(balance.id),next:{requestId:id,days:duration.chargeableDays}});
     if(status==="hr_approved")await refreshLeaveAttendance(tx,employee.id,input.fromDate,input.toDate);
     return {ok:true,id,requestCode:code,requestedDays:duration.chargeableDays,status,currentStage:stage};
-  });
 }
 
-export async function processLeaveRequest(input:{db:PostgresDatabase;request:Request;actor:LeaveActor;requestId:number;decision:"approve"|"reject";reason?:string}){
+export async function processLeaveRequest(input:{db:PostgresDatabase;request:Request;actor:LeaveActor;requestId:number;decision:"approve"|"reject";reason?:string;expectedStage?:string}){
   return input.db.transaction(async tx=>{
     await tx.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(771,input.requestId).run();
     const row=await tx.prepare("SELECT * FROM requests WHERE id=? FOR UPDATE").bind(input.requestId).first<Row>();
@@ -116,7 +131,7 @@ export async function processLeaveRequest(input:{db:PostgresDatabase;request:Req
     if(stage==="manager"&&input.decision==="approve")await requireEmployeeHr(tx,Number(row.employee_id));
     const details=jsonObject(row.details_json),leave=jsonObject(JSON.stringify(details.leave??{}));
     const managerApproval=true,hrApproval=true;
-    const transition=decideLeaveTransition({status:String(row.status),stage,decision:input.decision,hrApproval});
+    const transition=isWorkflowStage(stage)?await decideWorkflow(tx,'employee_request',input.requestId,input.actor.id,input.expectedStage||'',input.decision,input.reason):decideLeaveTransition({status:String(row.status),stage,decision:input.decision,hrApproval});
     const {status,currentStage}=transition;
     const finalEffect=transition.balanceAction==="consume"?"consumed":transition.balanceAction==="release"?"released":null;
     let nextEffect=String(row.balance_effect||"none");
@@ -141,13 +156,18 @@ export async function processLeaveRequest(input:{db:PostgresDatabase;request:Req
   });
 }
 
-export async function cancelLeaveRequest(input:{db:PostgresDatabase;request:Request;actor:LeaveActor;requestId:number;reason?:string}){
-  return input.db.transaction(async tx=>{
+type CancelLeaveInput={request:Request;actor:LeaveActor;requestId:number;reason?:string};
+export async function cancelLeaveRequest(input:CancelLeaveInput&{db:PostgresDatabase}){
+  return input.db.transaction(tx=>cancelLeaveInTx(tx,input));
+}
+async function cancelLeaveInTx(tx:TransactionDatabase,input:CancelLeaveInput){
     await tx.prepare("SELECT pg_advisory_xact_lock(?,?)").bind(771,input.requestId).run();
     const row=await tx.prepare("SELECT * FROM requests WHERE id=? FOR UPDATE").bind(input.requestId).first<Row>();
     if(!row||!row.leave_type_id) response("Leave request not found",404);
     if(input.actor.roleName==="Employee"&&Number(row.employee_id)!==Number(input.actor.employeeId)) response("You can cancel only your own leave request",403);
     if(["HR Manager","Super Admin"].includes(input.actor.roleName)&&Number(row.employee_id)!==Number(input.actor.employeeId))await assertEmployeeHr(tx,Number(row.employee_id),input.actor.id);
+    // A department manager may only cancel leave of employees they manage.
+    if(input.actor.roleName==="Department Manager"&&Number(row.employee_id)!==Number(input.actor.employeeId))await assertEmployeeManager(tx,Number(row.employee_id),input.actor.employeeId);
     const pending=["pending_manager","pending_hr"].includes(String(row.status));
     const approved=String(row.status)==="hr_approved"&&String(row.from_date)>new Date().toISOString().slice(0,10);
     if(!pending&&!approved) response("Only pending leave or approved future leave can be cancelled",409);
@@ -161,10 +181,26 @@ export async function cancelLeaveRequest(input:{db:PostgresDatabase;request:Requ
       if(!changed)response("The consumed leave balance is inconsistent",409);
     }
     await tx.prepare("UPDATE requests SET status='cancelled',current_stage='completed',balance_effect='released',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(input.requestId).run();
+    await cancelWorkflow(tx,input.requestId);
     await tx.prepare("INSERT INTO approvals (request_id,stage,actor_user_id,action,reason,created_at) VALUES (?,'employee',?,'cancel',?,CURRENT_TIMESTAMP)").bind(input.requestId,input.actor.id,input.reason?.trim()||null).run();
     await writeAudit(tx,{request:input.request,actor:input.actor,action:"leave_cancelled",recordType:"request",recordId:String(input.requestId),previous:{status:row.status,balanceEffect:effect},next:{status:"cancelled",balanceEffect:"released",days}});
     if(effect!=="none")await writeAudit(tx,{request:input.request,actor:input.actor,action:"leave_balance_released",recordType:"leave_balance",recordId:String(balanceId),previous:{effect},next:{requestId:input.requestId,days,cancelled:true}});
     if(String(row.status)==="hr_approved")await refreshLeaveAttendance(tx,Number(row.employee_id),String(row.from_date),String(row.to_date));
     return {ok:true,status:"cancelled"};
+}
+
+/**
+ * Edit = cancel the original (releasing its balance) and submit the new dates/type, in ONE transaction:
+ * if the new period is refused (overlap, balance, no working days) the original leave is left exactly as it was.
+ */
+export async function editLeaveRequest(input:{db:PostgresDatabase;request:Request;actor:LeaveActor;requestId:number;leaveTypeId:number;fromDate:string;toDate:string;reason:string;notes?:string;onBehalf:"manager"|"hr"|null}){
+  if(input.fromDate.slice(0,4)!==input.toDate.slice(0,4)) response("Leave requests must stay within one calendar year",400);
+  return input.db.transaction(async tx=>{
+    const original=await tx.prepare("SELECT id,employee_id,request_code,details_json FROM requests WHERE id=? AND leave_type_id IS NOT NULL").bind(input.requestId).first<Row>();
+    if(!original) response("Leave request not found",404);
+    await cancelLeaveInTx(tx,{request:input.request,actor:input.actor,requestId:input.requestId,reason:"Edited"});
+    const created=await createLeaveInTx(tx,{request:input.request,actor:input.actor,employeeId:Number(original!.employee_id),leaveTypeId:input.leaveTypeId,fromDate:input.fromDate,toDate:input.toDate,reason:input.reason,notes:input.notes,onBehalf:input.onBehalf,attachmentDocumentId:Number(jsonObject(JSON.stringify(jsonObject(original!.details_json).attachment??{})).documentId)||null});
+    await writeAudit(tx,{request:input.request,actor:input.actor,action:"leave_request_edited",recordType:"request",recordId:String(created.id),previous:{requestId:input.requestId,code:original!.request_code},next:{requestId:created.id,code:created.requestCode}});
+    return {...created,replacedRequestId:input.requestId};
   });
 }

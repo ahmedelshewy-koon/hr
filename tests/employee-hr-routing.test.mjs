@@ -62,7 +62,7 @@ test("request services validate routing before writes and HR notifications use a
   assert.ok(attendance.indexOf("requireEmployeeHr(tx,employeeId)")<attendance.indexOf("INSERT INTO attendance_corrections"));
   assert.match(notifications,/DELETE FROM notifications n/);
   assert.match(notifications,/FROM requests q JOIN employees e ON e.id=q.employee_id JOIN users u ON u.id=\$\{hrSql\}/);
-  assert.match(notifications,/c.status='pending_hr' AND u.id=\$\{hrSql\}/);
+  assert.match(notifications,/c.status='pending_hr' AND c.current_stage='hr' AND u.id=\$\{hrSql\}/);
 });
 
 test("HR cannot approve themselves or act after their employment becomes inactive",async()=>{

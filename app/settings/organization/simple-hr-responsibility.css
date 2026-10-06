@@ -1,18 +1,18 @@
-.simple-hr{max-width:950px;margin:28px auto;padding:var(--sana-space-6);border:1px solid var(--line);border-radius:var(--sana-radius-card);background:var(--sana-white)}
-.simple-hr h3{margin:0 0 22px;color:var(--sana-teal);font-size:1.2rem}
+.simple-hr{max-width:950px;margin:32px auto;padding:var(--sana-space-6);border:1px solid var(--line);border-radius:var(--sana-radius-card);background:var(--sana-white)}
+.simple-hr h3{margin:0 0 24px;color:var(--sana-teal);font-size:1.2rem}
 .simple-hr form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sana-space-4);align-items:end}
 .simple-hr form .settings-field{margin:0}
 .simple-hr form button{grid-column:1/-1;justify-self:start;min-width:130px}
-.simple-hr-credential{margin-top:20px;padding:var(--sana-space-4);border:1px solid var(--sana-mint-light);border-radius:var(--sana-radius-control);background:var(--sana-canvas)}
+.simple-hr-credential{margin-top:24px;padding:var(--sana-space-4);border:1px solid var(--sana-line);border-radius:var(--sana-radius-control);background:var(--sana-canvas)}
 .simple-hr-credential p{margin:8px 0 0}
 .simple-hr-credential code{display:inline-block;user-select:all;overflow-wrap:anywhere}
 .simple-hr-rules{margin-top:32px}
-.simple-hr-rules h4{margin:0 0 12px}
+.simple-hr-rules h4{margin:0 0 16px}
 .simple-hr-list{display:grid;gap:var(--sana-space-2)}
 .simple-hr-row{display:flex;gap:var(--sana-space-2);align-items:stretch}
 .simple-hr-pick{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;gap:var(--sana-space-4);text-align:start;padding:var(--sana-space-3) var(--sana-space-3);border:1px solid var(--line);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--sana-teal);cursor:pointer}
 .simple-hr-pick:hover{background:var(--sana-canvas)}
-.simple-hr-scope{margin-inline-start:8px;padding:2px var(--sana-space-2);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-success);font-size:.75rem;font-weight:600}
+.simple-hr-scope{margin-inline-start:8px;padding:0 var(--sana-space-2);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-success);font-size:.75rem;font-weight:600}
 .simple-hr-scope.all{background:var(--sana-canvas);color:var(--sana-teal-mid)}
 .simple-hr-delete{flex:none;display:grid;place-items:center;width:44px;border:1px solid var(--sana-warning-bg);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--sana-danger);cursor:pointer}
 .simple-hr-delete:hover:not(:disabled){background:var(--sana-canvas)}

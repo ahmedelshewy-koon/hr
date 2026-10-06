@@ -22,7 +22,7 @@ function dueBadge(daysLeft: number, rtl: boolean, fmt: (value: number) => string
   return <Badge tone={daysLeft <= 14 ? "warn" : "info"}>{rtl ? `متبقي ${daysLabel(daysLeft, true, fmt)}` : `${daysLabel(daysLeft, false, fmt)} left`}</Badge>;
 }
 
-const HIGHLIGHTS_COLLAPSED = 6;
+const HIGHLIGHTS_COLLAPSED = 3;
 
 export function HighlightList({ items, ctx, goTo }: { items: Highlight[]; ctx: ReportContext; goTo: (tab: ReportTab) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -43,22 +43,19 @@ export function HighlightList({ items, ctx, goTo }: { items: Highlight[]; ctx: R
 export function OverviewTab({ data, ctx, highlights, goTo }: Props & { highlights: Highlight[]; goTo: (tab: ReportTab) => void }) {
   const { rtl, fmt } = ctx, t = (ar: string, en: string) => (rtl ? ar : en);
   const now = data.attendance.totals, before = data.attendance.previous, hasBefore = hasBaseline(now.workdays, before.workdays);
-  const attendRate = percent(now.attended, now.workdays), absentRate = percent(now.absent, now.workdays);
-  const pending = data.approvals.pendingNow, docs = data.documents;
+  const attendRate = percent(now.attended, now.workdays);
+  const pending = data.approvals.pendingNow;
+  const attention = highlights.filter(item => item.tone === "bad" || item.tone === "warn" || item.id === "approvals-pending");
   return <>
-    <Panel title={t("أهم ما يحتاج انتباهك", "What needs your attention")} note={t("ملخص تلقائي من بيانات الفترة المختارة — اضغط على أي بند لفتح تفاصيله.", "An automatic summary of the selected period — click any item to see the detail.")}>
-      <HighlightList items={data.attendance.totals.workdays || data.workforce.active ? highlights : []} ctx={ctx} goTo={goTo}/>
+    <div className="rp-overview-kpis"><KpiGrid>
+      <Kpi icon={Users} label={t("الموظفون الحاليون", "Current employees")} value={fmt(data.workforce.active)} hint={t("الوضع الحالي · نشط وتحت التجربة وفترة الإشعار", "Current state · active, probation and notice")}/>
+      <Kpi icon={CalendarCheck} label={t("نسبة الحضور", "Attendance rate")} value={now.workdays ? `${fmt(attendRate)}%` : "—"} tone={now.workdays ? rateTone(attendRate) : "neutral"} hint={t("خلال الفترة · الأيام المكتملة فقط", "Selected period · completed days only")} delta={now.workdays && hasBefore ? <Delta current={attendRate} previous={percent(before.attended, before.workdays)} points rtl={rtl} fmt={fmt}/> : null}/>
+      <Kpi icon={TimerReset} label={t("أيام التأخير", "Late arrivals")} value={now.workdays ? fmt(now.late_days) : "—"} hint={now.workdays ? t(`خلال الفترة · ${durationLabel(now.late_minutes, true)}`, `Selected period · ${durationLabel(now.late_minutes, false)}`) : t("لا توجد سجلات حضور للفترة", "No attendance records for this period")} delta={hasBefore ? <Delta current={now.late_days} previous={before.late_days} worseWhenUp rtl={rtl} fmt={fmt}/> : null}/>
+      <Kpi icon={ClipboardCheck} label={t("طلبات بانتظار الاعتماد", "Requests awaiting approval")} value={fmt(pending.manager + pending.hr)} tone={pending.overdue ? "bad" : pending.manager + pending.hr ? "warn" : "neutral"} hint={pending.overdue ? t(`حاليًا · ${fmt(pending.overdue)} متأخر أكثر من 3 أيام`, `Current state · ${fmt(pending.overdue)} waiting over 3 days`) : t("الوضع الحالي · كل الفترات", "Current state · all periods")}/>
+    </KpiGrid></div>
+    <Panel title={t("محتاج إجراء", "Needs action")} note={t("الأولوية للأكثر إلحاحًا. اضغط على البند لفتح تفاصيله؛ الاعتمادات والمستندات تعكس الوضع الحالي.", "Most urgent first. Open an item for details; approvals and documents reflect the current state.")}>
+      {attention.length ? <HighlightList key={`${data.period.from}-${data.period.to}`} items={attention} ctx={ctx} goTo={goTo}/> : <Empty text={t("لا توجد تنبيهات تستدعي إجراء في البيانات المتاحة.", "No actionable alerts in the available data.")}/>}
     </Panel>
-    <KpiGrid>
-      <Kpi icon={Users} label={t("الموظفون الحاليون", "Current employees")} value={fmt(data.workforce.active)} hint={t(`${fmt(data.workforce.hires.total)} انضموا · ${fmt(data.workforce.leavers.total)} غادروا في الفترة`, `${fmt(data.workforce.hires.total)} joined · ${fmt(data.workforce.leavers.total)} left in the period`)}/>
-      <Kpi icon={CalendarCheck} label={t("نسبة الحضور", "Attendance rate")} value={now.workdays ? `${fmt(attendRate)}%` : "—"} tone={now.workdays ? rateTone(attendRate) : "neutral"} delta={now.workdays && hasBefore ? <Delta current={attendRate} previous={percent(before.attended, before.workdays)} points rtl={rtl} fmt={fmt}/> : null}/>
-      <Kpi icon={UserX} label={t("نسبة الغياب", "Absence rate")} value={now.workdays ? `${fmt(absentRate)}%` : "—"} hint={t(`${fmt(now.absent)} يوم غياب`, `${fmt(now.absent)} absent days`)} tone={absentRate >= 10 ? "bad" : absentRate >= 5 ? "warn" : "good"} delta={now.workdays && hasBefore ? <Delta current={absentRate} previous={percent(before.absent, before.workdays)} points worseWhenUp rtl={rtl} fmt={fmt}/> : null}/>
-      <Kpi icon={TimerReset} label={t("أيام التأخير", "Late arrivals")} value={fmt(now.late_days)} hint={t(`إجمالي ${durationLabel(now.late_minutes, true)}`, `${durationLabel(now.late_minutes, false)} in total`)} delta={hasBefore ? <Delta current={now.late_days} previous={before.late_days} worseWhenUp rtl={rtl} fmt={fmt}/> : null}/>
-      <Kpi icon={CalendarDays} label={t("أيام الإجازة المعتمدة", "Approved leave days")} value={fmt(data.leave.totals.approved_days)} hint={t(`${fmt(data.leave.onLeaveToday)} في إجازة اليوم`, `${fmt(data.leave.onLeaveToday)} on leave today`)} delta={<Delta current={data.leave.totals.approved_days} previous={data.leave.totals.previous_approved_days} neutral rtl={rtl} fmt={fmt}/>}/>
-      <Kpi icon={ClipboardCheck} label={t("طلبات بانتظار الاعتماد", "Requests awaiting approval")} value={fmt(pending.manager + pending.hr)} tone={pending.overdue ? "bad" : pending.manager + pending.hr ? "warn" : "good"} hint={pending.overdue ? t(`${fmt(pending.overdue)} قيد الانتظار أكثر من 3 أيام`, `${fmt(pending.overdue)} waiting over 3 days`) : undefined}/>
-      {docs && <Kpi icon={FileWarning} label={t("مستندات تحتاج إجراء", "Documents needing action")} value={fmt(docs.totals.expired + docs.totals.expiring)} tone={docs.totals.expired ? "bad" : docs.totals.expiring ? "warn" : "good"} hint={t(`${fmt(docs.totals.expired)} منتهي · ${fmt(docs.totals.expiring)} ينتهي خلال 30 يومًا`, `${fmt(docs.totals.expired)} expired · ${fmt(docs.totals.expiring)} within 30 days`)}/>}
-      <Kpi icon={UserMinus} label={t("معدل ترك العمل", "Turnover")} value={`${fmt(data.workforce.turnoverRate)}%`} tone={data.workforce.turnoverRate >= 5 ? "warn" : "neutral"} hint={t(`${fmt(data.workforce.leavers.total)} غادروا في الفترة`, `${fmt(data.workforce.leavers.total)} left in the period`)}/>
-    </KpiGrid>
     <div className="rp-grid two">
       <Panel title={t("الحضور اليومي", "Daily attendance")} note={t("كل عمود يوم عمل: في الموعد / متأخر / غائب.", "Each column is a working day: on time / late / absent.")} action={<button type="button" className="text-button" onClick={() => goTo("attendance")}>{t("التفاصيل", "Details")}</button>}>
         <AttendanceChart points={data.attendance.daily} dateLabel={ctx.dateLabel} fmt={fmt} labels={{ onTime: t("في الموعد", "On time"), late: t("متأخر", "Late"), absent: t("غائب", "Absent"), empty: t("لا توجد سجلات حضور في هذه الفترة.", "No attendance records in this period.") }}/>

@@ -24,7 +24,7 @@
 .lifecycle-heading,
 .portal-welcome{
   min-height:48px;
-  padding:2px var(--sana-space-1);
+  padding:0 var(--sana-space-1);
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -60,7 +60,7 @@
   .lifecycle-heading,
   .portal-welcome{
     min-height:48px;
-    padding:2px var(--sana-space-1);
+    padding:0 var(--sana-space-1);
     border-radius:0;
     flex-wrap:wrap;
   }

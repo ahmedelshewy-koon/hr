@@ -1,0 +1,82 @@
+/* Employee profile tabs (overview, history, leave, attendance, insurance, contacts, acknowledgements). */
+.pt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pt-panel{background:var(--sana-white);border:1px solid var(--line);border-radius:16px;padding:24px 24px;min-width:0}
+.pt-panel+.pt-panel{margin-top:16px}
+.pt-grid .pt-panel+.pt-panel{margin-top:0}
+.pt-panel>header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.pt-panel h2{display:flex;align-items:center;gap:8px;margin:0;font-size:var(--type-section,18px);color:var(--text)}
+.pt-panel h2 svg{width:20px;height:20px;color:var(--sana-teal)}
+.pt-facts{display:grid;gap:0;margin:0}
+.pt-facts>div{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,1.4fr);gap:16px;padding:8px 0}
+.pt-facts dt{color:var(--muted);font-size:var(--type-secondary,14px)}
+.pt-facts dd{margin:0;color:var(--text);overflow-wrap:anywhere}
+.pt-address{border-top:1px solid var(--line);margin-top:8px;padding-top:16px}
+.pt-address span,.pt-sub{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:var(--type-secondary,14px);margin-bottom:8px}
+.pt-address p{margin:0}
+.pt-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.pt-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:32px;background:var(--sana-canvas);border:1px solid var(--line);font-size:13px}
+.pt-chip small{color:var(--muted)}
+.pt-notes{margin:0;white-space:pre-wrap;line-height:1.7}
+.pt-empty{color:var(--muted);text-align:center;margin:16px 0}
+.pt-notice{background:var(--sana-canvas);border:1px solid var(--line);border-radius:16px;padding:8px 16px;margin:0 0 16px}
+.pt-table-wrap{overflow-x:auto}
+.pt-table{width:100%;border-collapse:collapse;font-size:var(--type-secondary,14px)}
+.pt-table th{color:var(--muted);font-weight:var(--weight-medium,500);text-align:start;padding:8px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.pt-table td{padding:16px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.pt-table tr:last-child td{border-bottom:0}
+.pt-name{display:flex;flex-direction:column;gap:0}
+.pt-name small{color:var(--muted)}
+.pt-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pt-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:16px;border:1px solid transparent;background:transparent;color:var(--text)}
+.pt-icon:hover{background:var(--sana-canvas);border-color:var(--line)}
+.pt-icon.danger{color:var(--sana-danger)}
+.pt-toggle{display:inline-flex;gap:8px}
+.pt-toggle button{height:36px;padding-inline:16px;border-radius:32px}
+.pt-balances{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.pt-balances article{border:1px solid var(--line);border-radius:16px;padding:16px 16px;background:var(--sana-canvas);display:grid;gap:8px}
+.pt-balances strong{font-size:28px;color:var(--sana-teal);line-height:1.1}
+.pt-balances small{color:var(--muted)}
+.pt-decision-body{white-space:pre-wrap;line-height:1.9;background:var(--sana-canvas);border:1px solid var(--line);border-radius:16px;padding:16px;max-height:60vh;overflow:auto}
+/* Profile header in the screenshot style. */
+.profile360-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;background:var(--sana-white);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:16px}
+.profile360-hero-main{display:flex;align-items:center;gap:24px;min-width:0}
+.profile360-hero-photo{width:96px;height:96px;border-radius:50%;object-fit:cover;flex:none;background:var(--sana-canvas);display:grid;place-items:center;font-size:28px;font-weight:700;color:var(--sana-teal);border:3px solid var(--sana-line)}
+.profile360-hero h1{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 8px;font-size:24px}
+.profile360-hero p{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--muted)}
+.profile360-hero p svg{width:16px;height:16px}
+.profile360-hero-contact{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.profile360-hero-contact span{display:inline-flex;align-items:center;gap:8px}
+.profile360-hero-ids{display:grid;gap:8px;text-align:end}
+.profile360-hero-ids small{color:var(--muted)}
+.profile360-hero-ids b{font-family:ui-monospace,Consolas,monospace;letter-spacing:.02em}
+.profile360-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.profile360-topbar h1{display:flex;align-items:center;gap:16px;margin:0;font-size:24px}
+@media(max-width:760px){
+  .pt-grid{grid-template-columns:1fr}
+  .pt-panel{padding:16px}
+  .pt-facts>div{grid-template-columns:1fr;gap:0}
+  .pt-table thead{display:none}
+  .pt-table tr{display:grid;border-bottom:1px solid var(--line);padding:8px 0}
+  .pt-table td{display:flex;justify-content:space-between;gap:16px;border:0;padding:8px 8px}
+  .pt-table td::before{content:attr(data-label);color:var(--muted)}
+  .profile360-hero-ids{text-align:start}
+}
+/* Leave print sheet: only the sheet is printed. */
+.pt-print-sheet{position:relative;z-index:2;background:var(--sana-white);width:min(820px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;margin:16px auto;border-radius:16px;padding:32px;color:var(--sana-teal)}
+.pt-print-layer{display:flex;align-items:flex-start;justify-content:center}
+.pt-print-controls{display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px}
+.pt-print-sheet header{display:flex;align-items:center;gap:24px;border-bottom:2px solid var(--sana-teal);padding-bottom:16px;margin-bottom:24px}
+.pt-print-sheet header img{width:64px;height:64px;object-fit:contain}
+.pt-print-sheet h1{margin:0;font-size:24px}
+.pt-print-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0;border:1px solid var(--sana-line)}
+.pt-print-facts>div{display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid var(--sana-line)}
+.pt-print-facts dt{background:var(--sana-canvas);padding:8px;font-weight:600}
+.pt-print-facts dd{margin:0;padding:8px}
+.pt-print-sheet footer{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:56px}
+.pt-print-sheet footer div{border-top:1px solid var(--sana-line);padding-top:8px;text-align:center}
+@media print{
+  body.pt-printing *{visibility:hidden}
+  body.pt-printing .pt-print-sheet,body.pt-printing .pt-print-sheet *{visibility:visible}
+  body.pt-printing .pt-print-sheet{position:fixed;inset:0;width:auto;max-height:none;margin:0;border-radius:0;overflow:visible}
+  body.pt-printing .pt-print-controls{display:none}
+}

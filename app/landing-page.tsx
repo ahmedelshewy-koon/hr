@@ -15,7 +15,7 @@ const DEMO_HREF = `mailto:?subject=${encodeURIComponent("طلب عرض توضي�
 const NAV = [
   { href: "#platform", label: "الوحدات" },
   { href: "#benefits", label: "المزايا" },
-  { href: "#why", label: "لماذا سنا HR" },
+  { href: "#why", label: "لماذا سنع HR" },
   { href: "#start", label: "كيف تبدأ" },
 ];
 
@@ -34,7 +34,7 @@ const STAGES = [
     modules: [
       { Icon: Fingerprint, name: "الحضور والانصراف", lead: "سجلات الحضور تصل تلقائيًا من أجهزة البصمة، مع ورديات وجداول دوام مرنة.", points: ["أجهزة البصمة", "رصد التأخير"] },
       { Icon: CalendarDays, name: "الإجازات", lead: "طلبات إجازة واضحة وأرصدة محدّثة لكل موظف وفق سياسة شركتك.", points: ["سياسات مرنة", "أرصدة تلقائية"] },
-      { Icon: ClipboardCheck, name: "الموافقات والإجراءات", lead: "كل طلب يصل إلى المسؤول الصحيح ويُعتمد بخطوة واحدة مع سجل موثّق.", points: ["موافقات متعددة", "سجل كامل"] },
+      { Icon: ClipboardCheck, name: "الاعتمادات والإجراءات", lead: "كل طلب يصل إلى المسؤول الصحيح ويُعتمد بخطوة واحدة مع سجل موثّق.", points: ["موافقات متعددة", "سجل كامل"] },
     ],
   },
   {
@@ -70,13 +70,13 @@ const STATS = [
 ] as const;
 
 const STEPS = [
-  { title: "احجز عرضًا", text: "نتعرف على شركتك وسياسات الموارد البشرية لديك، ونعرض لك سنا HR على سيناريوهاتك الفعلية." },
+  { title: "احجز عرضًا", text: "نتعرف على شركتك وسياسات الموارد البشرية لديك، ونعرض لك سنع HR على سيناريوهاتك الفعلية." },
   { title: "نهيّئ نظامك", text: "نبني الهيكل التنظيمي والصلاحيات وسياسات الإجازات، ونرحّل بيانات موظفيك بإشراف فريقك." },
   { title: "ابدأ العمل", text: "يسجّل فريق الموارد البشرية والموظفون الدخول ويعملون من اليوم الأول على نظام واحد واضح." },
 ] as const;
 
 function Wordmark() {
-  return <a className="landing-wordmark" href="#top" aria-label="SANA HR — الصفحة الرئيسية"><span className="landing-mark"><StarMark size={18} /></span><SanaBrand module="HR" /></a>;
+  return <a className="landing-wordmark" href="#top" aria-label="SANA HR — الصفحة الرئيسية"><SanaBrand module="HR" /></a>;
 }
 
 const SCENE_TEAM = 139;
@@ -195,7 +195,7 @@ function HrScene() {
   );
 
   return (
-    <div ref={rootRef} className="landing-hero-visual" role="img" aria-label="لوحة سنا HR: ملف الموظف والحضور والإجازات والرواتب في نظام واحد" onPointerMove={tiltScene} onPointerLeave={resetScene}>
+    <div ref={rootRef} className="landing-hero-visual" role="img" aria-label="لوحة سنع HR: ملف الموظف والحضور والإجازات والرواتب في نظام واحد" onPointerMove={tiltScene} onPointerLeave={resetScene}>
       <span className="landing-glare" aria-hidden="true" />
       <div className="landing-panel-bar" aria-hidden="true">
         <span className="landing-panel-title"><StarMark size={14} /> لوحة الموارد البشرية</span>
@@ -320,7 +320,7 @@ export function LandingPage() {
             <div className="landing-hero-copy" data-reveal>
               <p className="landing-eyebrow"><span dir="ltr">SANA HR</span> نظام متكامل لإدارة الموارد البشرية</p>
               <h1 className="landing-title">كل شؤون موظفيك،<br /><span>في منصة واحدة.</span></h1>
-              <p className="landing-lead">سنا HR تجمع ملفات الموظفين والحضور والإجازات والرواتب والموافقات في نظام واحد، لتدير فريقك بوضوح وتتخذ قراراتك على بيانات دقيقة ومحدّثة.</p>
+              <p className="landing-lead">سنع HR تجمع ملفات الموظفين والحضور والإجازات والرواتب والاعتمادات في نظام واحد، لتدير فريقك بوضوح وتتخذ قراراتك على بيانات دقيقة ومحدّثة.</p>
               <div className="landing-cta-row">
                 <a className="landing-btn landing-btn-primary landing-btn-lg" href={LOGIN_HASH}>ابدأ الآن <ArrowLeft size={20} /></a>
                 <a className="landing-btn landing-btn-outline landing-btn-lg" href={DEMO_HREF}>احجز عرضًا</a>
@@ -335,7 +335,7 @@ export function LandingPage() {
         <section className="landing-section" id="platform" aria-labelledby="platform-title">
           <div className="landing-shell">
             <div className="landing-section-head" data-reveal>
-              <p className="landing-kicker">وحدات سنا HR</p>
+              <p className="landing-kicker">وحدات سنع HR</p>
               <h2 id="platform-title">رحلة الموظف كاملة، في نظام واحد</h2>
               <p>تسع وحدات مترابطة ترافق الموظف في كل مرحلة: من التوظيف والتعيين، إلى العمل اليومي، حتى الرواتب والتطوير والتقارير، وكلها تعمل على ملف واحد.</p>
             </div>
@@ -386,9 +386,9 @@ export function LandingPage() {
         <section className="landing-section" id="why" aria-labelledby="why-title">
           <div className="landing-shell landing-why">
             <div className="landing-why-copy" data-reveal>
-              <p className="landing-kicker">لماذا سنا HR</p>
+              <p className="landing-kicker">لماذا سنع HR</p>
               <h2 id="why-title">لأن موظفيك يستحقون إدارة أوضح</h2>
-              <p className="landing-why-lead">حين تُدار شؤون الموظفين بين الجداول والبريد والرسائل، تضيع الساعات في المتابعة وتتأخر القرارات. سنا HR يضع كل ذلك في مسار واحد واضح.</p>
+              <p className="landing-why-lead">حين تُدار شؤون الموظفين بين الجداول والبريد والرسائل، تضيع الساعات في المتابعة وتتأخر القرارات. سنع HR يضع كل ذلك في مسار واحد واضح.</p>
               <div className="landing-pillars">
                 {PILLARS.map(({ Icon, title, text }) => (
                   <div className="landing-pillar" key={title}>
@@ -400,7 +400,7 @@ export function LandingPage() {
             </div>
             <div className="landing-compare" data-reveal>
               <div className="landing-compare-col is-before">
-                <h3>قبل سنا HR</h3>
+                <h3>قبل سنع HR</h3>
                 <ul>
                   <li><X size={16} /> بيانات الموظفين في جداول متفرقة</li>
                   <li><X size={16} /> حضور يُجمع يدويًا من أجهزة البصمة</li>
@@ -409,7 +409,7 @@ export function LandingPage() {
                 </ul>
               </div>
               <div className="landing-compare-col is-after">
-                <h3><StarMark size={16} /> مع سنا HR</h3>
+                <h3><StarMark size={16} /> مع سنع HR</h3>
                 <ul>
                   <li><Check size={16} strokeWidth={2.5} /> ملف موحّد ومحدّث لكل موظف</li>
                   <li><Check size={16} strokeWidth={2.5} /> حضور يصل تلقائيًا من الأجهزة</li>
@@ -421,7 +421,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-stats" aria-label="سنا HR بالأرقام">
+        <section className="landing-stats" aria-label="سنع HR بالأرقام">
           <div className="landing-shell">
             <ul>
               {STATS.map(stat => (
@@ -457,7 +457,7 @@ export function LandingPage() {
             <div className="landing-final-panel" data-reveal>
               <div>
                 <h2 id="final-title">جاهز لإدارة موظفيك من مكان واحد؟</h2>
-                <p>سجّل الدخول إلى سنا HR، أو احجز عرضًا توضيحيًا ليرى فريقك كيف يعمل النظام على بياناتكم.</p>
+                <p>سجّل الدخول إلى سنع HR، أو احجز عرضًا توضيحيًا ليرى فريقك كيف يعمل النظام على بياناتكم.</p>
               </div>
               <div className="landing-cta-row">
                 <a className="landing-btn landing-btn-light landing-btn-lg" href={LOGIN_HASH}><LogIn size={20} /> تسجيل الدخول</a>
@@ -472,7 +472,7 @@ export function LandingPage() {
         <div className="landing-shell landing-footer-grid">
           <div className="landing-footer-brand">
             <Wordmark />
-            <p>سنا HR نظام متكامل لإدارة الموارد البشرية ضمن منصة سنا، يجمع الموظفين والحضور والإجازات والرواتب والموافقات في مكان واحد.</p>
+            <p>سنع HR نظام متكامل لإدارة الموارد البشرية ضمن منصة سنع، يجمع الموظفين والحضور والإجازات والرواتب والاعتمادات في مكان واحد.</p>
           </div>
           <div>
             <h3>الوحدات</h3>
@@ -480,7 +480,7 @@ export function LandingPage() {
           </div>
           <div>
             <h3>تعرّف علينا</h3>
-            <ul><li><a href="#benefits">المزايا</a></li><li><a href="#why">لماذا سنا HR</a></li><li><a href="#start">كيف تبدأ</a></li></ul>
+            <ul><li><a href="#benefits">المزايا</a></li><li><a href="#why">لماذا سنع HR</a></li><li><a href="#start">كيف تبدأ</a></li></ul>
           </div>
           <div>
             <h3>ابدأ</h3>

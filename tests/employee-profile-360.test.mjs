@@ -42,14 +42,25 @@ test("audit JSON is never returned by the employee profile route",async()=>{
   assert.doesNotMatch(route,/previous_value|new_value/);
 });
 
-test("employee list opens the canonical profile workspace and edit reuses the existing drawer",async()=>{
+test("employee list opens the canonical profile workspace and edit reuses the existing form in the profile page layout",async()=>{
+  const drawer=await readFile(new URL("../app/employee-drawer.tsx",import.meta.url),"utf8");
+  assert.match(drawer,/if\(page\)return <section className="employee-profile360 profile360-inline profile360-edit"/);
   const app=await readFile(new URL("../app/hr-app.tsx",import.meta.url),"utf8");
-  assert.match(app,/EmployeeProfile360/);assert.match(app,/selected\.edit\?<EmployeeDetailsDrawer/);assert.match(app,/onEdit=\{\(\)=>setSelected/);
+  assert.match(app,/EmployeeProfile360/);assert.match(app,/if\(selected\?\.edit\)\{const back=\(\)=>setSelected\(selected\.fromProfile\?\{row:selected\.row,edit:false\}:null\);return <section className="employees-page-shell employee-profile-page"><EmployeeDetailsDrawer page /);assert.match(app,/<EmployeeProfile360 inline rtl=\{rtl\}/);assert.match(app,/setSelected\(\{row,edit:true\}\)/);
+  // the profile is part of the page content (sidebar stays beside it), not a full-screen overlay
+  assert.match(app,/employees-page-shell employee-profile-page/);
+  const profile=await readFile(new URL("../app/employee-profile-360.tsx",import.meta.url),"utf8");
+  assert.match(profile,/function ProfileShell\(\{inline/);assert.match(profile,/if\(inline\)return <>\{children\}<\/>/);
+  const css=await readFile(new URL("../app/employee-profile-360.css",import.meta.url),"utf8");
+  assert.match(css,/\.employee-profile360\.profile360-inline\{/);assert.match(css,/\.app:not\(\.sidebar-collapsed\) \.profile360-layer\{inset-inline-start:/);
+  // the page grows with the profile (no clipped bottom) and the tabs wrap instead of scrolling sideways
+  assert.match(css,/\.employees-page-shell\.employee-profile-page\{height:auto;min-height:0;overflow:visible/);assert.match(css,/\.profile360-tabs\{flex-wrap:wrap;overflow:visible/);
 });
 
-test("request history provides explicit localized filters and the profile has no attendance tab",async()=>{
+test("request history provides explicit localized filters; attendance is a month-filtered tab (2026-10-05 request)",async()=>{
   const profile=await readFile(new URL("../app/employee-profile-360.tsx",import.meta.url),"utf8");
-  assert.doesNotMatch(profile,/function AttendanceTab/);assert.doesNotMatch(profile,/id:"attendance"/);assert.match(profile,/function RequestsTab/);assert.match(profile,/"تطبيق":"Apply"/);assert.match(profile,/"إعادة ضبط":"Reset"/);
+  assert.match(profile,/id:"attendance"/);assert.match(profile,/<AttendanceTab rtl=\{rtl\} employeeId=\{employeeId\}\/>/);assert.match(profile,/function RequestsTab/);
+  const tabs=await readFile(new URL("../app/employee-profile-tabs.tsx",import.meta.url),"utf8");assert.match(tabs,/tab=attendance&month=\$\{monthOf\(value\)\}/);assert.match(profile,/"تطبيق":"Apply"/);assert.match(profile,/"إعادة ضبط":"Reset"/);
 });
 
 test("employee profile does not display team or grade facts",async()=>{

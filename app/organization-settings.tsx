@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useMemo, useState } from 'react';
-import { Building2, BriefcaseBusiness, MapPin, Network, UserCog } from 'lucide-react';
+import { Building2, BriefcaseBusiness, MapPin, Network } from 'lucide-react';
 import { localizeApiMessage } from './api-messages';
 import type { Row } from './ui-types';
 import { bilingualMessage, type OrganizationAccess } from './organization/settings-model.ts';
@@ -19,15 +19,18 @@ import { SimpleHrResponsibility } from './settings/organization/simple-hr-respon
  * Settings → Organizational Structure. Settings hold the controlled master data, the Employee Profile stores each
  * employee's actual assignment, and the organization chart is derived from those assignments and manager lines.
  */
-const SECTIONS = [
+export const ORGANIZATION_SECTIONS = [
   { id: 'companies', ar: 'الشركات والفروع', en: 'Companies & Branches', descriptionAr: 'إدارة الشركات وربطها بالفروع المتاحة داخل النظام.', descriptionEn: 'Manage companies and connect them to the branches available in the system.', icon: <Building2 size={16} aria-hidden="true" /> },
   { id: 'departments', ar: 'الإدارات', en: 'Departments', descriptionAr: 'إدارة الإدارات والأقسام الفرعية وربطها بالشركات.', descriptionEn: 'Manage departments and sections and link them to companies.', icon: <Network size={16} aria-hidden="true" /> },
   { id: 'positions', ar: 'الوظائف', en: 'Positions', descriptionAr: 'إدارة الوظائف المستخدمة في تعيينات الموظفين.', descriptionEn: 'Manage positions used in employee assignments.', icon: <BriefcaseBusiness size={16} aria-hidden="true" /> },
   { id: 'locations', ar: 'مقار العمل', en: 'Work Locations', descriptionAr: 'إدارة مقار ومواقع العمل وربطها بتعيينات الموظفين.', descriptionEn: 'Manage work locations and sites and link them to employee assignments.', icon: <MapPin size={16} aria-hidden="true" /> },
-  { id: 'hr', ar: 'مسؤولية الموارد البشرية', en: 'HR Responsibility', descriptionAr: 'إدارة قواعد مسؤولية الموارد البشرية حسب الشركة والفرع.', descriptionEn: 'Manage HR responsibility rules by company and branch.', icon: <UserCog size={16} aria-hidden="true" /> },
 ];
+const SECTIONS = ORGANIZATION_SECTIONS;
 
 type Props = {
+  /** Render a section inside the owning page's navigation. */
+  activeSection?: string;
+  onSectionChange?: (section: string) => void;
   rtl: boolean;
   access: OrganizationAccess;
   employees: Row[];
@@ -52,10 +55,11 @@ function settingsError(body: Row, status: number, rtl: boolean): Error {
   return Object.assign(new Error(text), main ? { code: main.code, field: main.field, issues: issues.length ? issues : [main] } : {});
 }
 
-export function OrganizationSettings({ rtl, access, employees, hrResponsibles, hrCandidates, onSaveJobTitle, onSaveHrResponsible, onChanged, notify }: Props) {
+function useOrganizationSettings({ activeSection, onSectionChange, rtl, access, employees, hrResponsibles, hrCandidates, onSaveJobTitle, onSaveHrResponsible, onChanged, notify }: Props, initialSection: () => string) {
   const { snapshot, status, reload } = useOrganizationSnapshot(access.canView);
-  const [section, setSection] = useState(() => consumeOrganizationSection() ?? 'companies');
-  const selectedSection = SECTIONS.find(item => item.id === section) ?? SECTIONS[0];
+  const [localSection, setLocalSection] = useState(initialSection);
+  const section = activeSection ?? localSection;
+  const setSection = onSectionChange ?? setLocalSection;
 
   const post = useCallback(async (payload: Row) => {
     const response = await fetch('/api/organization', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
@@ -96,30 +100,52 @@ export function OrganizationSettings({ rtl, access, employees, hrResponsibles, h
   const value = useMemo<OrganizationSettingsValue | null>(() => snapshot ? {
     rtl, access, catalog: snapshot.catalog, usage: snapshot.usage, occupants: snapshot.occupants, hrScopes: snapshot.hrScopes, legacyWorkLocations: snapshot.legacyWorkLocations, hrRoster: snapshot.hrRoster, hrEmployees: snapshot.hrEmployees, unlinkedHrAccounts: snapshot.unlinkedHrAccounts,
     employees, hrResponsibles, hrCandidates, saveEntity, saveJobTitle, saveHrResponsible, saveHrAssignment, previewEntity, previewJobTitle, deleteEntity, forceDeleteEntity, goTo: setSection,
-  } : null, [snapshot, rtl, access, employees, hrResponsibles, hrCandidates, saveEntity, saveJobTitle, saveHrResponsible, saveHrAssignment, previewEntity, previewJobTitle, deleteEntity, forceDeleteEntity]);
+  } : null, [snapshot, rtl, access, employees, hrResponsibles, hrCandidates, saveEntity, saveJobTitle, saveHrResponsible, saveHrAssignment, previewEntity, previewJobTitle, deleteEntity, forceDeleteEntity, setSection]);
+
+  return { value, status, reload, section, setSection };
+}
+
+function SettingsLoadStatus({ rtl, status, reload, hr = false }: { rtl: boolean; status: string; reload: () => Promise<void>; hr?: boolean }) {
+  return <>
+    {status === 'loading' && <p className="settings-muted" role="status">{rtl ? 'جارٍ تحميل الإعدادات...' : 'Loading settings...'}</p>}
+    {status === 'error' && <InfoNotice tone="warn">{hr ? (rtl ? 'تعذر تحميل مسؤولي الموارد البشرية. حاول مرة أخرى.' : 'Unable to load HR responsibles. Please try again.') : (rtl ? 'تعذر تحميل إعدادات الهيكل التنظيمي. تحقق من الاتصال وحاول مرة أخرى.' : 'Unable to load the organizational settings. Check your connection and try again.')} <button type="button" className="outline" onClick={() => void reload()}>{rtl ? 'إعادة المحاولة' : 'Retry'}</button></InfoNotice>}
+    {status === 'unavailable' && <InfoNotice>{rtl ? 'إعداد الهيكل التنظيمي غير متاح بعد في قاعدة البيانات.' : 'Organizational structure setup is not available in this database yet.'}</InfoNotice>}
+  </>;
+}
+
+export function HrResponsibilitySettings(props: Props) {
+  const { value, status, reload } = useOrganizationSettings(props, () => 'hr');
+  return <>
+    {!props.access.canManage && <StatusBadge rtl={props.rtl} tone="gray" label={props.rtl ? 'عرض فقط' : 'View only'} />}
+    <SettingsLoadStatus rtl={props.rtl} status={status} reload={reload} hr />
+    {value && <OrganizationSettingsContext.Provider value={value}><SimpleHrResponsibility /></OrganizationSettingsContext.Provider>}
+  </>;
+}
+
+export function OrganizationSettings(props: Props) {
+  const { rtl, access, activeSection } = props;
+  const { value, status, reload, section, setSection } = useOrganizationSettings(props, () => activeSection ?? consumeOrganizationSection() ?? 'companies');
+  const selectedSection = SECTIONS.find(item => item.id === section) ?? SECTIONS[0];
 
   return <section className="panel settings-panel" dir={rtl ? 'rtl' : 'ltr'} aria-labelledby="org-settings-title">
     <div className="org-settings-intro">
     <header className="settings-panel-head">
       <div>
-        <h2 id="org-settings-title">{rtl ? 'الهيكل التنظيمي' : 'Organizational Structure'}</h2>
-        <p>{rtl ? 'إدارة الشركات والفروع والإدارات والوظائف وربطها بملف الموظف والمخطط التنظيمي.' : 'Manage companies, branches, departments and positions, linked to employee profiles and the organizational chart.'}</p>
+        <h2 id="org-settings-title">{activeSection ? (rtl ? selectedSection.ar : selectedSection.en) : (rtl ? 'الهيكل التنظيمي' : 'Organizational Structure')}</h2>
+        {!activeSection && <p>{rtl ? 'إدارة الشركات والفروع والإدارات والوظائف وربطها بملف الموظف والمخطط التنظيمي.' : 'Manage companies, branches, departments and positions, linked to employee profiles and the organizational chart.'}</p>}
       </div>
       {!access.canManage && <StatusBadge rtl={rtl} tone="gray" label={rtl ? 'عرض فقط' : 'View only'} />}
     </header>
-    <SettingsSubnav level="primary" rtl={rtl} label={rtl ? 'أقسام الهيكل التنظيمي' : 'Organizational structure sections'} active={section} onChange={setSection}
-      items={SECTIONS.map(item => ({ id: item.id, label: rtl ? item.ar : item.en, icon: item.icon }))} />
+    {!activeSection && <SettingsSubnav level="primary" rtl={rtl} label={rtl ? 'أقسام الهيكل التنظيمي' : 'Organizational structure sections'} active={section} onChange={setSection}
+      items={SECTIONS.map(item => ({ id: item.id, label: rtl ? item.ar : item.en, icon: item.icon }))} />}
     <p className="org-settings-context" aria-live="polite" aria-atomic="true">{rtl ? selectedSection.descriptionAr : selectedSection.descriptionEn}</p>
     </div>
-    {status === 'loading' && <p className="settings-muted" role="status">{rtl ? 'جارٍ تحميل الإعدادات...' : 'Loading settings...'}</p>}
-    {status === 'error' && <InfoNotice tone="warn">{rtl ? 'تعذر تحميل إعدادات الهيكل التنظيمي. تحقق من الاتصال وحاول مرة أخرى.' : 'Unable to load the organizational settings. Check your connection and try again.'} <button type="button" className="outline" onClick={() => void reload()}>{rtl ? 'إعادة المحاولة' : 'Retry'}</button></InfoNotice>}
-    {status === 'unavailable' && <InfoNotice>{rtl ? 'إعداد الهيكل التنظيمي غير متاح بعد في قاعدة البيانات.' : 'Organizational structure setup is not available in this database yet.'}</InfoNotice>}
+    <SettingsLoadStatus rtl={rtl} status={status} reload={reload} />
     {value && <OrganizationSettingsContext.Provider value={value}>
       {section === 'companies' && <CompaniesAndBranches />}
       {section === 'departments' && <DepartmentsSection />}
       {section === 'positions' && <PositionsSection />}
       {section === 'locations' && <WorkLocationsSection />}
-      {section === 'hr' && <SimpleHrResponsibility />}
     </OrganizationSettingsContext.Provider>}
   </section>;
 }

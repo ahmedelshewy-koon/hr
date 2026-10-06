@@ -9,7 +9,7 @@ import type {Row} from "./ui-types";
 
 // Quick ratings for a criterion; the number box next to them fine-tunes the exact score.
 const RATINGS=[{score:50,en:"Weak",ar:"ضعيف"},{score:65,en:"Fair",ar:"مقبول"},{score:75,en:"Good",ar:"جيد"},{score:85,en:"Very Good",ar:"جيد جدًا"},{score:95,en:"Excellent",ar:"ممتاز"}];
-const TONES=["var(--sana-danger)","var(--sana-warning)","var(--sana-mint)","var(--sana-teal-mid)","var(--sana-teal)"];
+const TONES=["var(--sana-danger)","var(--sana-warning)","var(--sana-chart-3)","var(--sana-teal-mid)","var(--sana-teal)"];
 const toneFor=(score:number)=>score>=90?TONES[4]:score>=80?TONES[3]:score>=70?TONES[2]:score>=PASS_MARK?TONES[1]:TONES[0];
 
 export type EvaluationSubmit={passed:boolean;evaluation:{scores:Record<string,number>;notes:string};certificateDetails:{durationHours:number;instructorName:string}};

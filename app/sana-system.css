@@ -11,8 +11,8 @@ html .app .content h2{font-size:var(--type-section)!important;font-weight:700!im
 html .app .content h3{font-size:var(--type-component)!important;font-weight:600!important}
 html .app .content :is(.rp-overview-kpis .rp-kpi b,.rp-kpi b,.asset-kpi b,.biometric-summary b,.bp-kpis b,.insight-donut b,.balance-item>summary strong,.pt-balances strong,.ats-kpis strong,.ats-score-trio b,.evaluation-ring b,.attendance-kpis>button>b){font-size:var(--type-kpi)!important}
 
-/* Sidebar: 55px items, 16px radius/padding, 8px icon gap, 24px between items, dark hover. */
-html .app[dir] .sidebar nav{display:flex;flex-direction:column;gap:var(--sana-sidebar-item-gap);padding-block:8px;min-height:0;overflow-y:auto}
+/* Sidebar reference: 44px items, 16px between items, 16px radius/padding. */
+html .app[dir] .sidebar nav{display:flex;flex-direction:column;gap:var(--sana-sidebar-item-gap);padding-block:0;min-height:0;overflow-y:auto}
 html .app[dir] .sidebar nav button,html .app.sidebar-collapsed[dir] .sidebar nav button{flex:0 0 var(--sana-sidebar-item-height);height:var(--sana-sidebar-item-height);min-height:var(--sana-sidebar-item-height);max-height:var(--sana-sidebar-item-height);padding:0 16px;gap:8px;border-radius:var(--sana-radius-nav);font-size:14px!important;font-weight:500;background:transparent;color:var(--sana-line)}
 html .app[dir] .sidebar nav button svg{width:20px;height:20px;flex:none;color:inherit}
 html .app[dir] .sidebar nav button:hover,html .app[dir] .sidebar-bottom>button:hover{background:var(--sana-sidebar-hover);color:#fff}

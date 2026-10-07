@@ -55,7 +55,7 @@
   --sana-radius-switch:16px;
   --sana-space-7:56px;
   --sana-page-margin:24px; --sana-gutter:16px; --sana-card-padding:16px;
-  --sana-sidebar-item-height:55px; --sana-sidebar-item-gap:24px;
+  --sana-sidebar-item-height:44px; --sana-sidebar-item-gap:16px;
   --sana-shadow-card:0px 0px 8px 0px rgba(0,204,161,0.16);
   --sana-chart-1:#0B4237; --sana-chart-2:#1C7B61; --sana-chart-3:color-mix(in srgb,#1C7B61 45%,#FFFFFF);
 }

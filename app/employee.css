@@ -162,3 +162,5 @@
 .check-row span{display:grid;gap:0}
 .check-row small{color:var(--muted);font-weight:400}
 .field .field-hint{display:block;margin-top:8px;color:var(--muted);font-size:12px;line-height:1.5}
+
+@media(max-width:760px){.employees-page-shell{height:auto;min-height:0;overflow:visible}.employee-directory-panel{flex:none;overflow:visible}.employee-directory-scroll{flex:none;overflow:visible;overscroll-behavior:auto;scrollbar-gutter:auto}.employee-organization-panel{flex:none;overflow:visible}}

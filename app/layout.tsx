@@ -16,7 +16,6 @@ export async function generateMetadata(): Promise<Metadata> {
     description: "A bilingual employee experience and HR operations platform.",
     manifest: "/manifest.webmanifest",
     appleWebApp: { capable: true, title: "HR", statusBarStyle: "default" },
-    icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/hr-icon-192.png" },
     openGraph: {
       title: "HR — People, simply managed",
       description: "A modern bilingual employee experience and HR operations platform.",
@@ -33,6 +32,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
+      <head>
+        {/* Keep icons in the initial head: streamed metadata can land in the body. */}
+        <link rel="icon" type="image/png" href="/favicon.png?v=sana-1" />
+        <link rel="shortcut icon" href="/favicon.png?v=sana-1" />
+        <link rel="apple-touch-icon" href="/hr-icon-192.png" />
+      </head>
       <body
         className="antialiased"
       >

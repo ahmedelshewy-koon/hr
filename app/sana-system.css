@@ -1,0 +1,63 @@
+/*
+ * SANA shared design-system finish layer: same locked values as SANA Tasks.
+ * Visual only. Loaded after sana-theme.css; selectors are prefixed with `html`
+ * so they win over feature stylesheets imported later.
+ */
+html .app :is(.stat-card .stat-label,.stat-value,.attendance-kpis>button>b){color:var(--sana-text)}
+html .app{color:#000}
+html .app :is(h1,h2,h3,.dashboard-title){color:var(--sana-heading)}
+html .app .content :is(h1,.dashboard-title){font-size:var(--type-page)!important;font-weight:700!important}
+html .app .content h2{font-size:var(--type-section)!important;font-weight:700!important}
+html .app .content h3{font-size:var(--type-component)!important;font-weight:600!important}
+html .app .content :is(.rp-overview-kpis .rp-kpi b,.rp-kpi b,.asset-kpi b,.biometric-summary b,.bp-kpis b,.insight-donut b,.balance-item>summary strong,.pt-balances strong,.ats-kpis strong,.ats-score-trio b,.evaluation-ring b,.attendance-kpis>button>b){font-size:var(--type-kpi)!important}
+
+/* Sidebar: 55px items, 16px radius/padding, 8px icon gap, 24px between items, dark hover. */
+html .app[dir] .sidebar nav{display:flex;flex-direction:column;gap:var(--sana-sidebar-item-gap);padding-block:8px;min-height:0;overflow-y:auto}
+html .app[dir] .sidebar nav button,html .app.sidebar-collapsed[dir] .sidebar nav button{flex:0 0 var(--sana-sidebar-item-height);height:var(--sana-sidebar-item-height);min-height:var(--sana-sidebar-item-height);max-height:var(--sana-sidebar-item-height);padding:0 16px;gap:8px;border-radius:var(--sana-radius-nav);font-size:14px!important;font-weight:500;background:transparent;color:var(--sana-line)}
+html .app[dir] .sidebar nav button svg{width:20px;height:20px;flex:none;color:inherit}
+html .app[dir] .sidebar nav button:hover,html .app[dir] .sidebar-bottom>button:hover{background:var(--sana-sidebar-hover);color:#fff}
+html .app[dir] .sidebar nav button:hover svg{color:#fff}
+html .app[dir] .sidebar nav button.active,html .app[dir] .sidebar nav button.active:hover{background:var(--sana-canvas);color:var(--sana-teal)}
+html .app[dir] .sidebar nav button.active:hover svg{color:var(--sana-teal)}
+html .app.sidebar-collapsed[dir] .sidebar nav button{padding:0;justify-content:center}
+
+/* Cards: 16px padding, same surface everywhere. */
+html .app :is(.stat-card,.attendance-overview,.today-card,.approvals-card,.leave-card){padding:16px}
+html .app :is(.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange,.stat-icon){background:var(--sana-secondary-bg);color:var(--sana-teal)}
+html .app .attendance-kpis>button>span{background:var(--sana-secondary-bg)}
+
+/* Switch bar / segmented control: white, #E7E7E7 outer border (locked exception), 16px, #0B4237 selected. */
+html .app .tabs{display:inline-flex;align-items:center;gap:8px;padding:8px;max-width:100%;background:#fff;border:1px solid var(--sana-switch-border);border-radius:var(--sana-radius-switch);box-shadow:none;overflow-x:auto;scrollbar-width:none}
+html .app .tabs::-webkit-scrollbar{display:none}
+html .app .tabs button{flex:none;gap:8px;padding:8px 16px;border:0;border-radius:16px;background:transparent;color:var(--sana-muted);font-size:var(--type-body);font-weight:500}
+html .app .tabs button:hover{background:transparent;color:var(--sana-hover)}
+html .app .tabs button.active,html .app .tabs button.active:hover{background:#0b4237;color:#fff;font-weight:500}
+html .app .tabs button.active:after{display:none}
+html .app .tabs button.active :is(svg,span,b,small){color:inherit}
+
+/* Tables, badges, modals. */
+html .app :is(.data-table .tr.th,thead th){font-weight:500;font-size:var(--type-label);color:#000}
+html .app :is(.status,.badge){padding:4px 8px;font-size:var(--type-label)}
+html .app :is(.drawer,.modal-card,.password-card){border-radius:24px}
+
+/* Secondary buttons everywhere (org chart toolbar, filters, ...): #F4F3EF / #0B4237 / 32px radius, compact 40px. */
+html .app .outline{background:#f4f3ef;border:1px solid #0b4237;color:#0b4237;border-radius:32px;min-height:40px;padding:0 16px;gap:8px;font-size:14px!important;font-weight:500;display:inline-flex;align-items:center;justify-content:center}
+html .app .outline:hover{background:var(--sana-hover);border-color:var(--sana-hover);color:#fff}
+html .app .outline svg{width:18px;height:18px;flex:none}
+html .app .chart-actions{gap:8px}
+html .app .chart-actions>button{gap:8px}
+html .app .chart-actions>button:not(:has(:not(svg))){width:40px;padding:0}
+html .app .chart-actions>span{font-size:14px;font-weight:500;color:#000;min-width:48px;text-align:center}
+html .app .outline.small{min-height:32px;padding:0 16px;font-size:12px!important}
+
+/* QA fixes (rendered check): black = typography, green = brand/interaction only. */
+html .app .sana-module-label b{color:var(--sana-heading)}
+html .app .profile-trigger-name{color:var(--sana-text)}
+html .app :is(.ats-kpis strong,.ats-clear b,.ats-table .row b){color:var(--sana-text)}
+/* Keep feature headings on the shared 18px scale. */
+html .app :is(.dashboard-my-tasks h2,.biometric-device-title h2,.biometric-panel-head h2,.biometric-empty-device h2,.company-hr-panel h2,.role-list>.panel-head h2){font-size:var(--type-section);font-weight:700}
+html .app .attendance-workspace p{font-size:var(--type-body)}
+/* Employee portal: same card (24px) and button (32px) radius as every other page. */
+html .portal-shell .employee-workspace .panel{border-radius:var(--sana-radius-card)}
+html .portal-shell .portal-attendance dd{font-size:var(--type-kpi)}
+html .portal-shell .portal-attendance-actions>button{border-radius:var(--sana-radius-button)}

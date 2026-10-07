@@ -43,7 +43,7 @@
 .lifecycle-subheading h1,
 .portal-welcome h1{
   margin:0!important;
-  color:var(--text)!important;
+  color:var(--sana-heading)!important;
   font-family:var(--font-enterprise)!important;
   font-size:var(--type-page)!important;
   font-weight:var(--weight-semibold)!important;
@@ -81,5 +81,37 @@
   /* A heading left with nothing to show takes no space. */
   .content :is(.page-heading,.approvals-head,.attendance-page-head,.learning-heading,.lifecycle-heading,.portal-welcome,.ats-heading):not(:has(>:not(div:first-child))){
     display:none;
+  }
+}
+
+/* The settings page already has its own title outside this panel. */
+.content .settings-panel #hr-settings-title{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+}
+
+/* The top bar supplies the decisions page name on desktop. */
+@media(min-width:761px){
+  .content .decisions-head>div:first-child{
+    position:absolute;
+    width:1px;
+    height:1px;
+    padding:0;
+    margin:-1px;
+    overflow:hidden;
+    clip-path:inset(50%);
+    white-space:nowrap;
+  }
+  .content .decisions-head{
+    justify-content:flex-end;
+    padding:0;
+    background:transparent;
+    border:0;
   }
 }

@@ -1,31 +1,31 @@
-.dashboard-my-tasks{margin-block:24px;overflow:hidden;border:1px solid var(--sana-line) !important;border-radius:24px!important;background:var(--sana-white);box-shadow:var(--sana-shadow);container-type:inline-size;color:var(--sana-teal)}
+.dashboard-my-tasks{margin-block:24px;overflow:hidden;border:1px solid var(--sana-line) !important;border-radius:24px!important;background:var(--sana-white);box-shadow:var(--sana-shadow);container-type:inline-size;color:var(--sana-text)}
 .dashboard-my-tasks .my-tasks-header{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:24px 32px;background:var(--sana-canvas);border-bottom:1px solid var(--sana-line)}
 .dashboard-my-tasks .my-tasks-heading{display:flex;align-items:center;gap:16px;min-width:0}
 .dashboard-my-tasks .my-tasks-heading-icon{display:grid;place-items:center;flex:none;width:54px;height:54px;border-radius:16px;background:var(--sana-teal);color:var(--sana-white);box-shadow:var(--sana-shadow);transform:rotate(-5deg)}
-.dashboard-my-tasks .my-tasks-eyebrow{display:block;color:var(--sana-teal);font-size:11px;font-weight:600;margin-bottom:8px}
+.dashboard-my-tasks .my-tasks-eyebrow{display:block;color:var(--sana-text);font-size:11px;font-weight:600;margin-bottom:8px}
 .dashboard-my-tasks h2{display:flex;align-items:center;gap:8px;font-size:23px;line-height:1.4;margin:0;font-weight:750}
 .dashboard-my-tasks .my-tasks-heading p{color:var(--sana-muted);font-size:12px;margin:8px 0 0;line-height:1.7}
-.dashboard-my-tasks .my-tasks-count{display:inline-grid;place-items:center;min-width:27px;height:25px;padding:0 8px;background:var(--sana-canvas);color:var(--sana-teal);border-radius:16px;font-size:12px;font-weight:700}
-.dashboard-my-tasks .my-tasks-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid var(--sana-line);border-radius:16px;background:var(--sana-white);color:var(--sana-teal);font-size:12px;font-weight:650;text-decoration:none;transition:background .18s,border-color .18s;white-space:nowrap}
+.dashboard-my-tasks .my-tasks-count{display:inline-grid;place-items:center;min-width:27px;height:25px;padding:0 8px;background:var(--sana-canvas);color:var(--sana-text);border-radius:16px;font-size:12px;font-weight:700}
+.dashboard-my-tasks .my-tasks-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid var(--sana-line);border-radius:16px;background:var(--sana-white);color:var(--sana-text);font-size:12px;font-weight:650;text-decoration:none;transition:background .18s,border-color .18s;white-space:nowrap}
 .dashboard-my-tasks .my-tasks-open:hover{background:var(--sana-canvas);border-color:var(--sana-line)}
 .dashboard-my-tasks .my-tasks-overview{margin:24px 32px 0;display:flex;align-items:center;justify-content:space-between;gap:32px;border:1px solid var(--sana-line);background:var(--sana-canvas);border-radius:16px;padding:16px 24px}
 .dashboard-my-tasks .my-tasks-progress-label{display:flex;gap:16px;align-items:center}
-.dashboard-my-tasks .my-tasks-progress-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:16px;background:var(--sana-canvas);color:var(--sana-teal);flex:none}
+.dashboard-my-tasks .my-tasks-progress-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:16px;background:var(--sana-canvas);color:var(--sana-text);flex:none}
 .dashboard-my-tasks .my-tasks-progress-label strong{font-size:13px;display:block;line-height:1.6}
 .dashboard-my-tasks .my-tasks-progress-label div>span{display:block;font-size:11px;color:var(--sana-muted);margin-top:0}
 .dashboard-my-tasks .my-tasks-progress{width:38%;max-width:380px;min-width:130px}
 .dashboard-my-tasks .my-tasks-progress>div{display:flex;justify-content:space-between;gap:16px;margin-bottom:8px;font-size:11px;color:var(--sana-muted)}
-.dashboard-my-tasks .my-tasks-progress strong{color:var(--sana-teal);font-size:13px}
+.dashboard-my-tasks .my-tasks-progress strong{color:var(--sana-text);font-size:13px}
 .dashboard-my-tasks progress{display:block;appearance:none;width:100%;height:7px;border:0;border-radius:16px;overflow:hidden;background:var(--sana-canvas);accent-color:var(--sana-teal-mid)}
 .dashboard-my-tasks progress::-webkit-progress-bar{background:var(--sana-canvas);border-radius:16px}
 .dashboard-my-tasks progress::-webkit-progress-value{background:var(--sana-canvas);border-radius:16px}
 .dashboard-my-tasks progress::-moz-progress-bar{background:var(--sana-teal-mid);border-radius:16px}
 .dashboard-my-tasks .my-tasks-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:24px 32px 16px;flex-wrap:wrap}
 .dashboard-my-tasks .my-tasks-filters{display:flex;flex-wrap:wrap;gap:8px}
-.dashboard-my-tasks .my-tasks-filters button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid transparent;border-radius:16px;background:transparent;color:var(--sana-teal);font-size:12px;transition:background .18s,color .18s}
+.dashboard-my-tasks .my-tasks-filters button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid transparent;border-radius:16px;background:transparent;color:var(--sana-text);font-size:12px;transition:background .18s,color .18s}
 .dashboard-my-tasks .my-tasks-filters button:hover{background:var(--sana-hover);color:var(--sana-white)}
 .dashboard-my-tasks .my-tasks-filters button[aria-pressed=true]{background:var(--sana-teal);color:var(--sana-white);box-shadow:var(--sana-shadow)}
-.dashboard-my-tasks .my-tasks-filters button span{font-size:10px;min-width:20px;padding:0 8px;border-radius:16px;background:var(--sana-canvas);color:var(--sana-teal)}
+.dashboard-my-tasks .my-tasks-filters button span{font-size:10px;min-width:20px;padding:0 8px;border-radius:16px;background:var(--sana-canvas);color:var(--sana-text)}
 .dashboard-my-tasks .my-tasks-filters button[aria-pressed=true] span{background:color-mix(in srgb,var(--sana-white) 20%,transparent);color:var(--sana-white)}
 .dashboard-my-tasks .my-tasks-result-count{font-size:11px;color:var(--sana-muted)}
 .dashboard-my-tasks .my-tasks-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;list-style:none;margin:0;padding:0 32px 24px}
@@ -34,26 +34,26 @@
 .dashboard-my-tasks .my-task-card.is-overdue{border-color:var(--sana-line)}
 .dashboard-my-tasks .my-task-link{display:flex;flex-direction:column;height:100%;padding:16px;color:inherit;text-decoration:none;min-width:0}
 .dashboard-my-tasks .my-task-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
-.dashboard-my-tasks .my-task-priority{display:inline-flex;align-items:center;gap:8px;padding:8px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.6;background:var(--sana-canvas);color:var(--sana-teal)}
+.dashboard-my-tasks .my-task-priority{display:inline-flex;align-items:center;gap:8px;padding:8px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.6;background:var(--sana-canvas);color:var(--sana-text)}
 .dashboard-my-tasks .my-task-priority.high{background:var(--sana-warning-bg);color:var(--sana-warning)}
 .dashboard-my-tasks .my-task-priority.urgent{background:var(--sana-danger-bg);color:var(--sana-danger)}
-.dashboard-my-tasks .my-task-priority.low{background:var(--sana-canvas);color:var(--sana-teal)}
+.dashboard-my-tasks .my-task-priority.low{background:var(--sana-canvas);color:var(--sana-text)}
 .dashboard-my-tasks .my-task-arrow{color:var(--sana-muted)}
-.dashboard-my-tasks .my-task-link h3{font-size:14px;line-height:1.85;font-weight:650;color:var(--sana-teal);margin:0 0 8px;overflow-wrap:anywhere}
+.dashboard-my-tasks .my-task-link h3{font-size:14px;line-height:1.85;font-weight:650;color:var(--sana-text);margin:0 0 8px;overflow-wrap:anywhere}
 .dashboard-my-tasks .my-task-project{display:flex;align-items:flex-start;gap:8px;color:var(--sana-muted);font-size:11px;line-height:1.8;overflow-wrap:anywhere;margin-bottom:24px}
 .dashboard-my-tasks .my-task-project svg{flex:none;margin-top:0}
 .dashboard-my-tasks .my-task-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid var(--sana-line);padding-top:16px;margin-top:auto}
-.dashboard-my-tasks .my-task-status{display:inline-flex;gap:8px;align-items:center;font-size:10px;line-height:1.6;border-radius:16px;padding:8px 8px;background:var(--sana-canvas);color:var(--sana-teal);white-space:nowrap}
-.dashboard-my-tasks .my-task-status.in_progress{background:var(--sana-canvas);color:var(--sana-teal)}
-.dashboard-my-tasks .my-task-status.done{background:var(--sana-success-bg);color:var(--sana-teal)}
+.dashboard-my-tasks .my-task-status{display:inline-flex;gap:8px;align-items:center;font-size:10px;line-height:1.6;border-radius:16px;padding:8px 8px;background:var(--sana-canvas);color:var(--sana-text);white-space:nowrap}
+.dashboard-my-tasks .my-task-status.in_progress{background:var(--sana-canvas);color:var(--sana-text)}
+.dashboard-my-tasks .my-task-status.done{background:var(--sana-success-bg);color:var(--sana-text)}
 .dashboard-my-tasks .my-task-date{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--sana-muted);line-height:1.7}
 .dashboard-my-tasks .my-task-overdue{color:var(--sana-danger)}
 .dashboard-my-tasks .my-task-date small{font-size:10px;font-weight:650}
 .dashboard-my-tasks .my-tasks-message{padding:40px 24px;text-align:center;color:var(--sana-muted);font-size:13px}
 .dashboard-my-tasks .my-tasks-message>svg{color:var(--sana-muted)}
-.dashboard-my-tasks .my-tasks-message h3{font-size:16px;color:var(--sana-teal);margin:16px 0 8px}
+.dashboard-my-tasks .my-tasks-message h3{font-size:16px;color:var(--sana-text);margin:16px 0 8px}
 .dashboard-my-tasks .my-tasks-message p{margin:8px 0 16px}
-.dashboard-my-tasks .my-tasks-message button{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--sana-line);background:var(--sana-canvas);color:var(--sana-teal);border-radius:16px;padding:8px 16px;min-height:40px}
+.dashboard-my-tasks .my-tasks-message button{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--sana-line);background:var(--sana-canvas);color:var(--sana-text);border-radius:16px;padding:8px 16px;min-height:40px}
 .dashboard-my-tasks .my-tasks-loading{padding:24px 32px;color:var(--sana-muted);font-size:13px}
 .dashboard-my-tasks .my-tasks-loading>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
 .dashboard-my-tasks .my-task-skeleton{height:170px;border-radius:16px;background:linear-gradient(105deg,var(--sana-canvas) 30%,var(--sana-white) 45%,var(--sana-canvas) 60%);background-size:250% 100%;background-size:250% 100%;animation:my-task-shimmer 1.8s infinite}
@@ -64,11 +64,11 @@
 @container(max-width:560px){.dashboard-my-tasks .my-tasks-header{padding:24px;align-items:flex-start;flex-wrap:wrap}.dashboard-my-tasks .my-tasks-heading-icon{width:46px;height:46px}.dashboard-my-tasks .my-tasks-overview{margin:16px 16px 0;padding:16px;gap:16px;flex-wrap:wrap}.dashboard-my-tasks .my-tasks-progress{width:100%;max-width:none}.dashboard-my-tasks .my-tasks-toolbar{padding:16px 16px 16px}.dashboard-my-tasks .my-tasks-filters{gap:0}.dashboard-my-tasks .my-tasks-filters button{padding:8px;font-size:11px;gap:8px}.dashboard-my-tasks .my-tasks-list{grid-template-columns:1fr;padding:0 16px 24px;gap:16px}.dashboard-my-tasks .my-tasks-loading>div{grid-template-columns:1fr}.dashboard-my-tasks .my-task-link{padding:16px}}
 @media(prefers-reduced-motion:reduce){.dashboard-my-tasks *{animation:none!important;transition:none!important}.dashboard-my-tasks .my-task-card:hover{transform:none}}
 .dashboard-team-tasks .my-tasks-list{padding-top:24px}
-.dashboard-team-tasks .team-task-due{display:inline-flex;align-items:center;gap:8px;padding:8px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.6;background:var(--sana-canvas);color:var(--sana-teal)}
+.dashboard-team-tasks .team-task-due{display:inline-flex;align-items:center;gap:8px;padding:8px 8px;border-radius:16px;font-size:10px;font-weight:600;line-height:1.6;background:var(--sana-canvas);color:var(--sana-text)}
 .dashboard-team-tasks .team-task-due.overdue{background:var(--sana-danger-bg);color:var(--sana-danger)}
 .dashboard-team-tasks .team-task-due.today{background:var(--sana-warning-bg);color:var(--sana-warning)}
-.dashboard-team-tasks .team-task-due.soon{background:var(--sana-canvas);color:var(--sana-teal)}
-.dashboard-team-tasks .team-task-assignee{display:flex;align-items:flex-start;gap:8px;color:var(--sana-teal);font-size:12px;font-weight:600;line-height:1.8;overflow-wrap:anywhere;margin-bottom:8px}
+.dashboard-team-tasks .team-task-due.soon{background:var(--sana-canvas);color:var(--sana-text)}
+.dashboard-team-tasks .team-task-assignee{display:flex;align-items:flex-start;gap:8px;color:var(--sana-text);font-size:12px;font-weight:600;line-height:1.8;overflow-wrap:anywhere;margin-bottom:8px}
 .dashboard-team-tasks .team-task-assignee svg,.dashboard-team-tasks .team-task-due svg{flex:none}
 .dashboard-team-tasks .team-task-assignee svg{margin-top:8px}
 .dashboard-my-tasks .my-task-card:hover :is(h3,.my-task-project,.my-task-date,.my-task-overdue,.my-task-arrow,time,small,svg:not(.my-task-priority svg):not(.my-task-status svg)){color:var(--sana-white)}

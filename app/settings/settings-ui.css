@@ -1,7 +1,7 @@
 /* Shared Settings building blocks. Logical properties throughout so Arabic (RTL) needs no overrides. */
 .settings-panel{padding:var(--sana-space-4);margin-block:16px}
 .settings-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sana-space-3);flex-wrap:wrap;margin-block-end:16px}
-.settings-panel-head h2{margin:0;font-size:var(--type-section);color:var(--navy)}
+.settings-panel-head h2{margin:0;font-size:var(--type-section);color:var(--sana-text)}
 .settings-panel-head p{margin:8px 0 0;color:var(--muted);font-size:var(--type-secondary);max-inline-size:70ch}
 .settings-sr{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .settings-muted{color:var(--muted);font-size:var(--type-secondary);margin:0}
@@ -10,13 +10,13 @@
 .settings-subnav button{display:inline-flex;align-items:center;gap:var(--sana-space-2);white-space:nowrap;font-weight:var(--weight-semibold)}
 .settings-subnav em{font-style:normal;font-size:var(--type-label);min-inline-size:20px;padding:0 var(--sana-space-1);border-radius:var(--sana-radius-control);text-align:center;background:color-mix(in srgb, var(--sana-teal-mid) 16%, transparent)}
 .settings-subnav-primary{padding-block-end:var(--sana-space-3);margin-block-end:16px;border-block-end:1px solid var(--line)}
-.settings-subnav-primary button{block-size:40px;padding-inline:var(--sana-space-3);border:1px solid var(--line);background:var(--surface);color:var(--navy);border-radius:var(--sana-radius-button);font-size:var(--type-body)}
+.settings-subnav-primary button{block-size:40px;padding-inline:var(--sana-space-3);border:1px solid var(--line);background:var(--surface);color:var(--sana-text);border-radius:var(--sana-radius-button);font-size:var(--type-body)}
 .settings-subnav-primary button:hover{background:var(--neutral-bg)}
 .settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-white)}
 .settings-subnav-primary button.active em{background:color-mix(in srgb, var(--sana-white) 22%, transparent)}
 .settings-subnav-secondary{inline-size:max-content;padding:var(--sana-space-1);margin-block-end:16px;background:var(--neutral-bg);border-radius:var(--sana-radius-control)}
 .settings-subnav-secondary button{block-size:32px;padding-inline:var(--sana-space-3);border:0;background:transparent;color:var(--muted);border-radius:var(--sana-radius-button);font-size:var(--type-secondary)}
-.settings-subnav-secondary button.active{background:var(--surface);color:var(--navy);box-shadow:var(--sana-shadow)}
+.settings-subnav-secondary button.active{background:var(--surface);color:var(--sana-text);box-shadow:var(--sana-shadow)}
 
 /* Organization header only: keep the shared navigation elsewhere unchanged. */
 .org-settings-intro{margin-block-end:24px;min-inline-size:0}
@@ -26,7 +26,7 @@
 .org-settings-intro .settings-subnav-primary{inline-size:fit-content;max-inline-size:100%;box-sizing:border-box;flex-wrap:wrap;gap:var(--sana-space-1);padding:var(--sana-space-1);margin:0;border:0;border-radius:var(--sana-radius-card);background:var(--neutral-bg);overflow:visible}
 .org-settings-intro .settings-subnav-primary button{flex:0 1 auto;justify-content:center;gap:var(--sana-space-2);block-size:auto;min-block-size:44px;padding:var(--sana-space-2) var(--sana-space-4);border:1px solid transparent;border-radius:var(--sana-radius-pill);background:transparent;color:var(--muted);font-size:var(--type-secondary);line-height:1.5;transition:background-color .16s ease,color .16s ease,box-shadow .16s ease}
 .org-settings-intro .settings-subnav-primary button svg{flex:none;inline-size:17px;block-size:17px;stroke-width:1.8}
-.org-settings-intro .settings-subnav-primary button:hover{background:var(--surface);color:var(--navy)}
+.org-settings-intro .settings-subnav-primary button:hover{background:var(--surface);color:var(--sana-text)}
 .org-settings-intro .settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-white);font-weight:var(--weight-bold);box-shadow:var(--sana-shadow)}
 .org-settings-intro .settings-subnav-primary button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
 .org-settings-context{margin:16px 8px 0;padding-inline-start:var(--sana-space-3);border-inline-start:2px solid var(--line);color:var(--muted);font-size:var(--type-secondary);line-height:1.75}
@@ -58,27 +58,27 @@
 .settings-actions-col .outline.danger:hover:not(:disabled){background:var(--sana-canvas)}
 .settings-actions-col .outline.danger.is-blocked{color:var(--sana-muted);border-color:var(--line)}
 .settings-name{display:grid;gap:0;min-inline-size:0}
-.settings-name b{color:var(--navy);font-weight:var(--weight-semibold)}
+.settings-name b{color:var(--sana-text);font-weight:var(--weight-semibold)}
 .settings-name small,.settings-sub{color:var(--muted);font-size:var(--type-label)}
 .settings-chips{display:flex;gap:var(--sana-space-1);flex-wrap:wrap}
-.settings-chip{display:inline-flex;align-items:center;gap:var(--sana-space-1);padding:0 var(--sana-space-2);border-radius:var(--sana-radius-button);background:var(--neutral-bg);color:var(--navy);font-size:var(--type-label);white-space:nowrap}
-.settings-chip.accent{background:var(--sana-canvas);color:var(--sana-teal-mid)}
+.settings-chip{display:inline-flex;align-items:center;gap:var(--sana-space-1);padding:0 var(--sana-space-2);border-radius:var(--sana-radius-button);background:var(--neutral-bg);color:var(--sana-text);font-size:var(--type-label);white-space:nowrap}
+.settings-chip.accent{background:var(--sana-canvas);color:var(--sana-text-2)}
 .settings-chip.warn{background:var(--sana-canvas);color:var(--sana-warning)}
 .settings-usage-cell{display:grid;gap:0;font-size:var(--type-secondary)}
 .settings-empty{padding:var(--sana-space-8) var(--sana-space-4);text-align:center;border:1px dashed var(--line);border-radius:var(--sana-radius-control);color:var(--muted)}
-.settings-empty h4{margin:0 0 8px;color:var(--navy)}
+.settings-empty h4{margin:0 0 8px;color:var(--sana-text)}
 .settings-empty p{margin:0}
 
 .settings-note,.settings-error{display:flex;align-items:flex-start;gap:var(--sana-space-2);margin:0 0 16px;padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);font-size:var(--type-secondary);line-height:var(--leading-body)}
-.settings-note.info{background:var(--sana-canvas);border:1px solid var(--sana-line);color:var(--sana-teal)}
+.settings-note.info{background:var(--sana-canvas);border:1px solid var(--sana-line);color:var(--sana-text)}
 .settings-note.warn{background:var(--sana-canvas);border:1px solid var(--sana-teal-mid);color:var(--sana-warning)}
 .settings-error{background:var(--sana-canvas);border:1px solid var(--sana-warning-bg);color:var(--sana-danger)}
 
 .settings-usage{border:1px solid var(--line);border-radius:var(--sana-radius-control);padding:var(--sana-space-3);background:var(--sana-white);margin-block-start:8px}
-.settings-usage h4{margin:0 0 8px;font-size:var(--type-secondary);color:var(--navy)}
+.settings-usage h4{margin:0 0 8px;font-size:var(--type-secondary);color:var(--sana-text)}
 .settings-usage-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sana-space-2);margin:0;text-align:center}
 .settings-usage-stats div{background:var(--surface);border:1px solid var(--line);border-radius:var(--sana-radius-control);padding:var(--sana-space-2) var(--sana-space-1)}
-.settings-usage-stats dd{margin:0;font-size:var(--type-component);font-weight:var(--weight-bold);color:var(--navy)}
+.settings-usage-stats dd{margin:0;font-size:var(--type-component);font-weight:var(--weight-bold);color:var(--sana-text)}
 .settings-usage-stats dt{color:var(--muted);font-size:var(--type-label)}
 .settings-usage ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:var(--sana-space-1)}
 .settings-usage li{display:flex;align-items:center;gap:var(--sana-space-2);font-size:var(--type-secondary)}
@@ -103,7 +103,7 @@
 .settings-checks legend{padding-inline:var(--sana-space-1);font-size:var(--type-label);font-weight:var(--weight-semibold)}
 .settings-checks label{display:flex;align-items:center;gap:var(--sana-space-2);font-size:var(--type-body)}
 .settings-checks small{color:var(--muted);font-size:var(--type-label)}
-.settings-section-title{margin:16px 0 8px;font-size:var(--type-secondary);font-weight:var(--weight-bold);color:var(--navy)}
+.settings-section-title{margin:16px 0 8px;font-size:var(--type-secondary);font-weight:var(--weight-bold);color:var(--sana-text)}
 
 .settings-table-shell{container:settings-table/inline-size}
 @container settings-table (max-width:720px){

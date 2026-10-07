@@ -66,7 +66,8 @@ const shiftDate = (date: string, days: number) => new Date(new Date(date + "T12:
 export async function importDeviceSnapshot(db: PostgresDatabase, deviceId: number, syncId: number, snapshot: DeviceSnapshot, options: { incremental?: boolean } = {}) {
   return db.transaction(async tx => {
     await tx.prepare("SELECT pg_advisory_xact_lock(904370,?)").bind(deviceId).run();
-    const employees = (await tx.prepare("SELECT * FROM employees WHERE employment_status!='deleted'").all<{ id: number; fingerprint_code: string | null }>()).results;
+    // A device that belongs to a country only matches that country's employees, so the same code on two sites never collides.
+    const employees = (await tx.prepare("SELECT * FROM employees WHERE employment_status!='deleted' AND (COALESCE((SELECT country FROM attendance_devices WHERE id=?),'')='' OR country=(SELECT country FROM attendance_devices WHERE id=?))").bind(deviceId, deviceId).all<{ id: number; fingerprint_code: string | null }>()).results;
     await tx.prepare("UPDATE attendance_device_users SET enabled=0 WHERE device_id=?").bind(deviceId).run();
     for (const user of snapshot.users) {
       await tx.prepare("INSERT INTO attendance_device_users (device_id,device_user_id,device_uid,employee_id,display_name,privilege,enabled,last_seen_at) VALUES (?,?,?,?,?,?,1,CURRENT_TIMESTAMP) ON CONFLICT(device_id,device_user_id) DO UPDATE SET device_uid=excluded.device_uid,employee_id=COALESCE(attendance_device_users.employee_id,excluded.employee_id),display_name=excluded.display_name,privilege=excluded.privilege,enabled=1,last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP")

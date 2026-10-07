@@ -32,7 +32,7 @@
 
 .rp-body{display:grid;gap:var(--sana-space-4);min-width:0;transition:opacity .15s}
 .rp-body.loading{opacity:.55;pointer-events:none}
-.rp-note{margin:0;padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);background:var(--info-bg);color:var(--sana-teal);font-size:var(--type-secondary);line-height:var(--leading-body)}
+.rp-note{margin:0;padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);background:var(--info-bg);color:var(--sana-text);font-size:var(--type-secondary);line-height:var(--leading-body)}
 .rp-actions{display:flex;flex-wrap:wrap;gap:var(--sana-space-2)}
 .rp-export{display:inline-flex;align-items:center;justify-content:center;gap:var(--sana-space-2)}
 

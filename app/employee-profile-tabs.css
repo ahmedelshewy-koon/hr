@@ -5,7 +5,7 @@
 .pt-grid .pt-panel+.pt-panel{margin-top:0}
 .pt-panel>header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
 .pt-panel h2{display:flex;align-items:center;gap:8px;margin:0;font-size:var(--type-section,18px);color:var(--text)}
-.pt-panel h2 svg{width:20px;height:20px;color:var(--sana-teal)}
+.pt-panel h2 svg{width:20px;height:20px;color:var(--sana-text)}
 .pt-facts{display:grid;gap:0;margin:0}
 .pt-facts>div{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,1.4fr);gap:16px;padding:8px 0}
 .pt-facts dt{color:var(--muted);font-size:var(--type-secondary,14px)}
@@ -34,13 +34,13 @@
 .pt-toggle button{height:36px;padding-inline:16px;border-radius:32px}
 .pt-balances{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
 .pt-balances article{border:1px solid var(--line);border-radius:16px;padding:16px 16px;background:var(--sana-canvas);display:grid;gap:8px}
-.pt-balances strong{font-size:28px;color:var(--sana-teal);line-height:1.1}
+.pt-balances strong{font-size:28px;color:var(--sana-text);line-height:1.1}
 .pt-balances small{color:var(--muted)}
 .pt-decision-body{white-space:pre-wrap;line-height:1.9;background:var(--sana-canvas);border:1px solid var(--line);border-radius:16px;padding:16px;max-height:60vh;overflow:auto}
 /* Profile header in the screenshot style. */
 .profile360-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;background:var(--sana-white);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:16px}
 .profile360-hero-main{display:flex;align-items:center;gap:24px;min-width:0}
-.profile360-hero-photo{width:96px;height:96px;border-radius:50%;object-fit:cover;flex:none;background:var(--sana-canvas);display:grid;place-items:center;font-size:28px;font-weight:700;color:var(--sana-teal);border:3px solid var(--sana-line)}
+.profile360-hero-photo{width:96px;height:96px;border-radius:50%;object-fit:cover;flex:none;background:var(--sana-canvas);display:grid;place-items:center;font-size:28px;font-weight:700;color:var(--sana-text);border:3px solid var(--sana-line)}
 .profile360-hero h1{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 8px;font-size:24px}
 .profile360-hero p{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--muted)}
 .profile360-hero p svg{width:16px;height:16px}
@@ -62,7 +62,7 @@
   .profile360-hero-ids{text-align:start}
 }
 /* Leave print sheet: only the sheet is printed. */
-.pt-print-sheet{position:relative;z-index:2;background:var(--sana-white);width:min(820px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;margin:16px auto;border-radius:16px;padding:32px;color:var(--sana-teal)}
+.pt-print-sheet{position:relative;z-index:2;background:var(--sana-white);width:min(820px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;margin:16px auto;border-radius:16px;padding:32px;color:var(--sana-text)}
 .pt-print-layer{display:flex;align-items:flex-start;justify-content:center}
 .pt-print-controls{display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px}
 .pt-print-sheet header{display:flex;align-items:center;gap:24px;border-bottom:2px solid var(--sana-teal);padding-bottom:16px;margin-bottom:24px}

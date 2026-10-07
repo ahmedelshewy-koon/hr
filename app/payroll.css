@@ -45,7 +45,7 @@
 .allowance-row select,.allowance-row input{width:100%}
 .allowance-editor p.muted{color:var(--muted);font-size:var(--type-label);margin:0}
 .icon-button{align-items:center;background:var(--sana-white);border:1px solid var(--line);border-radius:var(--sana-radius-button);color:var(--muted);cursor:pointer;display:flex;height:32px;justify-content:center;width:32px}
-.icon-button:hover{background:var(--sana-canvas);color:var(--sana-teal-mid)}
+.icon-button:hover{background:var(--sana-canvas);color:var(--sana-text-2)}
 .outline.small{font-size:var(--type-label);height:32px;padding:0 var(--sana-space-3)}
 
 .payroll-run-detail-drawer{max-width:960px;width:96vw}

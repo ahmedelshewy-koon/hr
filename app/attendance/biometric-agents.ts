@@ -42,14 +42,14 @@ export function validTimezone(value: string) {
 }
 
 export function parseDeviceInput(payload: Row) {
-  const name = text(payload.name, 120), model = text(payload.model, 80) || "ZKTeco", ipAddress = text(payload.ipAddress, 15), timezone = text(payload.timezone, 64) || "Africa/Cairo";
+  const name = text(payload.name, 120), model = text(payload.model, 80) || "ZKTeco", ipAddress = text(payload.ipAddress, 15), timezone = text(payload.timezone, 64) || "Africa/Cairo", country = text(payload.country, 60) || null;
   const port = Number(payload.port ?? 4370), agentId = payload.agentId === null || payload.agentId === "" || payload.agentId === undefined ? null : Number(payload.agentId);
   if (!name) throw new Response("Device name is required", { status: 400 });
   if (!validIpv4(ipAddress)) throw new Response("Enter a valid device IP address, for example 192.168.1.201", { status: 400 });
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Response("Device port must be between 1 and 65535", { status: 400 });
   if (!validTimezone(timezone)) throw new Response("Invalid time zone", { status: 400 });
   if (agentId !== null && !(Number.isInteger(agentId) && agentId > 0)) throw new Response("Invalid office connector", { status: 400 });
-  return { name, model, ipAddress, port, timezone, agentId, enabled: payload.enabled === false || payload.enabled === 0 ? 0 : 1 };
+  return { name, model, ipAddress, port, timezone, country, agentId, enabled: payload.enabled === false || payload.enabled === 0 ? 0 : 1 };
 }
 
 const integer = (value: unknown, fallback = 0) => Number.isInteger(Number(value)) ? Number(value) : fallback;

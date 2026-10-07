@@ -1,16 +1,16 @@
 .dashboard-details-dialog{position:fixed;inset:0;margin:auto;width:min(900px,calc(100vw - 32px));max-height:85dvh;padding:0;border:1px solid var(--line);border-radius:var(--sana-radius-card);background:var(--surface);color:var(--text);box-shadow:var(--sana-shadow);font-family:var(--font-enterprise,inherit);overflow:auto}
 .dashboard-details-dialog::backdrop{background:var(--sana-overlay);backdrop-filter:var(--sana-overlay-blur)}
 .dashboard-details-header{display:flex;align-items:center;justify-content:space-between;gap:var(--sana-space-4);padding:var(--sana-space-4) var(--sana-space-6);border-bottom:1px solid var(--line)}
-.dashboard-details-header h2{font-size:1.2rem;margin:0}.dashboard-details-header p{font-size:.875rem;color:var(--sana-teal-mid);margin:8px 0 0}.dashboard-details-header button{flex-shrink:0}
+.dashboard-details-header h2{font-size:1.2rem;margin:0}.dashboard-details-header p{font-size:.875rem;color:var(--sana-text-2);margin:8px 0 0}.dashboard-details-header button{flex-shrink:0}
 .dashboard-details-table-wrap{overflow:auto;padding:0 var(--sana-space-6) var(--sana-space-4)}.dashboard-details-dialog table{width:100%;border-collapse:collapse;text-align:start;font-size:.875rem}
 .dashboard-details-dialog th,.dashboard-details-dialog td{padding:var(--sana-space-3) var(--sana-space-3);text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
-.dashboard-details-dialog th{color:var(--sana-teal-mid);font-weight:600}.dashboard-details-dialog td small{display:block;color:var(--sana-teal-mid);margin-top:8px}.dashboard-detail-name{font-weight:600}
-.dashboard-details-empty{padding:var(--sana-space-8) var(--sana-space-6);text-align:center;color:var(--sana-teal-mid);line-height:1.8}
+.dashboard-details-dialog th{color:var(--sana-text-2);font-weight:600}.dashboard-details-dialog td small{display:block;color:var(--sana-text-2);margin-top:8px}.dashboard-detail-name{font-weight:600}
+.dashboard-details-empty{padding:var(--sana-space-8) var(--sana-space-6);text-align:center;color:var(--sana-text-2);line-height:1.8}
 .dashboard-details-header{background:var(--sana-canvas);padding:var(--sana-space-6) var(--sana-space-6)}
 .dashboard-details-heading{display:flex;align-items:center;gap:var(--sana-space-3);min-width:0}
-.dashboard-details-icon{display:grid;place-items:center;width:48px;height:48px;flex-shrink:0;border:1px solid var(--sana-line);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--sana-teal-mid);box-shadow:var(--sana-shadow)}
+.dashboard-details-icon{display:grid;place-items:center;width:48px;height:48px;flex-shrink:0;border:1px solid var(--sana-line);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--sana-text-2);box-shadow:var(--sana-shadow)}
 .dashboard-details-header p{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sana-space-3)}
-.dashboard-details-count{padding:0 var(--sana-space-2);border-radius:var(--sana-radius-card);background:var(--sana-canvas);color:var(--sana-teal);font-weight:600}
+.dashboard-details-count{padding:0 var(--sana-space-2);border-radius:var(--sana-radius-card);background:var(--sana-canvas);color:var(--sana-text);font-weight:600}
 .dashboard-details-header time{font-variant-numeric:tabular-nums;direction:ltr}
 .dashboard-details-table-wrap{padding:var(--sana-space-4) var(--sana-space-6) var(--sana-space-6)}
 .dashboard-details-dialog thead{background:var(--sana-canvas)}
@@ -19,7 +19,7 @@
 .dashboard-details-dialog tbody tr:hover{background:var(--sana-white)}
 .dashboard-details-dialog tbody tr:last-child td{border-bottom:0}
 .dashboard-details-dialog td:first-child{min-width:200px}
-.dashboard-detail-name{font-size:.9375rem;color:var(--sana-teal)}
+.dashboard-detail-name{font-size:.9375rem;color:var(--sana-text)}
 @media(max-width:600px){.dashboard-details-header{padding:var(--sana-space-4)}.dashboard-details-table-wrap{padding:0 var(--sana-space-3) var(--sana-space-3)}.dashboard-details-dialog th,.dashboard-details-dialog td{padding:var(--sana-space-3) var(--sana-space-2)}}
 
 .attendance-kpis>button{text-align:start;font:inherit;color:inherit;cursor:pointer;transition:box-shadow .15s,border-color .15s}

@@ -6,7 +6,8 @@ import { ArrowLeft, ArrowRight, Check, Copy, KeyRound, Pencil, Plus, Power, Serv
 import type { Row } from "./ui-types";
 
 type Props = { rtl: boolean; agents: Row[]; devices: Row[]; notify: (message: string) => void; onChanged: () => void; onClose: () => void };
-type DeviceForm = { id: number | null; name: string; model: string; ipAddress: string; port: string; timezone: string; agentId: string; enabled: boolean };
+const COUNTRY_TIMEZONES: Record<string, string> = { Egypt: "Africa/Cairo", "Saudi Arabia": "Asia/Riyadh", Jordan: "Asia/Amman" };
+type DeviceForm = { id: number | null; name: string; model: string; ipAddress: string; port: string; timezone: string; country: string; agentId: string; enabled: boolean };
 
 // The connector polls every 15 seconds; allow a few missed polls before calling it disconnected.
 const connectorOnline = (agent: Row) => Boolean(agent.enabled) && Boolean(agent.last_seen_at) && Date.now() - new Date(String(agent.last_seen_at)).getTime() < 90000;
@@ -58,11 +59,11 @@ export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClos
     const firstAgent = agents.find(agent => Number(agent.enabled));
     setError("");
     setForm(device
-      ? { id: Number(device.id), name: String(device.name || ""), model: String(device.model || ""), ipAddress: String(device.ip_address || ""), port: String(device.port || 4370), timezone: String(device.timezone || "Africa/Cairo"), agentId: device.agent_id ? String(device.agent_id) : "", enabled: Boolean(Number(device.enabled)) }
-      : { id: null, name: "", model: "ZKTeco", ipAddress: "", port: "4370", timezone: "Africa/Cairo", agentId: firstAgent ? String(firstAgent.id) : "", enabled: true });
+      ? { id: Number(device.id), name: String(device.name || ""), model: String(device.model || ""), ipAddress: String(device.ip_address || ""), port: String(device.port || 4370), timezone: String(device.timezone || "Africa/Cairo"), country: String(device.country || ""), agentId: device.agent_id ? String(device.agent_id) : "", enabled: Boolean(Number(device.enabled)) }
+      : { id: null, name: "", model: "ZKTeco", ipAddress: "", port: "4370", timezone: "Africa/Cairo", country: "", agentId: firstAgent ? String(firstAgent.id) : "", enabled: true });
   };
   const saveDevice = () => form && run(async () => {
-    const result = await post({ action: "save_attendance_device", id: form.id, name: form.name, model: form.model, ipAddress: form.ipAddress, port: Number(form.port), timezone: form.timezone, agentId: form.agentId ? Number(form.agentId) : null, enabled: form.enabled });
+    const result = await post({ action: "save_attendance_device", id: form.id, name: form.name, model: form.model, ipAddress: form.ipAddress, port: Number(form.port), timezone: form.timezone, country: form.country, agentId: form.agentId ? Number(form.agentId) : null, enabled: form.enabled });
     setForm(null);
     notify(result.syncQueued ? t("Device saved. Downloading its records now.", "تم حفظ الجهاز، وجارٍ سحب بياناته الآن.") : t("Device saved.", "تم حفظ الجهاز."));
   });
@@ -84,6 +85,7 @@ export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClos
             {agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}{Number(agent.enabled) ? "" : t(" (disabled)", " (معطل)")}</option>)}
             <option value="">{t("None: sync service on the app server", "بدون: خدمة مزامنة على خادم البرنامج")}</option>
           </select>{!agents.length && <small className="bio-setup-hint">{t("Create an office connector first so the online app can reach this device.", "أنشئ رابط المكتب أولًا حتى يصل البرنامج المرفوع أونلاين لهذا الجهاز.")}</small>}</label>
+          <label><span>{t("Country", "الدولة")}</span><select value={form.country} onChange={event => setForm(current => current && { ...current, country: event.target.value, timezone: COUNTRY_TIMEZONES[event.target.value] || current.timezone })}><option value="">{t("All countries", "كل الدول")}</option>{Object.keys(COUNTRY_TIMEZONES).map(name => <option key={name} value={name}>{name}</option>)}</select><small className="bio-setup-hint">{t("Device user codes only match employees of this country.", "أكواد مستخدمي الجهاز تُربط بموظفي هذه الدولة فقط.")}</small></label>
           <div className="bio-setup-pair">
             <label><span>{t("Model", "الموديل")}</span><input value={form.model} onChange={event => field("model", event.target.value)}/></label>
             <label><span>{t("Time zone", "المنطقة الزمنية")}</span><input dir="ltr" value={form.timezone} onChange={event => field("timezone", event.target.value)}/></label>

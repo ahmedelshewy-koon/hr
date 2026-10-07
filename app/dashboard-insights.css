@@ -19,7 +19,7 @@
 .app .insight-table td small{display:block;margin-top:8px;font-size:11px}
 .app .insight-tag{display:inline-block;padding:8px 16px;border-radius:var(--sana-radius-pill);font-size:12px;font-weight:500}
 .app .insight-tag.blue{background:var(--sana-info-bg);color:var(--sana-info)}
-.app .insight-tag.green{background:var(--sana-success-bg);color:var(--sana-teal-mid)}
+.app .insight-tag.green{background:var(--sana-success-bg);color:var(--sana-text-2)}
 .app .insight-tag.red{background:var(--sana-danger-bg);color:var(--sana-danger)}
 .app .insight-empty{margin:0;color:var(--sana-muted)}
 .app .insight-donut-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}

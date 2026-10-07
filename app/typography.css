@@ -23,10 +23,10 @@ h1,.page-heading h1,.approvals-head h1,.attendance-page-head h1,.learning-headin
 .lifecycle-heading h1,.lifecycle-subheading h1,
 .portal-welcome h1,.login-copy h1{
   font-size:var(--type-page)!important;
-  font-weight:var(--weight-semibold)!important;
+  font-weight:var(--weight-bold)!important;
   line-height:var(--leading-heading)!important;
 }
-h2{font-size:var(--type-section);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
+h2{font-size:var(--type-section);font-weight:var(--weight-bold);line-height:var(--leading-heading)}
 h3,h4,h5,h6{font-size:var(--type-component);font-weight:var(--weight-semibold);line-height:var(--leading-heading)}
 .department-card h3,.setting-card h3,.portal-next h3,
 [class*="empty"] h2,[class*="empty"] h3{font-size:var(--type-component)!important;font-weight:var(--weight-semibold)!important}
@@ -45,12 +45,13 @@ th,.data-table .tr.th,.attendance-row.head,.official-holiday-row.head,[role="col
 }
 td,.data-table .tr:not(.th),.attendance-row:not(.head),.official-holiday-row:not(.head),
 [role="cell"],[role="gridcell"]{
-  font-size:var(--type-secondary)!important;
+  font-size:var(--type-table)!important;
   font-weight:var(--weight-regular);
   line-height:var(--leading-body);
 }
-table td b,table td strong,table td span,table td small,
-.data-table .tr:not(.th)>span:not(.status){font-size:var(--type-secondary)}
+table td b,table td strong,table td span,
+.data-table .tr:not(.th)>span:not(.status){font-size:var(--type-table)}
+table td small{font-size:var(--type-label)}
 
 .sidebar nav button,.sidebar-bottom>button{font-size:var(--type-nav)!important;font-weight:var(--weight-medium)}
 .sidebar nav button.active{font-weight:var(--weight-semibold)}

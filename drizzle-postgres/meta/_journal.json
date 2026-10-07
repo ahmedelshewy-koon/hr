@@ -330,6 +330,13 @@
       "when": 1791260000000,
       "tag": "0046_cost_center_debit_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791270000000,
+      "tag": "0047_attendance_device_country",
+      "breakpoints": true
     }
   ]
 }

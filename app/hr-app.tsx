@@ -59,6 +59,7 @@ import { DashboardMyTasks } from "./dashboard-my-tasks";
 import { DashboardInsights } from "./dashboard-insights";
 import { DashboardTeamTasks } from "./dashboard-team-tasks";
 import "./sana-theme.css";
+import "./sana-system.css";
 import "./employee-portal-dashboard.css";
 import type { Row } from "./ui-types";
 
@@ -1172,6 +1173,8 @@ function EmployeeCardGrid({rtl,rows,departments,jobTitles,canDelete,onDelete,onO
     const status=String(employee.employment_status||"active");
     const facts=[
       {label:rtl?"المدير المباشر":"Direct manager",value:managerName},
+      {label:rtl?"فرع العمل":"Branch",value:(rtl?(employee.branch_name_ar||employee.branch_name):(employee.branch_name||employee.branch_name_ar))||"—"},
+      {label:rtl?"نوع الدوام":"Schedule type",value:employee.schedule_type==="shift"?(rtl?"نظام ورديات":"Shift schedule"):(rtl?"دوام ثابت":"Fixed schedule")},
       {label:rtl?"تاريخ المباشرة":"Start date",value:employee.start_date||"—",ltr:true},
       {label:rtl?"تاريخ انتهاء العقد":"End date",value:resolvedContractEndDate(employee.start_date,employee.end_date)||"—",ltr:true},
     ];

@@ -4,7 +4,7 @@
   --blue:var(--sana-teal);--accent-blue:var(--sana-teal-mid);
   --light-blue:var(--sana-canvas);--light:var(--sana-canvas);
   --bg:var(--sana-canvas);--surface:var(--sana-white);--surface-soft:var(--sana-canvas);
-  --text:var(--sana-ink);--muted:var(--sana-muted);--line:var(--sana-line);
+  --text:var(--sana-text);--muted:var(--sana-muted);--line:var(--sana-line);
   --success:var(--sana-success);--success-bg:var(--sana-success-bg);
   --warning:var(--sana-warning);--warning-bg:var(--sana-warning-bg);
   --error:var(--sana-danger);--error-bg:var(--sana-danger-bg);
@@ -15,8 +15,8 @@
   --radius-input:var(--sana-radius-control);--radius-pill:var(--sana-radius-pill);
   --card-shadow:var(--sana-shadow);--shadow-lg:var(--sana-shadow-popover);
   --card-border:var(--sana-line);--card-gap:var(--sana-space-6);
-  --type-page:24px;--type-section:20px;--type-component:16px;--type-body:16px;
-  --type-secondary:14px;--type-label:12px;--type-nav:14px;--type-kpi:24px;
+  --type-page:22px;--type-section:18px;--type-component:15px;--type-body-large:15px;--type-body:14px;
+  --type-secondary:12px;--type-label:11px;--type-metadata:9px;--type-table:14px;--type-nav:14px;--type-kpi:22px;
 }
 
 /* CRM composition: continuous dark navigation, neutral inset workspace, white header. */
@@ -46,15 +46,15 @@
 .workspace-label{letter-spacing:0}
 .global-search{background:var(--sana-white);border-color:var(--sana-line);border-radius:var(--sana-radius-pill);color:var(--sana-muted)}
 .global-search kbd{border-radius:16px;color:var(--sana-muted)}
-.topbar :is(.icon-btn,.language,.role-select){background:transparent;border-color:var(--sana-line);color:var(--sana-teal);box-shadow:none}
+.topbar :is(.icon-btn,.language,.role-select){background:transparent;border-color:var(--sana-line);color:var(--sana-text);box-shadow:none}
 .profile-pop,.notification-pop{background:var(--sana-white);border:1px solid var(--sana-line);border-radius:var(--sana-radius-card);box-shadow:var(--sana-shadow-popover);backdrop-filter:none}
-.profile-pop-role{background:var(--sana-canvas);color:var(--sana-teal)}
+.profile-pop-role{background:var(--sana-canvas);color:var(--sana-text)}
 
 /* Shared surfaces, typography, controls and interaction states. */
 .app :is(h1,.dashboard-title){font-weight:700!important;letter-spacing:0!important}
 .app h2{font-weight:700}
 .app :is(p,small){color:var(--sana-muted)}
-.app :is(.ats-empty,.assets-empty,.learning-empty,.attendance-empty)>svg{color:var(--sana-teal-mid)}
+.app :is(.ats-empty,.assets-empty,.learning-empty,.attendance-empty)>svg{color:var(--sana-text-2)}
 .panel,.stat-card{border:1px solid var(--sana-line);border-radius:var(--sana-radius-card);background:var(--sana-white);box-shadow:var(--sana-shadow)}
 .app :is(.primary,.login-submit){background:var(--sana-button);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-white);box-shadow:none}
 .app .primary:hover{background:var(--sana-hover);border-color:var(--sana-hover)}
@@ -62,7 +62,7 @@
 .app .outline{background:var(--sana-canvas);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-teal);box-shadow:none}
 .app .outline:hover{background:var(--sana-hover);color:var(--sana-white)}
 .app .outline:not(:focus-visible){outline-style:none}
-.app :is(.primary,.outline,.ghost,.select-button,.text-button){font-size:var(--type-secondary)!important}
+.app :is(.primary,.outline,.ghost,.select-button,.text-button){font-size:var(--type-body)!important}
 .app :is(button,input,select,textarea):focus-visible{outline:2px solid var(--sana-teal-mid);outline-offset:3px}
 .app button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
 .app :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){border-color:var(--sana-line);color:var(--sana-ink);background-color:var(--sana-white);border-radius:var(--sana-radius-control);box-shadow:none}
@@ -77,32 +77,32 @@
 .app :is(.data-table .tr,td,th){border-color:var(--sana-line)}
 .app :is(.data-table .tr:not(.th):hover,tbody tr:hover){background:var(--sana-canvas)}
 .app :is(.status,.badge){border-radius:var(--sana-radius-pill);padding:8px 16px}
-.app :is(.status.green,.status.approved,.status.active){background:var(--sana-success-bg);color:var(--sana-teal)}
+.app :is(.status.green,.status.approved,.status.active){background:var(--sana-success-bg);color:var(--sana-text)}
 .app :is(.status.red,.status.rejected,.error-banner,.form-error){background:var(--sana-danger-bg);color:var(--sana-danger)}
 .app :is(.status.orange,.status.pending){background:var(--sana-warning-bg);color:var(--sana-warning)}
-.app :is(.status.blue,.status.violet){background:var(--sana-canvas);color:var(--sana-teal)}
+.app :is(.status.blue,.status.violet){background:var(--sana-canvas);color:var(--sana-text)}
 .app :is(.empty,.empty-state){color:var(--sana-muted);background:var(--sana-white)}
-.app :is(.empty,.empty-state)>svg{color:var(--sana-teal-mid)}
+.app :is(.empty,.empty-state)>svg{color:var(--sana-text-2)}
 .app :is(.drawer,.modal-card,.password-card){background:var(--sana-white);border-radius:var(--sana-radius-card);box-shadow:var(--sana-shadow-popover)}
 .app .drawer-head,.app .drawer-footer{border-color:var(--sana-line)}
 
 /* HR data and existing drill-down actions, with the CRM widget hierarchy. */
-.stat-grid,.dashboard-grid,.dashboard-grid.lower{gap:24px;margin-bottom:24px}
+.stat-grid,.dashboard-grid,.dashboard-grid.lower{gap:16px;margin-bottom:16px}
 .app .stat-card{padding:24px;box-shadow:var(--sana-shadow)}
-.app :is(.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange){background:var(--sana-canvas);color:var(--sana-teal)}
-.app .stat-value{color:var(--sana-teal-mid)}
+.app :is(.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange){background:var(--sana-canvas);color:var(--sana-text)}
+.app .stat-value{color:var(--sana-text-2)}
 .app .stat-label{color:var(--sana-ink)}
-.app :is(.attendance-overview,.today-card,.approvals-card,.leave-card){padding:24px}
+.app :is(.attendance-overview,.today-card,.approvals-card,.leave-card){padding:16px}
 .app .attendance-kpis{gap:16px}
 .app .attendance-kpis>button{padding:16px;background:var(--sana-white);border-radius:var(--sana-radius-card)}
-.app .attendance-kpis>button>span{color:var(--sana-teal);background:var(--sana-canvas)}
-.app .attendance-kpis>button>b{color:var(--sana-teal-mid);font-size:24px}
-.app .sana-dashboard-kpis{margin-bottom:24px;gap:16px}
+.app .attendance-kpis>button>span{color:var(--sana-text);background:var(--sana-canvas)}
+.app .attendance-kpis>button>b{color:var(--sana-text-2);font-size:var(--type-kpi)}
+.app .sana-dashboard-kpis{margin-bottom:16px;gap:16px}
 .app .sana-dashboard-kpis>button{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:16px;text-align:start;padding:16px 24px;box-shadow:var(--sana-shadow)}
 .app .sana-dashboard-kpis>button>span{grid-column:2;grid-row:1;margin:0}
 .app .sana-dashboard-kpis>button>b{grid-column:2;grid-row:2;text-align:end}
 .app .sana-dashboard-kpis>button>small{grid-column:1;grid-row:1;margin:0;color:var(--sana-ink);align-self:center;font-size:var(--type-secondary)}
-.app .attendance-summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.app .attendance-summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
 .app .attendance-distribution{grid-column:auto;margin:0;border-top:0}
 .app .attendance-progress .on-time,.app .bar.present{background:var(--sana-chart-1)}
 .app .attendance-progress .late,.app .bar.remote{background:var(--sana-chart-2)}
@@ -157,7 +157,7 @@
   .app :is(.attendance-overview,.today-card,.approvals-card,.leave-card,.stat-card){padding:16px}
   .app :is(input,select,textarea){font-size:16px!important}
   .employee-mobile-nav{background:var(--sana-white);border-color:var(--sana-line);backdrop-filter:none}
-  .employee-mobile-nav button[aria-current]{background:var(--sana-canvas);color:var(--sana-teal)}
+  .employee-mobile-nav button[aria-current]{background:var(--sana-canvas);color:var(--sana-text)}
 }
 @media print{
   .app[dir],.app[dir] .main{padding:0;margin:0;background:white}
@@ -191,16 +191,30 @@ html,body{background:var(--sana-page-bg) fixed var(--sana-page-start)}
 .app :is(.panel,.stat-card,.drawer,.modal-card,.password-card,.profile-pop,.notification-pop){background:var(--sana-white);border-color:var(--sana-line);box-shadow:var(--sana-shadow)}
 
 /* Clickable rows/cards/links use the locked hover; non-clickable rows keep the subtle canvas tint. */
-.app :is(tr,.tr,li,article,div,section)[role=button]:hover,
+.app :is(tr,.tr,li,article,div,section)[role=button]:not(.employee-card-head):hover,
 .app :is(button,a).attendance-row:hover,
-.app :is(button,a):is(.tr,.row,.my-task-link,.employee-card-head):hover,
+.app :is(button,a):is(.tr,.row,.my-task-link):hover,
 .app .dashboard-my-tasks :is(.my-tasks-open,.my-tasks-filters button):hover,
 .app .portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover,
 .portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover{background:var(--sana-hover);border-color:var(--sana-hover);color:var(--sana-white)}
-.app :is(tr,.tr,li,article,div,section)[role=button]:hover :is(b,span,small,em,svg,strong,h3,p):not(.status):not(.badge),
-.app :is(button,a):is(.attendance-row,.tr,.row,.employee-card-head):hover :is(b,span,small,em,svg,strong,p):not(.status):not(.badge),
+.app :is(tr,.tr,li,article,div,section)[role=button]:not(.employee-card-head):hover :is(b,span,small,em,svg,strong,h3,p):not(.status):not(.badge),
+.app :is(button,a):is(.attendance-row,.tr,.row):hover :is(b,span,small,em,svg,strong,p):not(.status):not(.badge),
 .portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover :is(b,span,small,em,svg,strong):not(.status):not(.portal-status){color:var(--sana-white)}
 .app .dashboard-my-tasks .my-task-card:hover{border-color:var(--sana-hover)}
 .app a:not([class]):hover{color:var(--sana-hover)}
 .app :is(.data-table .tr:not(.th):hover,tbody tr:hover){background:var(--sana-canvas)}
 @media(max-width:760px){body:has(.sidebar.open){overflow:hidden}}
+/* Desktop: the page never scrolls; the main shell scrolls its own content and keeps the topbar pinned. */
+@media(min-width:761px){
+  html:has(.app[dir]),body:has(.app[dir]){height:100%;overflow:hidden}
+  .app[dir]{height:100dvh;min-height:0;overflow:hidden}
+  .app[dir] .main{height:calc(100dvh - 48px);min-height:0;padding-top:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+  .app[dir] .main::-webkit-scrollbar{display:none}
+  .app[dir] .topbar{position:sticky;top:0;z-index:30;margin-top:24px;box-shadow:0 0 0 24px var(--sana-shell),var(--sana-shadow)}
+  .app[dir] .sidebar nav{scrollbar-width:none}
+  .app[dir] .sidebar nav::-webkit-scrollbar{display:none}
+}
+@media(min-width:761px) and (max-width:1100px){
+  .app[dir] .main{height:calc(100dvh - 32px)}
+  .app[dir] .topbar{top:0;margin-top:16px;box-shadow:0 0 0 16px var(--sana-shell),var(--sana-shadow)}
+}

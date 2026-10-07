@@ -2,13 +2,14 @@
    CRM supplies composition; semantic feedback colors come from DS badges.
    The reference outlines its text and does not identify a font family. */
 :root {
+  --sana-text:#000000; --sana-text-2:#3D3D3D; --sana-text-3:#6D6D6D;
   --sana-white:#FFFFFF;
   --sana-canvas:#F4F3EF;
   --sana-canvas-warm:#F0EDE8;
   --sana-line:#F5F5F5;
   --sana-disabled:#A8A8A8;
   --sana-muted:#6D6D6D;
-  --sana-ink:#031212;
+  --sana-ink:#111B1B;
   --sana-teal:#0B4237;
   --sana-teal-mid:#1C7B61;
 
@@ -35,14 +36,26 @@
   --sana-radius-button:32px;
   --sana-radius-nav:16px;
   --sana-radius-pill:32px;
-  --sana-shadow:0 0 8px 0 rgba(0,204,161,.16);
-  --sana-shadow-popover:0 0 8px 0 rgba(0,204,161,.16);
+  --sana-shadow:0px 0px 8px 0px rgba(0,204,161,0.16);
+  --sana-shadow-popover:0px 0px 8px 0px rgba(0,204,161,0.16);
   --sana-button:linear-gradient(100deg,#1C7B61,#0B4237);
   --sana-sidebar:linear-gradient(180deg,#031212,#083934);
   --sana-page-start:#031212;
   --sana-page-end:#083934;
   --sana-page-bg:linear-gradient(180deg,var(--sana-page-start),var(--sana-page-end));
   --sana-shell:#EBEBEB;
-  --sana-hover:#0B4237;
+  --sana-hover:#188164;
+  /* SANA Master Visual Design System — locked token aliases (single source of truth). */
+  --sana-bg-dark-start:#031212; --sana-bg-dark-end:#083934;
+  --sana-surface:#FFFFFF; --sana-border:#F5F5F5; --sana-switch-border:#E7E7E7;
+  --sana-primary-start:#1C7B61; --sana-primary-end:#0B4237;
+  --sana-secondary-bg:#F4F3EF; --sana-secondary-border:#0B4237; --sana-secondary-text:#0B4237;
+  --sana-sidebar-hover:#0B4237; --sana-heading:#111B1B;
+  --sana-green-50:#D9FBF3; --sana-green-200:#95E0D1; --sana-green-400:#79CBAA; --sana-green-900:#0B4237;
+  --sana-radius-switch:16px;
+  --sana-space-7:56px;
+  --sana-page-margin:24px; --sana-gutter:16px; --sana-card-padding:16px;
+  --sana-sidebar-item-height:55px; --sana-sidebar-item-gap:24px;
+  --sana-shadow-card:0px 0px 8px 0px rgba(0,204,161,0.16);
   --sana-chart-1:#0B4237; --sana-chart-2:#1C7B61; --sana-chart-3:color-mix(in srgb,#1C7B61 45%,#FFFFFF);
 }

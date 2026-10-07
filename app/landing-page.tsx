@@ -76,7 +76,7 @@ const STEPS = [
 ] as const;
 
 function Wordmark() {
-  return <a className="landing-wordmark" href="#top" aria-label="SANA HR — الصفحة الرئيسية"><SanaBrand module="HR" /></a>;
+  return <a className="landing-wordmark" href="#top" aria-label="SANA HR — الصفحة الرئيسية"><SanaBrand /></a>;
 }
 
 const SCENE_TEAM = 139;

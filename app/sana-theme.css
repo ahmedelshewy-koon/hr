@@ -29,8 +29,11 @@
 .sana-module-label{display:flex;align-items:center;gap:16px;color:var(--sana-teal)}
 .sana-module-label span{padding-inline-start:16px;border-inline-start:1px solid var(--sana-line);color:var(--sana-muted);font-size:var(--type-secondary)}
 .app[dir] .sidebar .brand{height:64px;padding:0 32px;margin:0 0 24px;border-radius:0;background:transparent}
-.sana-brand-mark{height:1.4em;width:auto;align-self:center;flex:none;margin-inline-end:0}
-.sana-brand{display:inline-flex;align-items:baseline;gap:8px;direction:ltr;white-space:nowrap;font-size:24px;font-weight:700;color:var(--sana-teal);letter-spacing:.02em}
+.sana-brand-mark{height:1.85em;width:auto;align-self:center;flex:none;margin-inline-end:0}
+.sana-brand{display:inline-flex;align-items:center;gap:8px;direction:ltr;white-space:nowrap;font-size:24px;font-weight:700;color:var(--sana-teal);letter-spacing:.02em}
+html .sana-brand .sana-brand-wordmark{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:3.6em;margin:0;font-size:inherit;color:inherit;letter-spacing:0;line-height:1}
+html .sana-brand .sana-brand-ar{display:block;margin:0;text-align:center;font-family:"Alexandria","IBM Plex Sans Arabic",sans-serif;font-size:1.2em;font-weight:700;line-height:1.1;color:inherit;letter-spacing:0}
+html .sana-brand .sana-brand-en{display:block;text-align:center;margin:0;padding:0 0 0 .26em;font-family:Arial,sans-serif;font-size:.42em;font-weight:700;line-height:1;color:inherit;letter-spacing:.26em}
 .sidebar .brand .sana-brand{display:inline-flex;color:var(--sana-white);font-size:24px;margin:0}
 .sana-brand i{font-style:normal;font-weight:400;color:var(--sana-teal-mid)}
 .sidebar .brand .sidebar-collapse,.sidebar .brand .mobile-close{background:transparent;color:var(--sana-line);border-color:transparent}
@@ -149,7 +152,7 @@
   .app.has-employee-nav[dir] .content{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
   .app[dir] .sidebar{width:min(290px,86vw);background:var(--sana-page-bg);padding:24px 16px}
   .app[dir] .sidebar .brand{padding:0 32px}
-  .app[dir] .sidebar .brand .mobile-close{display:grid}
+  .app[dir] .sidebar .brand .mobile-close{display:grid;position:static;transform:none;margin:0;margin-inline-start:auto;order:3;flex:none}
   .sana-module-label{display:none}
   .app .attendance-summary{grid-template-columns:1fr}
   .app .stat-grid,.app .dashboard-grid{gap:16px;margin-bottom:16px}
@@ -168,7 +171,7 @@
    the menu fits the viewport without scrolling (items shrink to 32px before it scrolls). */
 @media(min-width:761px){
   .app[dir] .sidebar{padding-block:16px}
-  .app[dir] .sidebar .brand{height:48px;margin:0 0 8px}
+  .app[dir] .sidebar .brand{height:64px;flex-shrink:0;margin:0 0 8px}
   .app[dir] .sidebar nav{gap:16px;scrollbar-width:none}
   .app[dir] .sidebar nav::-webkit-scrollbar{display:none}
   .app[dir] .sidebar nav button,.app.sidebar-collapsed[dir] .sidebar nav button{flex:1 1 0;min-height:32px;max-height:44px;height:auto}
@@ -177,9 +180,12 @@
 
 /* Expanded sidebar header: logo at the start, collapse button at the end in its own visible 36px tile (it used to float over the logo). */
 .app:not(.sidebar-collapsed)[dir] .sidebar .brand{justify-content:flex-start;gap:8px;padding:0 8px}
-.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse{position:static;transform:none;order:3;margin:0;margin-inline-start:auto;flex:none;width:36px;height:36px;border-radius:16px;border:1px solid color-mix(in srgb,var(--sana-line) 35%,transparent);background:color-mix(in srgb,var(--sana-white) 8%,transparent);color:var(--sana-line)}
+.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse{position:static;transform:none;order:3;margin:0;margin-inline-start:auto;flex:none;width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--sana-line)}
 .app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse:hover{background:color-mix(in srgb,var(--sana-white) 18%,transparent);color:var(--sana-white);border-color:var(--sana-line);transform:none}
-.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sana-brand{font-size:26px;gap:8px;min-width:0;flex:0 1 auto}
+.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sana-brand{font-size:28px;gap:8px;min-width:0;flex:0 1 auto}
+html .app .sidebar .brand .sidebar-collapse{border:0;border-radius:10px;box-shadow:none}
+html .app .sidebar .brand .sidebar-collapse:not(:focus-visible){outline:none}
+html .app .sidebar .brand .sidebar-collapse:focus-visible{outline:2px solid var(--sana-green-400);outline-offset:2px}
 @media(max-width:1200px){.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sana-brand{font-size:21px;gap:8px}}
 .app:not(.sidebar-collapsed)[dir] .sidebar .brand .sana-wordmark{overflow:visible}
 

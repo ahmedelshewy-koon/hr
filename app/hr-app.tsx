@@ -5,7 +5,7 @@ import {
   Landmark, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleUserRound,
   Clock3, Download, Eye, FileText, Globe2, GripVertical, KeyRound,
-  Languages, LayoutDashboard, LayoutGrid, List, Lock, Menu, Minus, MoreHorizontal, Network, PanelLeftClose, PanelLeftOpen,
+  Languages, LayoutDashboard, LayoutGrid, List, Lock, Menu, Minus, MoreHorizontal, Network,
   Pencil, Plus, Printer, RotateCcw, Search, Send, Settings, ShieldCheck, SlidersHorizontal,
   Trash2, Unlock, Users, ScrollText, Wallet, X, UserRoundSearch, Workflow, Laptop, GraduationCap,
 } from "lucide-react";
@@ -358,7 +358,7 @@ export function HRApp() {
   };
   const visiblePage=nav.some(item=>item.id===page)?page:(nav[0]?.id||null);
   const currentTitle = nav.find(n => n.id === visiblePage)?.label;
-  const sidebarToggle = <button type="button" className="sidebar-collapse" aria-expanded={!sidebarCollapsed} aria-controls="main-sidebar" onClick={()=>setSidebarCollapsed(value=>{const next=!value;window.localStorage.setItem("hr-sidebar-collapsed",String(next));return next;})} aria-label={sidebarCollapsed?(rtl?"فتح القائمة الجانبية":"Expand sidebar"):(rtl?"طي القائمة الجانبية":"Collapse sidebar")} title={sidebarCollapsed?(rtl?"فتح القائمة":"Expand sidebar"):(rtl?"طي القائمة":"Collapse sidebar")}>{sidebarCollapsed?<PanelLeftOpen size={19}/>:<PanelLeftClose size={19}/>}</button>;
+  const sidebarToggle = <button type="button" className="sidebar-collapse" aria-expanded={!sidebarCollapsed} aria-controls="main-sidebar" onClick={()=>setSidebarCollapsed(value=>{const next=!value;window.localStorage.setItem("hr-sidebar-collapsed",String(next));return next;})} aria-label={sidebarCollapsed?(rtl?"فتح القائمة الجانبية":"Expand sidebar"):(rtl?"طي القائمة الجانبية":"Collapse sidebar")} title={sidebarCollapsed?(rtl?"فتح القائمة":"Expand sidebar"):(rtl?"طي القائمة":"Collapse sidebar")}><ChevronRight size={20} style={{transform:rtl!==sidebarCollapsed?"none":"rotate(180deg)"}}/></button>;
 
   return (
     <div className={`app ${visiblePage==="portal"?"portal-shell":""} ${canOpen("portal")?"has-employee-nav":""} ${sidebarCollapsed?"sidebar-collapsed":""}`} dir={rtl ? "rtl" : "ltr"} data-lang={lang}>

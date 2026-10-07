@@ -3,6 +3,7 @@
 //
 //   RUNTIME_BASE_URL=http://localhost:3000 PLAYWRIGHT_MODULE=<path to playwright-core> node tests/runtime-navigation-smoke.mjs
 //   SMOKE_LANG=en runs the same checks against the English interface.
+//   SMOKE_ROLE=Employee limits the run to that role; PLAYWRIGHT_EXECUTABLE_PATH can select an installed browser.
 //
 // Checks per role (Super Admin, HR Manager, Department Manager, Employee): the sidebar lists exactly the granted pages under
 // the approved names, every page opens with a matching header and no console errors, dashboard buttons only lead to
@@ -13,12 +14,12 @@ const { PAGE_LABELS, PAGE_IDS } = await import(new URL("../app/navigation-labels
 const BASE = process.env.RUNTIME_BASE_URL || "http://localhost:3000";
 const L = process.env.SMOKE_LANG === "en" ? "en" : "ar";
 
-// Same defaults as hr-app.tsx `rolePages` (server-provided allowed_pages drives the real menu).
+// Server-provided grants drive the menu; Employee deliberately has only three pages.
 const ROLE_PAGES = {
   "Super Admin": [...PAGE_IDS],
   "HR Manager": PAGE_IDS.filter(p => p !== "settings"),
   "Department Manager": ["dashboard", "portal", "approvals", "employees", "leave", "attendance", "recruitment", "lifecycle", "assets", "learning", "org", "reports"],
-  "Employee": ["dashboard", "portal", "lifecycle", "learning"],
+  "Employee": ["dashboard", "portal", "learning"],
 };
 
 const emp = (id, extra = {}) => ({ id, employee_code: "E-" + id, name_en: "Person " + id, name_ar: "شخص " + id, work_email: `p${id}@test.invalid`, employment_status: "active", country: "Egypt", department_id: 1, department_name: "Tech", job_title_id: 1, job_title_name: "Designer", start_date: "2025-01-01", created_at: "2026-01-01", ...extra });
@@ -75,12 +76,13 @@ async function safeClick(page, loc, diag) {
 const problems = [];
 const record = (role, what, ok, detail = "") => { results.push({ role, what, ok, detail }); if (!ok) problems.push(`[${role}] ${what} ${detail}`); };
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined });
 const LATIN = /[A-Za-z]{3,}/g;
 const ALLOWED_LATIN = new Set(["CSV", "UTF", "Excel", "PDF", "DOCX", "TXT", "HH", "mm", "AM", "PM", "SAR", "EGP", "USD", "KSA", "IBAN", "CEO", "HR", "SIM", "ATS", "CV", "name", "company", "com", "Person", "Tech"]);
 
 for (const [role, pages] of Object.entries(ROLE_PAGES)) {
-  const user = { id: 1, email: `${role.replace(/\s/g, "").toLowerCase()}@test.invalid`, employee_id: role === "Super Admin" ? null : 7, employee_name: "Person 7", employee_name_ar: "شخص 7", allowed_pages: pages };
+  if (process.env.SMOKE_ROLE && role !== process.env.SMOKE_ROLE) continue;
+  const user = { id: 1, role_name: role, email: `${role.replace(/\s/g, "").toLowerCase()}@test.invalid`, employee_id: role === "Super Admin" ? null : 7, employee_name: "Person 7", employee_name_ar: "شخص 7", allowed_pages: pages };
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: L === "ar" ? "ar" : "en-GB", serviceWorkers: "block" });
   await context.addInitScript(lang => localStorage.setItem("hr-language", lang), L);
   const page = await context.newPage();

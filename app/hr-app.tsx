@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  CircleHelp, Home, Landmark, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
+  Landmark, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleUserRound,
   Clock3, Download, Eye, FileText, Globe2, GripVertical, KeyRound,
   Languages, LayoutDashboard, LayoutGrid, List, Lock, Menu, Minus, MoreHorizontal, Network, PanelLeftClose, PanelLeftOpen,
@@ -350,12 +350,6 @@ export function HRApp() {
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
   const canOpen=(target:Page)=>nav.some(item=>item.id===target);
   const goTo=(target:Page,employeeId?:number)=>{setFocusEmployeeId(employeeId??null);setPage(target);setMobileOpen(false);};
-  // Employee shortcuts remain available across pages, without duplicating the management menu.
-  const openPortalSection=(section:EmployeeSection,target:string)=>{
-    setEmployeeSection(section);
-    goTo("portal");
-    window.requestAnimationFrame(()=>document.getElementById(target)?.scrollIntoView({block:"nearest"}));
-  };
   // Notifications only ever navigate to a page this user can open; otherwise they explain instead of landing somewhere unrelated.
   const openNotificationTarget=(targetPath:unknown)=>{
     const destination=resolveNotificationDestination(targetPath,nav.map(item=>item.id));
@@ -379,15 +373,6 @@ export function HRApp() {
               </button>
             </Fragment>
           ))}
-          {role==="employee"&&canOpen("portal")&&<>
-            <button onClick={()=>{openPortalSection("requests","portal-requests");}}><FileText size={20}/><span>{rtl?"طلباتي":"My requests"}</span></button>
-            <button onClick={()=>{openPortalSection("home","portal-attendance");}}><Clock3 size={20}/><span>{rtl?"الحضور والانصراف":"Attendance"}</span></button>
-            <button onClick={()=>{openPortalSection("leave","portal-balances");}}><CalendarDays size={20}/><span>{rtl?"الإجازات":"My leave"}</span></button>
-            <button onClick={()=>{setRequestPreset("request:Work from home");setRequestOpen(true);setMobileOpen(false);}}><Home size={20}/><span>{rtl?"العمل من المنزل":"Work from home"}</span></button>
-            {authUser?.employee_id&&<button onClick={()=>{setPortalProfileOpen(true);setMobileOpen(false);}}><CircleUserRound size={20}/><span>{rtl?"البيانات الشخصية":"Personal details"}</span></button>}
-            <button onClick={()=>{openPortalSection("home","portal-services");}}><LayoutGrid size={20}/><span>{rtl?"الخدمات":"Services"}</span></button>
-            <button onClick={()=>{setMobileOpen(false);(document.getElementById("portal-help") as HTMLDialogElement)?.showModal();}}><CircleHelp size={20}/><span>{rtl?"الدعم والمساعدة":"Help & support"}</span></button>
-          </>}
         </nav>
         {canOpen("portal")&&<div className="sidebar-bottom"><button onClick={()=>void logout()}><LogOut size={20}/><span>{rtl?"تسجيل الخروج":"Sign out"}</span></button></div>}
       </aside>
@@ -445,7 +430,6 @@ export function HRApp() {
       {requestOpen && <EmployeeRequestDrawer rtl={rtl} preset={requestPreset} close={() => {setRequestOpen(false);setRequestPreset("");}} submit={async (payload) => { const result=await hrApi({action:"create_request",...payload}); window.dispatchEvent(new Event("hr-data-changed")); setRequestOpen(false);setRequestPreset(""); notify(result.status==="hr_approved"?(rtl?"تم تسجيل الإجازة واعتمادها للموظف":"Leave recorded and approved for the employee"):(rtl?"تم إرسال الطلب وحجز الرصيد بنجاح":"Request submitted and balance reserved successfully")); }} />}
       {Boolean(authUser?.must_change_password)&&<PasswordChange rtl={rtl} forced onChanged={()=>setAuthUser(current=>current?{...current,must_change_password:0}:current)}/>}
       {portalProfileOpen&&authUser?.employee_id&&<EmployeeProfile360 rtl={rtl} employeeId={authUser.employee_id} close={()=>setPortalProfileOpen(false)} onEdit={()=>{setPortalProfileOpen(false);if(canOpen("employees"))goTo("employees",authUser.employee_id!);}}/>}
-      {canOpen("portal")&&<dialog id="portal-help" className="portal-help" dir={rtl?"rtl":"ltr"}><h2>{rtl?"الدعم والمساعدة":"Help & support"}</h2><p>{rtl?"لمراجعة طلبك ومسار اعتماده، افتح الطلب من بطاقة الأحدث وحالاتها.":"Open a recent request to review its details and approval timeline."}</p><p>{rtl?"إذا كانت بصمة الحضور ناقصة أو غير صحيحة، استخدم «مشكلة في الحضور» لإرسال طلب تصحيح.":"For a missing or incorrect punch, use Attendance issue to submit a correction."}</p><p>{rtl?"للاستفسارات المتعلقة ببياناتك أو أرصدتك، تواصل مع مسؤول الموارد البشرية في شركتك.":"For questions about your details or balances, contact your company's HR representative."}</p><form method="dialog"><button className="primary">{rtl?"فهمت":"Got it"}</button></form></dialog>}
       {toast && <div className="toast"><CheckCircle2 size={20} />{toast}</div>}
       <DecisionPrompt rtl={rtl} />
     </div>

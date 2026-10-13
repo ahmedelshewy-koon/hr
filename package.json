@@ -10,6 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && node --test tests/*.test.mjs",
+    "test:payroll-isolated": "node --experimental-transform-types scripts/payroll-isolated-e2e.mjs --e2e",
     "lint": "eslint app db worker tests vite.config.ts drizzle.config.ts next.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

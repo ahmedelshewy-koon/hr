@@ -1,7 +1,7 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { allowsLocalPortalLogin } from "../../local-platform-access";
 import { appOrigin, isSecureRequest } from "../../app-origin";
-import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPassword, portalLoginEmail, portalSessionCookie, readPortalSession, verifyBootstrapPassword, verifyPassword } from "../../portal-auth";
+import { clearPortalSessionCookie, createPortalSession, ensureAuthSchema, hashPassword, portalLoginEmail, portalSessionCookie, readPortalSession, registerPortalSession, requirePortalSession, revokePortalSession, verifyBootstrapPassword, verifyPassword } from "../../portal-auth";
 import { createDatabase, type PostgresDatabase } from "../../../db/postgres";
 import { enforceRateLimit, enforceWriteOrigin } from "../api-security";
 import { PAGE_MODULES, filterAvailablePages } from "../../page-availability";
@@ -63,6 +63,7 @@ export async function GET(request: Request) {
     await requirePlatformAccess(request);await ensureAuthSchema(d1);
     const session = await readPortalSession(request);
     if (!session) return Response.json({ authenticated:false, user:null }, { headers:noStore });
+    try { await requirePortalSession(request,d1); } catch { return Response.json({authenticated:false,user:null},{headers:{...noStore,"set-cookie":clearPortalSessionCookie(isSecure(request))}}); }
     const user = await d1.prepare("SELECT u.id,u.email,u.status,u.session_version,u.must_change_password,u.employee_id,r.name AS role_name,r.name_en AS role_name_en,r.name_ar AS role_name_ar,e.name_en AS employee_name,e.name_ar AS employee_name_ar,e.department_id,d.name_en AS department_name,d.name_ar AS department_name_ar FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN employees e ON e.id=u.employee_id LEFT JOIN departments d ON d.id=e.department_id WHERE u.id=?").bind(session.userId).first<Record<string,unknown>>();
     const valid=Boolean(user&&user.status==="active"&&Number(user.session_version)===session.sessionVersion&&String(user.email).toLowerCase()===session.email);
     if(valid)user!.allowed_pages=await allowedPagesForUser(d1,Number(user!.id),String(user!.role_name));
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
     const expiryDays=Math.max(0,Number(securityValues.passwordExpiryDays)||0);if(expiryDays&&(!user!.password_hash||!user!.password_changed_at||new Date(user!.password_changed_at).getTime()<Date.now()-expiryDays*86400000)){user!.must_change_password=1;await d1.prepare("UPDATE users SET must_change_password=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(user!.id).run();}
     const sessionSeconds=Math.min(86400,Math.max(900,(Number(securityValues.sessionMinutes)||480)*60));
     const token = await createPortalSession(user!,sessionSeconds);
+    await registerPortalSession(d1,token,user!.id);
     const roleLabels=await d1.prepare("SELECT name_en,name_ar FROM roles WHERE name=?").bind(user!.role_name).first<{name_en:string|null;name_ar:string|null}>(),allowedPages=await allowedPagesForUser(d1,user!.id,user!.role_name);
     return Response.json({ authenticated:true, user:{id:user!.id,email:user!.email,role_name:user!.role_name,role_name_en:roleLabels?.name_en,role_name_ar:roleLabels?.name_ar,employee_id:user!.employee_id,must_change_password:user!.must_change_password,allowed_pages:allowedPages} }, { headers:{ "set-cookie":portalSessionCookie(token,isSecure(request),sessionSeconds), ...noStore } });
   } catch(error) { return error instanceof Response ? error : Response.json({ error:"تعذر تسجيل الدخول" }, { status:500,headers:noStore }); }
@@ -110,7 +112,7 @@ export async function PATCH(request: Request) {
   try {
     enforceWriteOrigin(request);
     await requirePlatformAccess(request);await ensureAuthSchema(d1);
-    const session=await readPortalSession(request);if(!session)throw new Response("Portal login required",{status:401});
+    const session=await requirePortalSession(request,d1);
     await enforceRateLimit(d1,request,"password-change",5,3600,session.userId);
     const body=await request.json() as {currentPassword?:unknown;newPassword?:unknown};
     const currentPassword=typeof body.currentPassword==="string"?body.currentPassword:"";const newPassword=typeof body.newPassword==="string"?body.newPassword:"";
@@ -122,9 +124,10 @@ export async function PATCH(request: Request) {
     await d1.prepare("UPDATE users SET password_hash=?,must_change_password=0,password_changed_at=CURRENT_TIMESTAMP,session_version=?,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(passwordHash,nextVersion,user.id).run();
     await d1.prepare("INSERT INTO audit_logs (user_id,action,module,record_type,record_id,ip_address,created_at) VALUES (?,'password_change','authentication','user',?,?,CURRENT_TIMESTAMP)").bind(user.id,String(user.id),request.headers.get("cf-connecting-ip")).run();
     const token=await createPortalSession({id:user.id,email:user.email,session_version:nextVersion});
+    await registerPortalSession(d1,token,user.id);
     return Response.json({ok:true},{headers:{"set-cookie":portalSessionCookie(token,isSecure(request)),...noStore}});
   } catch(error){return error instanceof Response?error:Response.json({error:"تعذر تغيير كلمة المرور"},{status:500,headers:noStore});}
   finally{await d1.close();}
 }
 
-export async function DELETE(request: Request) { try{enforceWriteOrigin(request);return Response.json({ authenticated:false }, { headers:{ "set-cookie":clearPortalSessionCookie(isSecure(request)), ...noStore } });}catch(error){return error instanceof Response?error:Response.json({error:"Unable to sign out"},{status:500});} }
+export async function DELETE(request: Request) { const db=createDatabase();try{enforceWriteOrigin(request);await revokePortalSession(db,request);return Response.json({ authenticated:false }, { headers:{ "set-cookie":clearPortalSessionCookie(isSecure(request)), ...noStore } });}catch(error){return error instanceof Response?error:Response.json({error:"Unable to sign out"},{status:500});}finally{await db.close();} }

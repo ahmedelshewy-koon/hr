@@ -44,7 +44,8 @@ test("every employee-facing read path applies the branch HR scope", async () => 
 
 test("per-employee HR writes check scope and only Super Admin changes an account's HR visibility", async () => {
   const hr = await read("app/api/hr/route.ts");
-  assert.ok((hr.match(/await assertEmployeeInScope\(d1,user,/g) || []).length >= 9);
+  assert.ok((hr.match(/await assertEmployeeInScope\(d1,user,/g) || []).length >= 7);
+  assert.match(hr, /"save_salary_structure","save_loan","save_tax_bracket","save_insurance_rate"/);
   assert.match(hr, /if\(hrDataScope!==null&&user\.role_name!=="Super Admin"\)throw new Response\("Only the system administrator can change HR visibility"/);
   assert.match(hr, /hr_data_scope=COALESCE\(\?,hr_data_scope\)/);
   assert.match(hr, /action==="save_company"\|\|action==="save_hr_responsible"\)\{[\s\S]{0,200}assertNotBranchHr\(user\);/);

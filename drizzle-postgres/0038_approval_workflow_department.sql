@@ -1,0 +1,6 @@
+ALTER TABLE "approval_workflows" DROP CONSTRAINT IF EXISTS "approval_workflows_company_id_request_type_key";--> statement-breakpoint
+ALTER TABLE "approval_workflow_runs" ADD COLUMN IF NOT EXISTS "department_id" integer;--> statement-breakpoint
+ALTER TABLE "approval_workflows" ADD COLUMN IF NOT EXISTS "department_id" integer;--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'approval_workflow_runs_department_id_departments_id_fk') THEN ALTER TABLE "approval_workflow_runs" ADD CONSTRAINT "approval_workflow_runs_department_id_departments_id_fk" FOREIGN KEY ("department_id") REFERENCES "public"."departments"("id") ON DELETE no action ON UPDATE no action; END IF; END $$;--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'approval_workflows_department_id_departments_id_fk') THEN ALTER TABLE "approval_workflows" ADD CONSTRAINT "approval_workflows_department_id_departments_id_fk" FOREIGN KEY ("department_id") REFERENCES "public"."departments"("id") ON DELETE no action ON UPDATE no action; END IF; END $$;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_approval_workflows_scope" ON "approval_workflows" USING btree ("company_id","request_type",coalesce("department_id",0));

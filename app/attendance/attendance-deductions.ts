@@ -24,9 +24,9 @@ export type DayOvertime = { rule: DeductionRule | null; minutes: number; multipl
 
 const EXCUSED = ["resolved", "dismissed"];
 const clock = (value: unknown) => /^([01]\d|2[0-3]):[0-5]\d/.test(String(value ?? "")) ? Number(String(value).slice(0, 2)) * 60 + Number(String(value).slice(3, 5)) : null;
-const end = (rule: DeductionRule) => (rule.max_minutes === null || rule.max_minutes === undefined ? Infinity : Number(rule.max_minutes));
-const inRange = (rule: DeductionRule, minutes: number) => Number(rule.min_minutes ?? 0) <= minutes && minutes <= end(rule);
-const mostSpecific = (rules: DeductionRule[]) => [...rules].sort((a, b) => Number(b.min_minutes ?? 0) - Number(a.min_minutes ?? 0) || end(a) - end(b) || a.id - b.id)[0] ?? null;
+export const end = (rule: DeductionRule) => (rule.max_minutes === null || rule.max_minutes === undefined ? Infinity : Number(rule.max_minutes));
+export const inRange = (rule: DeductionRule, minutes: number) => Number(rule.min_minutes ?? 0) <= minutes && minutes <= end(rule);
+export const mostSpecific = (rules: DeductionRule[]) => [...rules].sort((a, b) => Number(b.min_minutes ?? 0) - Number(a.min_minutes ?? 0) || end(a) - end(b) || a.id - b.id)[0] ?? null;
 
 export async function loadDeductionRules(db: PostgresDatabase | TransactionDatabase): Promise<DeductionRule[]> {
   const rows = await db.prepare("SELECT id,name_en,name_ar,rule_type,min_minutes,max_minutes,deduction_type,value,overtime_multiplier,absence_notice FROM deduction_rules WHERE status='active' ORDER BY id").all<DeductionRule>();
@@ -44,7 +44,7 @@ export function minutesAfterStart(day: AttendanceDay): number {
 
 export const absenceNotice = (day: AttendanceDay) => (EXCUSED.includes(String(day.absence_exception_status)) ? "with_notice" : "without_notice");
 
-function amounts(rule: DeductionRule): DayDeduction {
+export function amounts(rule: DeductionRule): DayDeduction {
   const value = Number(rule.value) || 0;
   if (rule.deduction_type === "fixed_amount") return { rule, wageDays: 0, fixedAmount: value };
   if (rule.deduction_type === "days_of_wage") return { rule, wageDays: value, fixedAmount: 0 };

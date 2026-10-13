@@ -1,4 +1,5 @@
 import { requireEmployeeHr, assertEmployeeHr, assertEmployeeManager } from "../employees/hr-assignment";
+import { nextRequestCode } from "../approvals/request-code";
 import type { PostgresDatabase, TransactionDatabase } from "../../db/postgres";
 import { availableLeaveBalance, calculateLeaveDuration } from "./leave-calculation";
 import { loadCalendarHolidays } from "./holiday-store";
@@ -33,7 +34,9 @@ async function writeAudit(db:Db,input:{request:Request;actor:LeaveActor;action:s
 
 async function ensureBalance(db:Db,employee:Employee,leaveType:LeaveType,year:number){
   const entitlement=Number(leaveType.default_days)||0;
-  await db.prepare("INSERT INTO leave_balances (employee_id,leave_type_id,year,entitlement,used,pending) VALUES (?,?,?,?,0,0) ON CONFLICT(employee_id,leave_type_id,year) DO UPDATE SET entitlement=CASE WHEN leave_balances.used=0 AND leave_balances.pending=0 THEN excluded.entitlement ELSE leave_balances.entitlement END")
+  // An existing yearly balance may have a custom entitlement set in Vacation Setup.
+  // Defaults initialize a missing year only; they never overwrite a reviewed balance.
+  await db.prepare("INSERT INTO leave_balances (employee_id,leave_type_id,year,entitlement,used,pending) VALUES (?,?,?,?,0,0) ON CONFLICT(employee_id,leave_type_id,year) DO NOTHING")
     .bind(employee.id,leaveType.id,year,entitlement).run();
   const balance=await db.prepare("SELECT * FROM leave_balances WHERE employee_id=? AND leave_type_id=? AND year=? FOR UPDATE").bind(employee.id,leaveType.id,year).first<LeaveBalance>();
   if(!balance) response("Unable to initialize leave balance",500);
@@ -102,7 +105,7 @@ async function createLeaveInTx(tx:TransactionDatabase,input:CreateLeaveInput){
       if(!changed) response("Leave balance changed while this request was being submitted. Please try again.",409);
     }
     const sequence=await tx.prepare("SELECT nextval(pg_get_serial_sequence('requests','id'))::int AS id").first<{id:number}>();
-    const id=Number(sequence!.id),code=`REQ-${1000+id}`;
+    const id=Number(sequence!.id),code=await nextRequestCode(tx,id);
     const details={leave:{balanceId:balance.id,leaveTypeId:leaveType.id,requestedDays:duration.chargeableDays,balanceYear:year,managerApproval,hrApproval,createdOnBehalfBy:input.onBehalf?{userId:input.actor.id,role:input.onBehalf}:null,chargeableDates:duration.chargeableDates,excludedWeekends:duration.excludedWeekends,excludedHolidays:duration.excludedHolidays},attachmentName:report?.name??null,attachment:report?{documentId:report.id,name:report.name}:null};
     await tx.prepare("INSERT INTO requests (id,request_code,employee_id,type,leave_type_id,requested_days,balance_year,balance_effect,from_date,to_date,reason,notes,details_json,status,current_stage,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")
       .bind(id,code,employee.id,leaveType.name_en,leaveType.id,duration.chargeableDays,year,effect,input.fromDate,input.toDate,input.reason,input.notes||null,JSON.stringify(details),status,stage).run();

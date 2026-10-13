@@ -8,7 +8,7 @@ import type { Row } from '../ui-types';
  */
 export type HrSettingsEntity = 'documentTypes' | 'deductionRules' | 'medicalPlans' | 'attendanceTypes';
 export const HR_SETTINGS_ENTITIES: HrSettingsEntity[] = ['documentTypes', 'deductionRules', 'medicalPlans', 'attendanceTypes'];
-export const RULE_TYPES = ['absence', 'late_arrival', 'overtime'] as const;
+export const RULE_TYPES = ['absence', 'late_arrival', 'early_leave', 'overtime'] as const;
 export const DEDUCTION_TYPES = ['fixed_amount', 'daily_wage_percent', 'days_of_wage'] as const;
 export const ABSENCE_NOTICE = ['with_notice', 'without_notice'] as const;
 export const COVERAGE_TYPES = ['basic', 'standard', 'premium', 'vip'] as const;
@@ -69,7 +69,7 @@ export function validateDocumentType(input: Row) {
 export function validateDeductionRule(input: Row) {
   const rule_type = oneOf(input.rule_type, RULE_TYPES, 'rule_type', ['نوع القاعدة', 'Rule type']);
   const start = number(input.min_minutes, 'min_minutes', ['من (دقيقة)', 'From (minutes)'], 0, MAX_MINUTES, true);
-  const min_minutes = rule_type === 'late_arrival' ? required(start, 'min_minutes', ['بداية النطاق', 'Range start']) : start;
+  const min_minutes = rule_type === 'late_arrival' || rule_type === 'early_leave' ? required(start, 'min_minutes', ['بداية النطاق', 'Range start']) : start;
   const max_minutes = number(input.max_minutes, 'max_minutes', ['إلى (دقيقة)', 'To (minutes)'], 0, MAX_MINUTES, true);
   if (max_minutes !== null && (min_minutes === null || max_minutes < min_minutes)) fail('INVALID_RANGE', 'max_minutes', 'نهاية النطاق يجب ألا تقل عن بدايته', 'Range end must not be less than its start');
   const absence_notice = rule_type === 'absence' && text(input.absence_notice)
@@ -93,7 +93,7 @@ export function overlappingRule(rules: Row[], candidate: Row): Row | null {
   const end = (row: Row) => (row.max_minutes === null || row.max_minutes === undefined ? Infinity : Number(row.max_minutes));
   return rules.find(rule => Number(rule.id) !== Number(candidate.id || 0) && rule.status === 'active' && rule.rule_type === candidate.rule_type
     && !(rule.rule_type === 'absence' && rule.absence_notice && candidate.absence_notice && rule.absence_notice !== candidate.absence_notice)
-    && !(rule.rule_type === 'late_arrival' && rule.value === 0 && candidate.value === 0)
+    && !((rule.rule_type === 'late_arrival' || rule.rule_type === 'early_leave') && rule.value === 0 && candidate.value === 0)
     && Number(rule.min_minutes) <= end(candidate) && Number(candidate.min_minutes) <= end(rule)) ?? null;
 }
 

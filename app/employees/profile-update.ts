@@ -10,8 +10,9 @@ import { resolvedContractEndDate } from './contract-policy.ts';
 import { validateCompanyHr } from './company-hr-catalog.ts';
 import { resolveEmployeeCostCenter } from '../cost-centers/catalog.ts';
 import { assertEmployeeCodeFree, cleanEmployeeCode } from './employee-code.ts';
+import { normalizeEmployeePayrollChange } from '../payroll/employee-setup.ts';
 
-const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',nationalityCountry:'nationality_country',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',employmentStatus:'employment_status',salaryCurrency:'salary_currency',salaryCountry:'salary_country',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
+const textFields:Record<string,string>={nameEn:'name_en',nameAr:'name_ar',workEmail:'work_email',fingerprintCode:'fingerprint_code',personalPhone:'personal_phone',workPhone:'work_phone',nationality:'nationality',nationalityCountry:'nationality_country',religion:'religion',passportNumber:'passport_number',gender:'gender',birthDate:'birth_date',identificationNumber:'identification_number',address:'address',startDate:'start_date',endDate:'end_date',terminationDate:'termination_date',dopayEmployeeNumber:'dopay_employee_number',employmentStatus:'employment_status',salaryCurrency:'salary_currency',salaryCountry:'salary_country',country:'country',workLocation:'work_location',employmentType:'employment_type',scheduleType:'schedule_type',workDays:'work_days',checkInTime:'check_in_time',checkOutTime:'check_out_time',bankName:'bank_name',bankAccountNumber:'bank_account_number',bankIban:'bank_iban'};
 
 /** Called inside the authorized API transaction. Omitted fields are never rewritten. */
 export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:number,payload:Row,actor:{id:number;ip?:string|null;employeeId?:number|null;roleName?:string},afterSave?:(db:TransactionDatabase)=>Promise<void>) {
@@ -24,16 +25,39 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
   const assignment=await validateEmployeeWrite(db,employeeId,payload,before);
   await validateCompanyHr(db,payload,before);
   const updates:Row={};
+  if(['salary','salaryCurrency','salaryCountry','workingBusinessUnitId'].some(key=>payload[key]!==undefined)){
+    const ready=await db.prepare("SELECT to_regclass('public.hr_managers') IS NOT NULL AND to_regclass('public.business_units') IS NOT NULL AS ready").first<{ready:boolean}>();
+    if(!ready?.ready)throw new Response('Payroll rebuild requires unapplied migrations 0052 and 0053',{status:503});
+    const privileged=actor.roleName==='Super Admin'||Boolean(await db.prepare("SELECT 1 AS allowed FROM hr_managers WHERE user_id=? AND is_active=1 AND admin_order=0").bind(actor.id).first());
+    let payroll:Row;
+    try{payroll=normalizeEmployeePayrollChange(payload,before,privileged);}catch(error){throw new Response(error instanceof Error?error.message:'Invalid payroll setup',{status:error instanceof Error&&/privilege/i.test(error.message)?403:400});}
+    if(payroll.salary_currency){
+      const active=await db.prepare("SELECT 1 AS active FROM payroll_currencies WHERE code=? AND is_active=1").bind(payroll.salary_currency).first();
+      if(!active)throw new Response('Configure the salary currency and its SAR rate first',{status:409});
+    }
+    if(payroll.working_business_unit_id){
+      const active=await db.prepare("SELECT 1 AS active FROM business_units WHERE id=? AND is_active=1").bind(payroll.working_business_unit_id).first();
+      if(!active)throw new Response('Working Business Unit is not active',{status:400});
+    }
+    Object.assign(updates,payroll);
+  }
   // These columns predate the optional organizational tables and must also save in fallback mode.
   for(const column of ['company_id','department_id','job_title_id','manager_id','hr_user_id'])updates[column]=assignment[column];
   for(const [key,column] of Object.entries(textFields)){
+    if(key==='salaryCurrency'||key==='salaryCountry')continue;
     if(payload[key]===undefined)continue;
     const limit=key==='address'?1000:['religion','passportNumber'].includes(key)?100:500;
     const value=String(payload[key]??'').trim().slice(0,limit);
     if(['nameEn','nameAr','workEmail','startDate','country'].includes(key)&&!value)throw new Response(`${key} is required`,{status:400});
     updates[column]=key==='workEmail'?value.toLowerCase():value||null;
   }
-  if(payload.salaryCountry!==undefined&&!['','Saudi Arabia','Egypt'].includes(String(payload.salaryCountry??'').trim()))throw new Response('Invalid payroll country',{status:400});
+  if(payload.terminationDate!==undefined||payload.dopayEmployeeNumber!==undefined){
+    const ready=await db.prepare("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employees' AND column_name='termination_date') AS ready").first<{ready:boolean}>();
+    if(!ready?.ready){if(payload.terminationDate||payload.dopayEmployeeNumber)throw new Response('Payroll rebuild requires unapplied migrations 0052 and 0053',{status:503});delete updates.termination_date;delete updates.dopay_employee_number;}
+  }
+  if(payload.salaryCountry!==undefined&&!['','Saudi Arabia','Egypt','KSA'].includes(String(payload.salaryCountry??'').trim()))throw new Response('Invalid payroll country',{status:400});
+  if(payload.terminationDate!==undefined){const date=String(payload.terminationDate||'').trim();if(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<String(payload.startDate??before.start_date).slice(0,10)))throw new Response('Invalid termination date',{status:400});}
+  if(payload.employmentStatus==='terminated'&&before.employment_status!=='terminated'&&!String(payload.terminationDate||'').trim())throw new Response('Termination date required',{status:400});
   if(payload.fingerprintRequired!==undefined)updates.fingerprint_required=payload.fingerprintRequired===false||payload.fingerprintRequired==='false'||payload.fingerprintRequired===0||payload.fingerprintRequired==='0'?0:1;
   if(payload.costCenterId!==undefined)updates.cost_center_id=await resolveEmployeeCostCenter(db,payload.costCenterId,before.cost_center_id);
   if(payload.employeeCode!==undefined){
@@ -41,6 +65,7 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
     if(code!==before.employee_code){await assertEmployeeCodeFree(db,code,employeeId);updates.employee_code=code;}
   }
   for(const [key,column] of Object.entries({salary:'salary',graceMinutes:'grace_minutes',requiredDailyMinutes:'required_daily_minutes'})){
+    if(key==='salary')continue;
     if(payload[key]===undefined)continue;
     const value=payload[key]===''||payload[key]===null?null:Number(payload[key]);
     if(value!==null&&(!Number.isFinite(value)||value<0))throw new Response(`Invalid ${key}`,{status:400});

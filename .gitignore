@@ -68,3 +68,5 @@ yarn-error.log*
 *.bak
 *.dump
 *.sql
+# migrations are source code, not backups
+!/drizzle-postgres/*.sql

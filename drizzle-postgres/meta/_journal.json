@@ -365,6 +365,20 @@
       "when": 1791310000000,
       "tag": "0051_attendance_ingest_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791320000000,
+      "tag": "0052_timesheet_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791321000000,
+      "tag": "0053_payroll_rebuild",
+      "breakpoints": true
     }
   ]
 }

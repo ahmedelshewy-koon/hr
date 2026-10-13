@@ -205,3 +205,42 @@ html[data-theme="dark"] .app .dashboard-my-tasks .my-tasks-header { background:t
 html[data-theme="dark"] .app .dashboard-my-tasks :is(.my-tasks-overview,.my-task-card) { background:var(--sana-table-dark); border-color:var(--sana-border-dark-inner); box-shadow:none; }
 html[data-theme="dark"] .app .dashboard-my-tasks :is(.my-tasks-message,.my-tasks-loading) { margin:0 16px 16px; border:1px solid var(--sana-border-dark-inner); border-radius:16px; background:var(--sana-table-dark); }
 html[data-theme="dark"] .app .dashboard-my-tasks .my-task-skeleton { background:linear-gradient(105deg,var(--sana-canvas-dark) 30%,rgba(255,255,255,.09) 45%,var(--sana-canvas-dark) 60%); background-size:250% 100%; }
+
+/* ==========================================================================
+   22. Header / welcome / KPI / table correction (colours and surface hierarchy only).
+   #031212->#083934 = outer page only. #021615->#000 = header + main cards. #000C0C = dense inner surfaces.
+   ========================================================================== */
+
+/* 22.1 Main cards that still rendered flat #111B1B. */
+html[data-theme="dark"] .app .content :is(.ats-panel,.lifecycle-panel,.learning-panel,.asset-panel,.rp-panel,.rp-toolbar,.user-access-card,.portal-hero,.org-settings-intro,article:not([class])) {
+  background:var(--sana-card-dark); border-color:var(--sana-border-dark); border-radius:var(--sana-radius-card-dark); box-shadow:var(--sana-shadow-card-dark);
+}
+html[data-theme="dark"] .app .content .portal-hero { padding:24px; }
+html[data-theme="dark"] .app .content .portal-hero :is(h1,h2) { color:var(--sana-heading-dark); }
+html[data-theme="dark"] .app .content .portal-hero p { color:var(--sana-text-2-dark); }
+html[data-theme="dark"] .app .content :is(.balance-item,.portal-attendance dl>div,.portal-request-list>button,.portal-action-grid button,.portal-year) { background:var(--sana-table-dark); border-color:var(--sana-border-dark-inner); box-shadow:none; }
+
+/* 22.2 Table body = #000C0C inset in the card (16px from the card edge), #021914 separators, no row shadows. */
+html[data-theme="dark"] .app .content :is(.lifecycle-table-wrap,.decisions-table-wrap,.learning-table-wrap,.settings-table-wrap,.official-holiday-scroll,.asset-table,.data-table) {
+  background:var(--sana-table-dark); border:1px solid var(--sana-border-dark-inner); border-radius:16px; overflow-x:auto;
+}
+html[data-theme="dark"] .app .content :is(.lifecycle-panel,.learning-panel,.asset-panel,.ats-panel,.panel) > :is(.lifecycle-table-wrap,.learning-table-wrap,.asset-table,.data-table,.table-scroll) { margin:0 16px 16px; }
+html[data-theme="dark"] .app .content :is(table,.data-table,.lifecycle-table,.learning-table,.decisions-table,.settings-table) { background:transparent; }
+html[data-theme="dark"] .app .content :is(thead th,.data-table .tr.th) { background:var(--sana-table-dark); color:var(--sana-text-2-dark); border-bottom:1px solid var(--sana-border-dark-inner); }
+html[data-theme="dark"] .app .content :is(tbody tr,.data-table .tr:not(.th)) { background:transparent; box-shadow:none; }
+html[data-theme="dark"] .app .content :is(tbody tr:hover,.data-table .tr:not(.th):hover) { background:color-mix(in srgb,var(--sana-hover-dark) 38%,var(--sana-table-dark)); }
+html[data-theme="dark"] .app .content :is(td,th) { font-size:13px; line-height:1.5; }
+
+/* 22.3 Scrollbars stay dark and thin (page scroll hides its bar already). */
+html[data-theme="dark"] .app .content * { scrollbar-width:thin; scrollbar-color:var(--sana-border-dark) transparent; }
+html[data-theme="dark"] .app .content *::-webkit-scrollbar { height:8px; width:8px; }
+html[data-theme="dark"] .app .content *::-webkit-scrollbar-track { background:transparent; }
+html[data-theme="dark"] .app .content *::-webkit-scrollbar-thumb { background:var(--sana-border-dark); border-radius:8px; }
+
+/* 22.4 Tables fit the content width first (the Light min-widths forced horizontal scroll); real overflow still scrolls, with the thin dark bar. */
+html[data-theme="dark"] .app .content :is(.lifecycle-table,.learning-table.courses,.learning-table.enrollments,.official-holiday-table,.documents-table,.payroll-items-table,.biometric-table,.record-table) { min-width:0; width:100%; }
+html[data-theme="dark"] .app .content :is(.lifecycle-table,.learning-table) :is(td,th) { padding:12px 8px; overflow-wrap:break-word; word-break:normal; }
+html[data-theme="dark"] .app .content :is(.lifecycle-table,.learning-table) th { white-space:nowrap; }
+html[data-theme="dark"] .app .content .learning-table.courses { min-width:1180px; }
+html[data-theme="dark"] .app .content .official-holidays-head { background:transparent; border-bottom-color:var(--sana-border-dark-inner); }
+html[data-theme="dark"] .app .content :is(.lifecycle-table,.learning-table) :is(td,th) :is(button,.status,.badge) { white-space:nowrap; }

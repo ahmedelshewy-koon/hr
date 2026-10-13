@@ -5,19 +5,19 @@
    Source: docs/SANA_DARK_MASTER_PROMPT.md */
 [data-theme="dark"] {
   --sana-bg-dark-start:#031212; --sana-bg-dark-end:#083934;
-  --sana-bg-dark:linear-gradient(180deg,var(--sana-bg-dark-start),var(--sana-bg-dark-end));
+  --sana-bg-dark:linear-gradient(135deg,var(--sana-bg-dark-start),var(--sana-bg-dark-end));
   --sana-shell-dark:#111B1B;
 
   --sana-card-dark-start:#021615; --sana-card-dark-end:#000000;
   --sana-card-dark:linear-gradient(135deg,var(--sana-card-dark-start),var(--sana-card-dark-end));
-  --sana-topbar-dark:linear-gradient(135deg,var(--sana-bg-dark-start),var(--sana-bg-dark-end));
+  --sana-topbar-dark:var(--sana-card-dark);
   --sana-table-dark:#000C0C;
 
   --sana-border-dark:#073028;
   --sana-border-dark-inner:#021914;
   --sana-switch-border-dark:#073028;
 
-  --sana-primary-dark:linear-gradient(100deg,#1C7B61,#0B4237);
+  --sana-primary-dark:linear-gradient(135deg,#1C7B61,#0B4237);
   --sana-primary-hover-dark:#0B4237;
   --sana-secondary-bg-dark:#111B1B;
   --sana-secondary-border-dark:#25C6A3;

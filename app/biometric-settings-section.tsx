@@ -7,7 +7,7 @@ import { BiometricWorkspace } from './biometric-workspace';
 import { InfoNotice, StatusBadge } from './settings/settings-ui';
 import type { Row } from './ui-types';
 
-type SetupData = { canManageDevices: boolean; setupUnavailable: boolean; agents: Row[]; devices: Row[]; statusDevices: Row[] };
+type SetupData = { canManageDevices: boolean; setupUnavailable: boolean; agents: Row[]; devices: Row[]; statusDevices: Row[]; ingestSources: Row[] };
 const dateTime = (value: unknown, rtl: boolean, timezone = 'Africa/Cairo') => {
   const instant = value ? new Date(String(value)) : null;
   if (!instant || !Number.isFinite(instant.getTime())) return '—';
@@ -24,7 +24,7 @@ export function useBiometricSetup() {
       const response = await fetch('/api/hr?view=biometric&tab=users&page=1', { cache: 'no-store' });
       if (!response.ok) throw new Error('load failed');
       const body = await response.json();
-      setData({ canManageDevices: Boolean(body.canManageDevices), setupUnavailable: Boolean(body.setupUnavailable), agents: body.agents || [], devices: body.allDevices || [], statusDevices: body.devices || [] });
+      setData({ canManageDevices: Boolean(body.canManageDevices), setupUnavailable: Boolean(body.setupUnavailable), agents: body.agents || [], devices: body.allDevices || [], statusDevices: body.devices || [], ingestSources: body.ingestSources || [] });
       setFailed(false);
     } catch { setFailed(true); }
   }, []);
@@ -77,7 +77,7 @@ export function BiometricSettingsSection({ rtl, notify, data, failed, reload }: 
       {!data.devices.length && <li className="settings-muted">{t('No biometric device yet.', 'لم تتم إضافة جهاز بصمة بعد.')}</li>}
     </ul>
     <button type="button" className="primary" onClick={() => setOpen(true)}><Settings size={16} aria-hidden="true" />{t('Manage devices', 'إدارة الأجهزة')}</button>
-    {open && <BiometricSetup rtl={rtl} agents={data.agents} devices={data.devices} notify={notify} onChanged={() => void reload()} onClose={() => setOpen(false)} />}
+    {open && <BiometricSetup rtl={rtl} agents={data.agents} devices={data.devices} sources={data.ingestSources} notify={notify} onChanged={() => void reload()} onClose={() => setOpen(false)} />}
     <div className="biometric-settings-data" style={{ marginTop: 24 }}><BiometricWorkspace rtl={rtl} employees={employees} notify={notify} onMapped={() => undefined} /></div>
   </div>;
 }

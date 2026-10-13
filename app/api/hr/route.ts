@@ -22,7 +22,8 @@ import { validIsoDate } from "../../leave/leave-calculation";
 import { mapAttendanceDeviceUser } from "../../attendance/zkteco-service";
 import { ABSENCE_EXCEPTION_STATUS_SQL, loadDeductionRules, summarizeAttendanceDeductions } from "../../attendance/attendance-deductions";
 import { readBiometricWorkspace } from "../../attendance/biometric-query";
-import { newAgentToken, parseDeviceInput } from "../../attendance/biometric-agents";
+import { newAgentToken, parseDeviceInput, validTimezone } from "../../attendance/biometric-agents";
+import { newIngestKey } from "../../attendance/biometric-ingest";
 import { apiFailure, enforceRateLimit, enforceWriteOrigin, loadPermissions } from "../api-security";
 import { MANAGED_DEPARTMENTS_CTE } from "../../organization/department-scope";
 import { HR_DATA_SCOPES, branchHrCanSee, branchHrEmployeeIds, branchHrEmployeeSql, isBranchScopedHr, normalizeHrDataScope } from "../../employees/hr-data-scope";
@@ -899,9 +900,37 @@ export async function POST(request: Request) {
       const rows=ids.length?(await d1.prepare(`SELECT s.id,s.status,s.error,d.name AS device_name FROM attendance_device_syncs s JOIN attendance_devices d ON d.id=s.device_id WHERE s.id IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<Row>()).results:[];
       return Response.json({syncs:rows});
     }
-    if(["save_attendance_device","create_attendance_agent","rotate_attendance_agent_token","set_attendance_agent_enabled"].includes(action)) {
+    if(["save_attendance_device","create_attendance_agent","rotate_attendance_agent_token","set_attendance_agent_enabled","create_attendance_ingest_source","rotate_attendance_ingest_key","set_attendance_ingest_enabled"].includes(action)) {
       await authorize(d1,user,"attendance","edit");
       if(user.role_name!=="Super Admin")throw new Response("Only a system administrator can configure biometric devices",{status:403});
+      if(action==="create_attendance_ingest_source"){
+        const name=required(payload.name,"Source name").slice(0,120),country=typeof payload.country==="string"&&payload.country.trim()?payload.country.trim().slice(0,60):null,timezone=typeof payload.timezone==="string"&&payload.timezone.trim()?payload.timezone.trim().slice(0,64):"Africa/Cairo";
+        if(!validTimezone(timezone))throw new Response("Invalid time zone",{status:400});
+        const key=await newIngestKey();
+        const created=await d1.transaction(async tx=>{
+          const source=await tx.prepare("INSERT INTO attendance_ingest_sources (name,key_hash,key_hint,created_by_user_id) VALUES (?,?,?,?) RETURNING id").bind(name,key.hash,key.hint,user.id).first<Row>();
+          const sourceId=Number(source!.id);
+          // Never connected to: records are pushed in. The pseudo address only satisfies the device table's NOT NULL columns.
+          await tx.prepare("INSERT INTO attendance_devices (source_id,name,model,ip_address,port,timezone,country,enabled,status) VALUES (?,?,'API ingest',?,0,?,?,1,'offline')").bind(sourceId,name,"api-source-"+sourceId,timezone,country).run();
+          return sourceId;
+        });
+        await audit(d1,request,user,"biometric_ingest_source_created","attendance","attendance_ingest_source",String(created),null,{name,country,timezone,keyHint:key.hint});
+        return Response.json({ok:true,id:created,key:key.key},{headers:{"cache-control":"no-store"}});
+      }
+      if(action==="rotate_attendance_ingest_key"||action==="set_attendance_ingest_enabled"){
+        const sourceId=Number(payload.sourceId);const source=await d1.prepare("SELECT id,enabled,key_hint FROM attendance_ingest_sources WHERE id=?").bind(sourceId||0).first<Row>();if(!source)throw new Response("Ingest source not found",{status:404});
+        if(action==="rotate_attendance_ingest_key"){
+          const key=await newIngestKey();
+          await d1.prepare("UPDATE attendance_ingest_sources SET key_hash=?,key_hint=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(key.hash,key.hint,sourceId).run();
+          await audit(d1,request,user,"biometric_ingest_key_rotated","attendance","attendance_ingest_source",String(sourceId),{keyHint:source.key_hint},{keyHint:key.hint});
+          return Response.json({ok:true,id:sourceId,key:key.key},{headers:{"cache-control":"no-store"}});
+        }
+        const enabled=payload.enabled?1:0;
+        await d1.prepare("UPDATE attendance_ingest_sources SET enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(enabled,sourceId).run();
+        await d1.prepare("UPDATE attendance_devices SET enabled=?,updated_at=CURRENT_TIMESTAMP WHERE source_id=?").bind(enabled,sourceId).run();
+        await audit(d1,request,user,enabled?"biometric_ingest_source_enabled":"biometric_ingest_source_disabled","attendance","attendance_ingest_source",String(sourceId),{enabled:source.enabled},{enabled});
+        return Response.json({ok:true});
+      }
       if(action==="save_attendance_device"){
         const id=Number(payload.id)||null,input=parseDeviceInput(payload);
         if(input.agentId&&!await d1.prepare("SELECT id FROM attendance_agents WHERE id=?").bind(input.agentId).first())throw new Response("Office connector not found",{status:404});

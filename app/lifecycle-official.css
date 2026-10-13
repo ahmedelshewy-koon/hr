@@ -12,7 +12,7 @@
 .hr-record dd.approved{color:var(--sana-success)}.hr-record dd.withheld{color:var(--sana-danger)}
 .hr-record .record-section{margin-top:16px;break-inside:auto;counter-increment:record-section}
 .hr-record .record-section>h2{display:flex;align-items:center;gap:var(--sana-space-2);margin:0;padding:0 0 var(--sana-space-1);border:0;border-bottom:2px solid var(--sana-teal);background:transparent;color:var(--sana-text);font-size:var(--type-label);font-weight:var(--weight-semibold)}
-.hr-record .record-section>h2::before{content:counter(record-section,decimal-leading-zero);display:inline-grid;place-items:center;min-width:25px;height:21px;padding:0 var(--sana-space-1);background:var(--sana-teal);color:var(--sana-white);font-size:10px;font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
+.hr-record .record-section>h2::before{content:counter(record-section,decimal-leading-zero);display:inline-grid;place-items:center;min-width:25px;height:21px;padding:0 var(--sana-space-1);background:var(--sana-teal);color:var(--sana-on-fill);font-size:10px;font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
 .hr-record .record-fields{width:100%;margin:0;border-collapse:collapse;table-layout:fixed;background:var(--sana-white)}
 .hr-record .record-fields th,.hr-record .record-fields td{height:39px;padding:var(--sana-space-2) var(--sana-space-2);border:1px solid var(--sana-line);text-align:start;vertical-align:middle}
 .hr-record .record-fields th{width:17%;background:var(--sana-canvas);color:var(--sana-text);font-size:var(--type-label)!important;font-weight:var(--weight-medium)!important}

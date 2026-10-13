@@ -6,7 +6,57 @@ import {
 } from "lucide-react";
 import { SanaBrand } from "./sana-brand";
 import { StarMark } from "./login-showcase";
+import { durationLabel, featureLines, priceLabel } from "./plans/format";
 import "./landing.css";
+
+type PublicPlan = Record<string, unknown>;
+
+/** Plans the admin published on the Plans page; the section stays hidden until at least one is shown. */
+function usePublicPlans() {
+  const [plans, setPlans] = useState<PublicPlan[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/plans/public", { signal: controller.signal })
+      .then(response => (response.ok ? response.json() : { plans: [] }))
+      .then((data: { plans?: PublicPlan[] }) => setPlans(Array.isArray(data.plans) ? data.plans : []))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return plans;
+}
+
+function PlansSection({ plans }: { plans: PublicPlan[] }) {
+  if (!plans.length) return null;
+  return (
+    <section className="landing-section landing-section-tint" id="plans" aria-labelledby="plans-title">
+      <div className="landing-shell">
+        <div className="landing-section-head">
+          <p className="landing-kicker">الباقات</p>
+          <h2 id="plans-title">اختر الباقة المناسبة لشركتك</h2>
+        </div>
+        <ul className="landing-plans">
+          {plans.map(plan => {
+            const features = featureLines(plan.features_ar);
+            const featured = Boolean(plan.is_featured);
+            const priced = plan.price !== null && plan.price !== undefined;
+            return (
+              <li className={`landing-plan${featured ? " is-featured" : ""}`} key={String(plan.id)}>
+                {featured && <span className="landing-plan-badge">الأكثر طلبًا</span>}
+                <h3>{String(plan.name_ar)}</h3>
+                {plan.description_ar ? <p className="landing-plan-text">{String(plan.description_ar)}</p> : null}
+                <p className="landing-plan-price"><b>{priceLabel(plan, true)}</b>{priced && <span> / {durationLabel(plan.duration_months, true)}</span>}</p>
+                {!priced && <p className="landing-plan-period">{durationLabel(plan.duration_months, true)}</p>}
+                {plan.max_employees ? <p className="landing-plan-period">حتى {new Intl.NumberFormat("ar-SA-u-nu-arab").format(Number(plan.max_employees))} موظف</p> : null}
+                {features.length > 0 && <ul className="landing-plan-features">{features.map(line => <li key={line}><Check size={14} strokeWidth={2.6} />{line}</li>)}</ul>}
+                <a className={`landing-btn ${featured ? "landing-btn-primary" : "landing-btn-outline"}`} href={DEMO_HREF}>{priced ? "اشترك الآن" : "تواصل معنا"}</a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
+  );
+}
 
 /** The sign-in screen is the same SPA view, reached through this hash so the browser back button returns here. */
 export const LOGIN_HASH = "#login";
@@ -290,6 +340,8 @@ export function LandingPage() {
     return () => observer.disconnect();
   }, []);
 
+  const plans = usePublicPlans();
+  const nav = plans.length ? [...NAV.slice(0, 3), { href: "#plans", label: "الباقات" }, ...NAV.slice(3)] : NAV;
   const closeMenu = () => setMenuOpen(false);
 
   return (
@@ -298,7 +350,7 @@ export function LandingPage() {
         <div className="landing-shell landing-header-row">
           <Wordmark />
           <nav className="landing-nav" aria-label="أقسام الصفحة">
-            {NAV.map(item => <a key={item.href} href={item.href} onClick={closeMenu}>{item.label}</a>)}
+            {nav.map(item => <a key={item.href} href={item.href} onClick={closeMenu}>{item.label}</a>)}
           </nav>
           <div className="landing-header-actions">
             <a className="landing-btn landing-btn-ghost" href={LOGIN_HASH}><LogIn size={18} /> تسجيل الدخول</a>
@@ -309,7 +361,7 @@ export function LandingPage() {
           </div>
         </div>
         <nav id="landing-mobile-nav" className="landing-mobile-nav" aria-label="أقسام الصفحة" hidden={!menuOpen}>
-          {NAV.map(item => <a key={item.href} href={item.href} onClick={closeMenu}>{item.label}</a>)}
+          {nav.map(item => <a key={item.href} href={item.href} onClick={closeMenu}>{item.label}</a>)}
           <a className="landing-btn landing-btn-primary" href={DEMO_HREF} onClick={closeMenu}>احجز عرضًا</a>
         </nav>
       </header>
@@ -420,6 +472,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <PlansSection plans={plans} />
 
         <section className="landing-stats" aria-label="سنع HR بالأرقام">
           <div className="landing-shell">

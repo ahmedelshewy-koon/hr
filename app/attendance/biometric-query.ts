@@ -56,12 +56,15 @@ export async function readBiometricWorkspace(db: PostgresDatabase, url: URL, emp
 async function readBiometricSetup(db: PostgresDatabase) {
   // Until migration 0032 runs, the attendance screen still loads; only device setup is unavailable.
   const migrated = await db.prepare("SELECT to_regclass('attendance_agents') IS NOT NULL AS ready").first<{ ready: boolean }>();
-  if (!migrated?.ready) return { agents: [], allDevices: [], setupUnavailable: true };
-  const [agents, allDevices] = await Promise.all([
+  if (!migrated?.ready) return { agents: [], allDevices: [], ingestSources: [], setupUnavailable: true };
+  // API ingest sources arrive with migration 0051; before it runs, the connector setup keeps working without them.
+  const ingestReady = (await db.prepare("SELECT to_regclass('attendance_ingest_sources') IS NOT NULL AS ready").first<{ ready: boolean }>())?.ready;
+  const [agents, allDevices, ingestSources] = await Promise.all([
     db.prepare("SELECT a.id,a.name,a.enabled,a.token_hint,a.agent_version,a.last_seen_at,a.last_ip,a.created_at,(SELECT count(*)::integer FROM attendance_devices d WHERE d.agent_id=a.id) AS device_count FROM attendance_agents a ORDER BY a.id").all(),
-    db.prepare("SELECT id,agent_id,name,model,ip_address,port,timezone,enabled,status,last_seen_at,last_sync_at,last_error FROM attendance_devices ORDER BY id").all(),
+    db.prepare(ingestReady ? "SELECT id,agent_id,name,model,ip_address,port,timezone,enabled,status,last_seen_at,last_sync_at,last_error FROM attendance_devices WHERE source_id IS NULL ORDER BY id" : "SELECT id,agent_id,name,model,ip_address,port,timezone,enabled,status,last_seen_at,last_sync_at,last_error FROM attendance_devices ORDER BY id").all(),
+    ingestReady ? db.prepare("SELECT s.id,s.name,s.enabled,s.key_hint,s.last_seen_at,s.last_error,d.country,d.timezone,d.user_count,d.log_count,(SELECT count(*)::integer FROM attendance_device_users u WHERE u.device_id=d.id AND u.enabled=1 AND u.employee_id IS NULL) AS unmatched_users FROM attendance_ingest_sources s LEFT JOIN attendance_devices d ON d.source_id=s.id ORDER BY s.id").all() : Promise.resolve({ results: [] }),
   ]);
-  return { agents: agents.results, allDevices: allDevices.results };
+  return { agents: agents.results, allDevices: allDevices.results, ingestSources: ingestSources.results };
 }
 
 

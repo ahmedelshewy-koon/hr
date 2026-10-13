@@ -20,7 +20,7 @@
 .evaluation-pills{display:flex;flex-wrap:wrap;gap:var(--sana-space-1)}
 .evaluation-pills button{padding:var(--sana-space-1) var(--sana-space-2);border:1px solid var(--sana-line);border-radius:var(--sana-radius-pill);background:var(--sana-white);color:var(--sana-text);font-size:var(--type-label);font-weight:var(--weight-semibold);transition:background .12s,color .12s,border-color .12s}
 .evaluation-pills button:hover{border-color:var(--sana-line);color:var(--sana-text-2)}
-.evaluation-pills button.on{border-color:var(--sana-teal-mid);background:var(--sana-teal-mid);color:var(--sana-white)}
+.evaluation-pills button.on{border-color:var(--sana-teal-mid);background:var(--sana-teal-mid);color:var(--sana-on-fill)}
 .evaluation-rate label{display:flex;align-items:center;gap:var(--sana-space-1);color:var(--sana-text-2);font-size:var(--type-label)}
 .evaluation-rate input{width:74px;min-height:36px;padding:var(--sana-space-1) var(--sana-space-2);border:1px solid var(--sana-line);border-radius:var(--sana-radius-control);background:var(--sana-white);color:var(--sana-text);font-weight:var(--weight-bold);text-align:center}
 .evaluation-bar{display:block;height:5px;overflow:hidden;border-radius:var(--sana-radius-pill);background:var(--sana-canvas)}

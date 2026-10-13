@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Copy, KeyRound, Pencil, Plus, Power, Server, X } from "lucide-react";
 import type { Row } from "./ui-types";
 
-type Props = { rtl: boolean; agents: Row[]; devices: Row[]; notify: (message: string) => void; onChanged: () => void; onClose: () => void };
+type Props = { rtl: boolean; agents: Row[]; devices: Row[]; sources?: Row[]; notify: (message: string) => void; onChanged: () => void; onClose: () => void };
 const COUNTRY_TIMEZONES: Record<string, string> = { Egypt: "Africa/Cairo", "Saudi Arabia": "Asia/Riyadh", Jordan: "Asia/Amman" };
 type DeviceForm = { id: number | null; name: string; model: string; ipAddress: string; port: string; timezone: string; country: string; agentId: string; enabled: boolean };
 
@@ -28,7 +28,10 @@ export function connectorInstallCommand(origin: string, token: string) {
   return `[Net.ServicePointManager]::SecurityProtocol='Tls12'; $f="$env:TEMP\\hr-connector-install.ps1"; iwr -UseBasicParsing '${origin}/biometric-agent/install.ps1' -OutFile $f; powershell -NoProfile -ExecutionPolicy Bypass -File $f -ServerUrl '${origin}' -Token '${token}'`;
 }
 
-export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClose }: Props) {
+export function BiometricSetup({ rtl, agents, devices, sources = [], notify, onChanged, onClose }: Props) {
+  const [sourceName, setSourceName] = useState("");
+  const [sourceCountry, setSourceCountry] = useState("Egypt");
+  const [pushKey, setPushKey] = useState<{ source: string; key: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState<DeviceForm | null>(null);
@@ -54,6 +57,17 @@ export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClos
     void run(async () => { const result = await post({ action: "rotate_attendance_agent_token", agentId: agent.id }); showCommand(String(agent.name), result.token); });
   };
   const toggleAgent = (agent: Row) => void run(async () => { await post({ action: "set_attendance_agent_enabled", agentId: agent.id, enabled: !Number(agent.enabled) }); });
+  const createSource = () => run(async () => {
+    const name = sourceName.trim();
+    const result = await post({ action: "create_attendance_ingest_source", name, country: sourceCountry, timezone: COUNTRY_TIMEZONES[sourceCountry] || "Africa/Cairo" });
+    setSourceName(""); setPushKey({ source: name, key: result.key });
+  });
+  const rotateSource = (source: Row) => {
+    if (!window.confirm(t("A new API key will be created and the current key stops working until the sending program is updated. Continue?", "سيتم إنشاء مفتاح API جديد، وسيتوقف المفتاح الحالي حتى يتم تحديثه في البرنامج المرسل. متابعة؟"))) return;
+    void run(async () => { const result = await post({ action: "rotate_attendance_ingest_key", sourceId: source.id }); setPushKey({ source: String(source.name), key: result.key }); });
+  };
+  const toggleSource = (source: Row) => void run(async () => { await post({ action: "set_attendance_ingest_enabled", sourceId: source.id, enabled: !Number(source.enabled) }); });
+  const copyText = async (value: string) => { try { await navigator.clipboard.writeText(value); notify(t("Copied.", "تم النسخ.")); } catch { notify(t("Copy failed; select the text and copy it manually.", "تعذر النسخ؛ حدد النص وانسخه يدويًا.")); } };
   const copy = async () => { try { await navigator.clipboard.writeText(command!.text); setCopied(true); } catch { setCopied(false); } };
   const editDevice = (device?: Row) => {
     const firstAgent = agents.find(agent => Number(agent.enabled));
@@ -112,6 +126,26 @@ export function BiometricSetup({ rtl, agents, devices, notify, onChanged, onClos
               <button className="outline" disabled={busy} onClick={() => toggleAgent(agent)}><Power size={14}/>{Number(agent.enabled) ? t("Disable", "تعطيل") : t("Enable", "تفعيل")}</button>
             </div>; })}
             <div className="bio-setup-add"><input value={agentName} onChange={event => setAgentName(event.target.value)} placeholder={t("Connector name, e.g. Main office", "اسم الرابط، مثل: المكتب الرئيسي")}/><button className="outline" disabled={busy} onClick={() => void createAgent()}><Plus size={15}/>{t("Create connector", "إنشاء رابط")}</button></div>
+          </section>
+          {pushKey && <section className="bio-setup-command" aria-live="polite">
+            <b>{t("API details for", "بيانات الـ API لـ")} {pushKey.source}</b>
+            <ol>
+              <li>{t("In the sending program add a server with this URL and key.", "في البرنامج المرسل أضف سيرفرًا بهذا الرابط وهذا المفتاح.")}</li>
+              <li>{t("Test the connection, then run one manual sync with a small batch before enabling automatic sync.", "اختبر الاتصال، ثم جرّب مزامنة يدوية بدفعة صغيرة قبل تفعيل المزامنة التلقائية.")}</li>
+            </ol>
+            <textarea dir="ltr" readOnly value={window.location.origin + "/api/biometric-ingest"} onFocus={event => event.currentTarget.select()} rows={1}/>
+            <textarea dir="ltr" readOnly value={pushKey.key} onFocus={event => event.currentTarget.select()} rows={2}/>
+            <div className="bio-setup-command-actions"><button className="primary" onClick={() => void copyText(pushKey.key)}><Copy size={16}/>{t("Copy key", "نسخ المفتاح")}</button><small>{t("This key is shown only once. Keep it private.", "هذا المفتاح يظهر مرة واحدة فقط؛ لا تشاركه.")}</small></div>
+          </section>}
+          <section className="bio-setup-section">
+            <h3><Server size={17}/>{t("Programs that send punches (API)", "برامج ترسل البصمات (API)")}</h3>
+            {sources.map(source => { const recent = Boolean(source.last_seen_at) && Date.now() - new Date(String(source.last_seen_at)).getTime() < 86400000; return <div className="bio-setup-row" key={source.id}>
+              <div><b>{source.name}</b><small>{source.country || t("All countries", "كل الدول")} · …{source.key_hint}{" · "}{!Number(source.enabled) ? t("Disabled", "معطل") : source.last_seen_at ? t("Last received ", "آخر استلام ") + when(source.last_seen_at, rtl) : t("Nothing received yet", "لم يصل شيء بعد")}</small><small>{Number(source.log_count) || 0} {t("punches", "بصمة")} · {Number(source.unmatched_users) || 0} {t("unmatched codes", "كود بدون موظف")}{source.last_error ? " · " + source.last_error : ""}</small></div>
+              <span className={Number(source.enabled) && recent ? "bio-linked" : "bio-warning"}>{!Number(source.enabled) ? t("Disabled", "معطل") : recent ? t("Receiving", "يستقبل") : t("Idle", "خامل")}</span>
+              <button className="outline" disabled={busy} onClick={() => rotateSource(source)}><KeyRound size={14}/>{t("New key", "مفتاح جديد")}</button>
+              <button className="outline" disabled={busy} onClick={() => toggleSource(source)}><Power size={14}/>{Number(source.enabled) ? t("Disable", "تعطيل") : t("Enable", "تفعيل")}</button>
+            </div>; })}
+            <div className="bio-setup-add"><input value={sourceName} onChange={event => setSourceName(event.target.value)} placeholder={t("Source name, e.g. ZK Egypt", "اسم المصدر، مثل: بصمة مصر")}/><select value={sourceCountry} onChange={event => setSourceCountry(event.target.value)} aria-label={t("Country", "الدولة")}>{Object.keys(COUNTRY_TIMEZONES).map(name => <option key={name} value={name}>{name}</option>)}</select><button className="outline" disabled={busy || !sourceName.trim()} onClick={() => void createSource()}><Plus size={15}/>{t("Create source", "إنشاء مصدر")}</button></div>
           </section>
           <section className="bio-setup-section">
             <h3>{t("Biometric devices", "أجهزة البصمة")}</h3>

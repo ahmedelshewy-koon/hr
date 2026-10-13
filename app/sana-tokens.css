@@ -1,7 +1,7 @@
 /* SANA source: DESIGN SYSTEM.svg. Shared across HR and future ERP modules.
    CRM supplies composition; semantic feedback colors come from DS badges.
    The reference outlines its text and does not identify a font family. */
-:root {
+:root, .landing {
   --sana-text:#000000; --sana-text-2:#3D3D3D; --sana-text-3:#6D6D6D;
   --sana-white:#FFFFFF;
   --sana-canvas:#F4F3EF;
@@ -46,7 +46,6 @@
   --sana-shell:#EBEBEB;
   --sana-hover:#188164;
   /* SANA Master Visual Design System — locked token aliases (single source of truth). */
-  --sana-bg-dark-start:#031212; --sana-bg-dark-end:#083934;
   --sana-surface:#FFFFFF; --sana-border:#F5F5F5; --sana-switch-border:#E7E7E7;
   --sana-primary-start:#1C7B61; --sana-primary-end:#0B4237;
   --sana-secondary-bg:#F4F3EF; --sana-secondary-border:#0B4237; --sana-secondary-text:#0B4237;
@@ -58,4 +57,7 @@
   --sana-sidebar-item-height:44px; --sana-sidebar-item-gap:16px;
   --sana-shadow-card:0px 0px 8px 0px rgba(0,204,161,0.16);
   --sana-chart-1:#0B4237; --sana-chart-2:#1C7B61; --sana-chart-3:color-mix(in srgb,#1C7B61 45%,#FFFFFF);
+  /* Foreground-only aliases: text drawn on top of fills. Dark Mode remaps surfaces but never these. */
+  --sana-on-fill:#FFFFFF; --sana-on-fill-soft:var(--sana-line); --sana-on-fill-canvas:var(--sana-canvas);
+  --sana-brand-text:var(--sana-teal); --sana-accent-text:var(--sana-teal-mid);
 }

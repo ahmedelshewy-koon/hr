@@ -23,7 +23,7 @@
 .decisions-empty svg{width:36px;height:36px;color:var(--sana-text)}
 .decisions-picker{border:1px solid var(--line);border-radius:16px;padding:16px 16px;margin:8px 0 0;display:grid;gap:8px;min-width:0}
 .decisions-picker legend{display:flex;align-items:center;gap:8px;padding:0 8px;font-weight:600}
-.decisions-picker legend b{background:var(--sana-teal);color:var(--sana-white);border-radius:32px;padding:0 8px;font-size:12px}
+.decisions-picker legend b{background:var(--sana-teal);color:var(--sana-on-fill);border-radius:32px;padding:0 8px;font-size:12px}
 .decisions-group{display:flex;gap:8px;flex-wrap:wrap}
 .decisions-group select{height:36px;border:1px solid var(--sana-line);border-radius:16px;padding:0 8px;background:var(--sana-white);min-width:0;flex:1 1 120px}
 .decisions-group button{height:36px;padding-inline:8px;display:inline-flex;align-items:center;gap:8px}

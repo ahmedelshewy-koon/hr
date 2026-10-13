@@ -11,7 +11,7 @@
 .rp-presets{display:flex;flex-wrap:wrap;gap:var(--sana-space-1)}
 .rp-presets button{padding:var(--sana-space-2) var(--sana-space-4);border:1px solid var(--line);border-radius:var(--radius-pill);background:var(--surface-soft);color:var(--text);font-size:var(--type-secondary);transition:background .15s,border-color .15s}
 .rp-presets button:hover{border-color:var(--accent-blue)}
-.rp-presets button.active{background:var(--blue);border-color:var(--blue);color:var(--sana-white)}
+.rp-presets button.active{background:var(--blue);border-color:var(--blue);color:var(--sana-on-fill)}
 .rp-dates{display:flex;flex:none;flex-wrap:nowrap;align-items:flex-end;gap:var(--sana-space-2);margin-inline-start:auto}
 .rp-dates label{display:grid;gap:var(--sana-space-1);color:var(--muted);font-size:var(--type-label)}
 .rp-dates input{height:40px;padding:0 var(--sana-space-3);border:1px solid var(--line);border-radius:var(--radius-input);background:var(--sana-white);color:var(--text)}
@@ -24,11 +24,11 @@
 .rp-tabs{display:flex;flex:1 1 0;min-width:0;gap:var(--sana-space-1);overflow-x:auto;padding:0 var(--sana-space-1);scrollbar-width:thin}
 .rp-tabs button{flex:none;display:inline-flex;align-items:center;gap:var(--sana-space-2);padding:var(--sana-space-3) var(--sana-space-3);border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);font-size:var(--type-body);white-space:nowrap}
 .rp-tabs button:hover{color:var(--text)}
-.rp-tabs button.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:var(--weight-semibold)}
+.rp-tabs button.active{color:var(--sana-brand-text);border-bottom-color:var(--blue);font-weight:var(--weight-semibold)}
 .rp-tabs em{min-width:20px;padding:0 var(--sana-space-1);border-radius:var(--radius-pill);background:var(--warning-bg);color:var(--sana-warning);font-size:11px;font-style:normal;font-weight:var(--weight-semibold);text-align:center}
 .rp-subtabs{display:flex;flex-wrap:wrap;gap:var(--sana-space-1)}
 .rp-subtabs button{padding:var(--sana-space-2) var(--sana-space-3);border:1px solid var(--line);border-radius:var(--radius-pill);background:var(--surface);color:var(--text);font-size:var(--type-secondary)}
-.rp-subtabs button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-white)}
+.rp-subtabs button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-on-fill)}
 
 .rp-body{display:grid;gap:var(--sana-space-4);min-width:0;transition:opacity .15s}
 .rp-body.loading{opacity:.55;pointer-events:none}

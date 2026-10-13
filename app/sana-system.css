@@ -13,21 +13,21 @@ html .app .content :is(.rp-overview-kpis .rp-kpi b,.rp-kpi b,.asset-kpi b,.biome
 
 /* Sidebar reference: 44px items, 16px between items, 16px radius/padding. */
 html .app[dir] .sidebar nav{display:flex;flex-direction:column;gap:var(--sana-sidebar-item-gap);padding-block:0;min-height:0;overflow-y:auto}
-html .app[dir] .sidebar nav button,html .app.sidebar-collapsed[dir] .sidebar nav button{flex:0 0 var(--sana-sidebar-item-height);height:var(--sana-sidebar-item-height);min-height:var(--sana-sidebar-item-height);max-height:var(--sana-sidebar-item-height);padding:0 16px;gap:8px;border-radius:var(--sana-radius-nav);font-size:14px!important;font-weight:500;background:transparent;color:var(--sana-line)}
+html .app[dir] .sidebar nav button,html .app.sidebar-collapsed[dir] .sidebar nav button{flex:0 0 var(--sana-sidebar-item-height);height:var(--sana-sidebar-item-height);min-height:var(--sana-sidebar-item-height);max-height:var(--sana-sidebar-item-height);padding:0 16px;gap:8px;border-radius:var(--sana-radius-nav);font-size:14px!important;font-weight:500;background:transparent;color:var(--sana-on-fill-soft)}
 html .app[dir] .sidebar nav button svg{width:20px;height:20px;flex:none;color:inherit}
 html .app[dir] .sidebar nav button:hover,html .app[dir] .sidebar-bottom>button:hover{background:var(--sana-sidebar-hover);color:#fff}
 html .app[dir] .sidebar nav button:hover svg{color:#fff}
-html .app[dir] .sidebar nav button.active,html .app[dir] .sidebar nav button.active:hover{background:var(--sana-canvas);color:var(--sana-teal)}
-html .app[dir] .sidebar nav button.active:hover svg{color:var(--sana-teal)}
+html .app[dir] .sidebar nav button.active,html .app[dir] .sidebar nav button.active:hover{background:var(--sana-canvas);color:var(--sana-brand-text)}
+html .app[dir] .sidebar nav button.active:hover svg{color:var(--sana-brand-text)}
 html .app.sidebar-collapsed[dir] .sidebar nav button{padding:0;justify-content:center}
 
 /* Cards: 16px padding, same surface everywhere. */
 html .app :is(.stat-card,.attendance-overview,.today-card,.approvals-card,.leave-card){padding:16px}
-html .app :is(.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange,.stat-icon){background:var(--sana-secondary-bg);color:var(--sana-teal)}
+html .app :is(.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange,.stat-icon){background:var(--sana-secondary-bg);color:var(--sana-brand-text)}
 html .app .attendance-kpis>button>span{background:var(--sana-secondary-bg)}
 
 /* Switch bar / segmented control: white, #E7E7E7 outer border (locked exception), 16px, #0B4237 selected. */
-html .app .tabs{display:inline-flex;align-items:center;gap:8px;padding:8px;max-width:100%;background:#fff;border:1px solid var(--sana-switch-border);border-radius:var(--sana-radius-switch);box-shadow:none;overflow-x:auto;scrollbar-width:none}
+html .app .tabs{display:inline-flex;align-items:center;gap:8px;padding:8px;max-width:100%;background:var(--sana-white);border:1px solid var(--sana-switch-border);border-radius:var(--sana-radius-switch);box-shadow:none;overflow-x:auto;scrollbar-width:none}
 html .app .tabs::-webkit-scrollbar{display:none}
 html .app .tabs button{flex:none;gap:8px;padding:8px 16px;border:0;border-radius:16px;background:transparent;color:var(--sana-muted);font-size:var(--type-body);font-weight:500}
 html .app .tabs button:hover{background:transparent;color:var(--sana-hover)}

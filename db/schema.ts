@@ -343,11 +343,30 @@ export const attendanceAgents = pgTable(
   (t) => [uniqueIndex("idx_attendance_agents_token_hash").on(t.tokenHash)],
 );
 
+// An external program that pushes punch records over HTTP (/api/biometric-ingest) with its own API key.
+export const attendanceIngestSources = pgTable(
+  "attendance_ingest_sources",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull(),
+    keyHint: text("key_hint").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+    lastIp: text("last_ip"),
+    lastError: text("last_error"),
+    createdByUserId: integer("created_by_user_id"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("idx_attendance_ingest_sources_key_hash").on(t.keyHash)],
+);
+
 export const attendanceDevices = pgTable(
   "attendance_devices",
   {
     id: serial("id").primaryKey(),
     agentId: integer("agent_id"),
+    sourceId: integer("source_id"),
     name: text("name").notNull(),
     model: text("model").notNull(),
     ipAddress: text("ip_address").notNull(),
@@ -1930,6 +1949,56 @@ export const costCenters = pgTable("cost_centers", {
   companyId: integer("company_id").references(() => companies.id),
   description: text("description"),
   status: text("status").notNull().default("active"),
+  ...timestamps,
+});
+
+/** System subscription plans (0048): managed on the Plans page, the active ones flagged for the landing page are shown publicly. */
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en").notNull(),
+  descriptionAr: text("description_ar"),
+  descriptionEn: text("description_en"),
+  featuresAr: text("features_ar"),
+  featuresEn: text("features_en"),
+  price: doublePrecision("price"),
+  currency: text("currency").notNull().default("SAR"),
+  durationMonths: integer("duration_months").notNull().default(1),
+  maxEmployees: integer("max_employees"),
+  isFeatured: integer("is_featured").notNull().default(0),
+  showOnLanding: integer("show_on_landing").notNull().default(1),
+  sortOrder: integer("sort_order").notNull().default(0),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+});
+
+/** External API connections (0049) and the saved requests of each, used by the Integrations workbench. */
+export const integrations = pgTable("integrations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  baseUrl: text("base_url").notNull().default(""),
+  authType: text("auth_type").notNull().default("none"),
+  authConfig: text("auth_config"),
+  defaultHeaders: text("default_headers"),
+  variables: text("variables"),
+  description: text("description"),
+  ...timestamps,
+});
+
+export const integrationRequests = pgTable("integration_requests", {
+  id: serial("id").primaryKey(),
+  integrationId: integer("integration_id").notNull().references(() => integrations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  method: text("method").notNull().default("GET"),
+  path: text("path").notNull().default(""),
+  params: text("params"),
+  headers: text("headers"),
+  bodyType: text("body_type").notNull().default("none"),
+  body: text("body"),
+  pathVars: text("path_vars"),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
   ...timestamps,
 });
 

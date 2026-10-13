@@ -17,7 +17,7 @@
 
 .sidebar{
   padding:var(--sana-space-3) var(--sana-space-3) var(--sana-space-3);
-  color:var(--sana-teal-mid);
+  color:var(--sana-accent-text);
   background:linear-gradient(180deg,color-mix(in srgb, var(--sana-white) 66%, transparent),color-mix(in srgb, var(--sana-white) 40%, transparent));
   -webkit-backdrop-filter:blur(28px) saturate(175%);
   backdrop-filter:blur(28px) saturate(175%);
@@ -68,28 +68,28 @@
   max-height:54px;
   padding-inline:var(--sana-space-4);
   gap:var(--sana-space-3);
-  color:var(--sana-teal-mid);
+  color:var(--sana-accent-text);
   font-size:calc(var(--type-nav) + 2px)!important;
   border:1px solid transparent;
   border-radius:var(--sana-radius-nav);
   transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease;
 }
-.sidebar nav button svg{width:22px;height:22px;stroke-width:1.6;color:var(--sana-teal-mid);transition:color .18s ease}
+.sidebar nav button svg{width:22px;height:22px;stroke-width:1.6;color:var(--sana-accent-text);transition:color .18s ease}
 .sidebar nav button:hover{
   background:color-mix(in srgb, var(--sana-white) 55%, transparent);
   border-color:color-mix(in srgb, var(--sana-line) 70%, transparent);
-  color:var(--sana-teal);
+  color:var(--sana-brand-text);
 }
-.sidebar nav button:hover svg{color:var(--sana-teal-mid)}
+.sidebar nav button:hover svg{color:var(--sana-accent-text)}
 .sidebar nav button:focus-visible{outline:2px solid color-mix(in srgb, var(--sana-teal-mid) 45%, transparent);outline-offset:-1px}
 
 .sidebar nav button.active{
-  color:var(--sana-teal-mid);
+  color:var(--sana-accent-text);
   background:linear-gradient(135deg,color-mix(in srgb, var(--sana-white) 88%, transparent),color-mix(in srgb, var(--sana-canvas) 72%, transparent));
   border-color:color-mix(in srgb, var(--sana-line) 95%, transparent);
   box-shadow:none;
 }
-.sidebar nav button.active svg{color:var(--sana-teal-mid)}
+.sidebar nav button.active svg{color:var(--sana-accent-text)}
 .sidebar nav button.active::after{display:none}
 .app[dir="rtl"] .sidebar nav button.active{box-shadow:none}
 
@@ -137,7 +137,7 @@
 
 /* Account menu: keep the name visible beside the avatar in the top bar. */
 .profile-menu{position:relative;display:inline-flex}
-.profile-trigger{display:flex;align-items:center;gap:var(--sana-space-2);min-width:0;padding:8px;border:0;border-radius:var(--sana-radius-pill);background:transparent;color:var(--sana-teal);cursor:pointer}
+.profile-trigger{display:flex;align-items:center;gap:var(--sana-space-2);min-width:0;padding:8px;border:0;border-radius:var(--sana-radius-pill);background:transparent;color:var(--sana-brand-text);cursor:pointer}
 .profile-trigger:hover{background:var(--sana-canvas)}
 .profile-trigger .avatar{display:inline-grid;flex:none;transition:box-shadow .18s ease}
 .profile-trigger-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--type-label);font-weight:var(--weight-semibold);text-align:start}
@@ -164,11 +164,11 @@
 .profile-pop-head{display:flex;align-items:center;gap:var(--sana-space-3);padding-bottom:var(--sana-space-3)}
 .profile-pop-head .avatar{display:inline-grid;width:46px;height:46px;font-size:var(--type-component)}
 .profile-pop-head>div{min-width:0}
-.profile-pop-head b{display:block;color:var(--sana-teal);font-size:var(--type-body);font-weight:var(--weight-semibold);line-height:var(--leading-heading);overflow-wrap:anywhere}
-.profile-pop-role{display:inline-flex;margin-top:8px;padding:0 var(--sana-space-2);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-teal-mid);font-size:var(--type-label);font-weight:var(--weight-medium)}
+.profile-pop-head b{display:block;color:var(--sana-brand-text);font-size:var(--type-body);font-weight:var(--weight-semibold);line-height:var(--leading-heading);overflow-wrap:anywhere}
+.profile-pop-role{display:inline-flex;margin-top:8px;padding:0 var(--sana-space-2);border-radius:var(--sana-radius-pill);background:var(--sana-canvas);color:var(--sana-accent-text);font-size:var(--type-label);font-weight:var(--weight-medium)}
 .profile-pop-rows{display:grid;gap:0;padding:var(--sana-space-2) 0;border-block:1px solid color-mix(in srgb, var(--sana-teal-mid) 16%, transparent)}
-.profile-pop-rows>div{display:flex;align-items:center;gap:var(--sana-space-2);min-width:0;padding:var(--sana-space-1) var(--sana-space-1);color:var(--sana-teal);font-size:var(--type-secondary)}
-.profile-pop-rows svg{flex:none;color:var(--sana-teal-mid)}
+.profile-pop-rows>div{display:flex;align-items:center;gap:var(--sana-space-2);min-width:0;padding:var(--sana-space-1) var(--sana-space-1);color:var(--sana-brand-text);font-size:var(--type-secondary)}
+.profile-pop-rows svg{flex:none;color:var(--sana-accent-text)}
 .profile-pop-rows span{min-width:0;overflow-wrap:anywhere}
 .profile-pop-logout{
   width:100%;
@@ -186,9 +186,9 @@
   transition:background .18s ease,border-color .18s ease;
 }
 .profile-pop-logout:hover{background:var(--sana-canvas);border-color:var(--sana-warning-bg)}
-.profile-pop-install{width:100%;height:42px;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:var(--sana-space-2);border:1px solid color-mix(in srgb, var(--sana-line) 95%, transparent);border-radius:var(--sana-radius-control);background:color-mix(in srgb, var(--sana-canvas) 90%, transparent);color:var(--sana-teal-mid);font-weight:var(--weight-semibold);cursor:pointer}
+.profile-pop-install{width:100%;height:42px;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:var(--sana-space-2);border:1px solid color-mix(in srgb, var(--sana-line) 95%, transparent);border-radius:var(--sana-radius-control);background:color-mix(in srgb, var(--sana-canvas) 90%, transparent);color:var(--sana-accent-text);font-weight:var(--weight-semibold);cursor:pointer}
 .profile-pop-install:hover{background:var(--sana-canvas);border-color:var(--sana-line)}
-.profile-pop-install-hint{margin:16px 0 0;display:flex;align-items:flex-start;gap:var(--sana-space-2);padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);background:color-mix(in srgb, var(--sana-canvas) 80%, transparent);color:var(--sana-teal);font-size:13px;line-height:1.6}
+.profile-pop-install-hint{margin:16px 0 0;display:flex;align-items:flex-start;gap:var(--sana-space-2);padding:var(--sana-space-2) var(--sana-space-3);border-radius:var(--sana-radius-control);background:color-mix(in srgb, var(--sana-canvas) 80%, transparent);color:var(--sana-brand-text);font-size:13px;line-height:1.6}
 .profile-pop-install-hint svg{flex:none;margin-top:0}
 
 @media(max-width:760px){
@@ -226,9 +226,9 @@
   .app.sidebar-collapsed .sidebar nav button svg{width:21px;height:21px;flex-shrink:0}
   .app.sidebar-collapsed .sidebar nav button.nav-group-start{margin-top:8px}
   .app.sidebar-collapsed .sidebar nav button.nav-group-start::before{display:none}
-  .app.sidebar-collapsed .sidebar nav button.active{background:var(--sana-line);box-shadow:none;color:var(--sana-teal)}
+  .app.sidebar-collapsed .sidebar nav button.active{background:var(--sana-line);box-shadow:none;color:var(--sana-brand-text)}
   .app.sidebar-collapsed[dir] .sidebar nav button.active{box-shadow:none}
-  .app.sidebar-collapsed .sidebar nav button.active svg{color:var(--sana-teal)}
+  .app.sidebar-collapsed .sidebar nav button.active svg{color:var(--sana-brand-text)}
 }
 
 /* Nav group headings (Main / People / Organization & growth / Finance & admin). */

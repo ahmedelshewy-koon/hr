@@ -113,7 +113,7 @@
 }
 .ats-heading h1 {
   margin: 8px 0 8px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-page);
 }
 .ats-heading p {
@@ -141,7 +141,7 @@
   position: relative;
 }
 .ats-nav button.active {
-  color: var(--blue);
+  color:var(--sana-brand-text);
   font-weight: var(--weight-bold);
 }
 .ats-nav button.active:after {
@@ -174,7 +174,7 @@
   place-items: center;
   border-radius: var(--sana-radius-control);
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
   flex: none;
 }
 .ats-kpis svg {
@@ -186,7 +186,7 @@
 }
 .ats-kpis strong {
   font-size: 22px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   line-height: 1.1;
 }
 .ats-kpis small {
@@ -220,7 +220,7 @@
 .ats-panel h2 {
   margin: 0 0 8px;
   font-size: var(--type-component);
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-panel p {
   margin: 0;
@@ -230,7 +230,7 @@
 .ats-panel header > button:not(.primary):not(.outline) {
   border: 0;
   background: transparent;
-  color: var(--blue);
+  color:var(--sana-brand-text);
   display: flex;
   align-items: center;
   gap: var(--sana-space-1);
@@ -271,7 +271,7 @@
   display: block;
 }
 .ats-table b {
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-table small {
   color: var(--muted);
@@ -298,7 +298,7 @@
   background: var(--success-bg);
 }
 .ats-status.blue {
-  color: var(--blue);
+  color:var(--sana-brand-text);
   background: var(--light-blue);
 }
 .ats-status.amber {
@@ -342,11 +342,11 @@
   width: 16px;
 }
 .ats-actions b {
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-label);
 }
 .ats-actions strong {
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-clear,
 .ats-empty,
@@ -366,7 +366,7 @@
 }
 .ats-clear b,
 .ats-empty h3 {
-  color: var(--navy);
+  color:var(--sana-brand-text);
   margin: 0;
 }
 .ats-clear span,
@@ -443,7 +443,7 @@
   align-items: center !important;
 }
 .ats-list-head .primary {
-  color: var(--sana-white);
+  color:var(--sana-on-fill);
 }
 .ats-head-actions {
   display: flex;
@@ -488,7 +488,7 @@
   grid-template-columns: 1.35fr 1.15fr 1fr 0.65fr 0.7fr 1fr 0.8fr;
 }
 .ats-score-cell strong {
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-score-cell small {
   color: var(--sana-warning);
@@ -512,7 +512,7 @@
 }
 .ats-inline-tabs button.active,
 .ats-detail-tabs button.active {
-  color: var(--blue);
+  color:var(--sana-brand-text);
   font-weight: var(--weight-bold);
 }
 .ats-inline-tabs button.active:after,
@@ -560,7 +560,7 @@
 .ats-detail-head h1 {
   font-size: var(--type-page);
   margin: 0 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-detail-head p {
   margin: 0;
@@ -579,7 +579,7 @@
   height: 52px;
   border-radius: 50%;
   background: var(--navy);
-  color: var(--sana-white);
+  color:var(--sana-on-fill);
   display: grid;
   place-items: center;
   font-weight: var(--weight-bold);
@@ -594,7 +594,7 @@
 }
 .ats-match-pill strong {
   font-size: 20px;
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-match-pill small {
   color: var(--muted);
@@ -629,7 +629,7 @@
 .ats-copy-panel h2,
 .ats-facts h2,
 .ats-copy-panel h3 {
-  color: var(--navy);
+  color:var(--sana-brand-text);
   margin: 0 0 8px;
   font-size: var(--type-component);
 }
@@ -664,7 +664,7 @@
 .ats-facts dd,
 .ats-candidate-summary dd {
   margin: 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-weight: var(--weight-semibold);
   text-align: end;
 }
@@ -685,7 +685,7 @@
   height: 42px;
   border-radius: var(--sana-radius-control);
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
   display: grid;
   place-items: center;
   font-weight: var(--weight-bold);
@@ -703,7 +703,7 @@
   color: var(--muted);
 }
 .ats-simple-list > header .primary {
-  color: var(--sana-white);
+  color:var(--sana-on-fill);
 }
 .ats-simple-list > button,
 .ats-static-row {
@@ -733,7 +733,7 @@
   padding: var(--sana-space-2);
   border-radius: var(--sana-radius-control);
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-person b,
 .ats-person small,
@@ -743,7 +743,7 @@
 }
 .ats-person b,
 .ats-static-row b {
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-person small,
 .ats-static-row small {
@@ -768,7 +768,7 @@
   display: grid;
   place-items: center;
   background: var(--navy);
-  color: var(--sana-white);
+  color:var(--sana-on-fill);
   font-weight: var(--weight-bold);
 }
 .ats-plan-main > header {
@@ -777,7 +777,7 @@
 }
 .ats-plan-main h2 {
   margin: 0 0 8px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-component);
 }
 .ats-plan-main p {
@@ -823,7 +823,7 @@
   display: flex;
   justify-content: space-between;
   padding: var(--sana-space-1) 0 var(--sana-space-2);
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-kanban > section > button {
   width: 100%;
@@ -850,7 +850,7 @@
   color: var(--muted);
 }
 .ats-kanban strong {
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-review-layout {
   display: grid;
@@ -880,7 +880,7 @@
 }
 .ats-candidate-summary h3 {
   font-size: var(--type-component);
-  color: var(--navy);
+  color:var(--sana-brand-text);
   margin-top: 16px;
 }
 .ats-tags {
@@ -893,7 +893,7 @@
   background: var(--neutral-bg);
   border-radius: var(--sana-radius-pill);
   padding: var(--sana-space-1) var(--sana-space-2);
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-next-action,
 .ats-primary-actions {
@@ -902,7 +902,7 @@
 .ats-next-action h2,
 .ats-primary-actions h2 {
   margin: 0 0 16px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-component);
 }
 .ats-next-action > div {
@@ -933,7 +933,7 @@
 .ats-offer-flow > button {
   border: 0;
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
   height: 34px;
   border-radius: var(--sana-radius-button);
   padding: 0 var(--sana-space-2);
@@ -952,7 +952,7 @@
 }
 .ats-match-score strong {
   font-size: 34px;
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-match-score span {
   color: var(--muted);
@@ -980,7 +980,7 @@
   border: 0;
   border-radius: var(--sana-radius-button);
   background: var(--neutral-bg);
-  color: var(--navy);
+  color:var(--sana-brand-text);
   display: flex;
   align-items: center;
   gap: var(--sana-space-2);
@@ -1031,7 +1031,7 @@
   border-bottom: 1px solid var(--line);
 }
 .ats-document > svg {
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-document b,
 .ats-document small {
@@ -1050,7 +1050,7 @@
   overflow: auto;
   padding: var(--sana-space-3);
   background: var(--sana-teal);
-  color: var(--sana-line);
+  color:var(--sana-on-fill-soft);
   border-radius: var(--sana-radius-control);
   direction: ltr;
   text-align: left;
@@ -1077,7 +1077,7 @@
 }
 .ats-breakdown-score strong {
   display: block;
-  color: var(--blue);
+  color:var(--sana-brand-text);
   font-size: 18px;
 }
 .ats-breakdown-score:after {
@@ -1126,7 +1126,7 @@
 }
 .ats-match-notes h2 {
   margin: 0 0 8px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-component);
 }
 .ats-match-notes span {
@@ -1147,7 +1147,7 @@
   display: flex !important;
   width: max-content;
   background: var(--light-blue);
-  color: var(--blue) !important;
+  color:var(--sana-brand-text) !important;
   border-radius: var(--sana-radius-pill);
   padding: var(--sana-space-1) var(--sana-space-2);
 }
@@ -1180,7 +1180,7 @@
 }
 .ats-score-trio b {
   font-size: 24px;
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-score-trio small {
   color: var(--muted);
@@ -1188,7 +1188,7 @@
 .ats-formula {
   margin: 0 16px 8px;
   background: var(--light-blue);
-  color: var(--sana-teal-mid);
+  color:var(--sana-accent-text);
   padding: var(--sana-space-2);
   border-radius: var(--sana-radius-control);
 }
@@ -1254,7 +1254,7 @@
   padding: var(--sana-space-2);
   border-radius: var(--sana-radius-control);
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-interview-card b,
 .ats-interview-card small,
@@ -1262,11 +1262,11 @@
   display: block;
 }
 .ats-interview-card b {
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-interview-card em {
   font-style: normal;
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-interview-card > div {
   display: flex;
@@ -1304,7 +1304,7 @@
 }
 .ats-context dd {
   margin: 8px 0 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-weight: var(--weight-semibold);
 }
 .ats-verify,
@@ -1316,7 +1316,7 @@
 .ats-questions h2,
 .ats-notes h2 {
   margin: 0 0 8px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-component);
 }
 .ats-verify p {
@@ -1343,7 +1343,7 @@
   display: grid;
   place-items: center;
   background: var(--navy);
-  color: var(--sana-white);
+  color:var(--sana-on-fill);
 }
 .ats-notes textarea {
   width: 100%;
@@ -1413,7 +1413,7 @@
 }
 .ats-question-form h3 {
   margin: 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-question-form label {
   display: grid;
@@ -1448,7 +1448,7 @@
   display: grid;
   place-items: center;
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-question-bank b,
 .ats-question-bank small {
@@ -1483,7 +1483,7 @@
   display: grid;
   place-items: center;
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
   border-radius: var(--sana-radius-control);
 }
 .ats-card-actions {
@@ -1504,7 +1504,7 @@
 }
 .ats-icon-button:hover {
   background: var(--neutral-bg);
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-icon-button.danger {
   color: var(--sana-danger);
@@ -1530,7 +1530,7 @@
 }
 .ats-template-list h3 {
   margin: 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-template-list p {
   margin: 0 0;
@@ -1567,7 +1567,7 @@
   display: grid;
   place-items: center;
   background: var(--light-blue);
-  color: var(--blue);
+  color:var(--sana-brand-text);
 }
 .ats-timeline p {
   margin: 0 0;
@@ -1588,7 +1588,7 @@
   color: var(--error);
 }
 .ats-error b {
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 /* ATS drawers */
 .ats-modal-layer {
@@ -1631,7 +1631,7 @@
 }
 .ats-drawer > header h2 {
   margin: 8px 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-section);
 }
 .ats-drawer > header p {
@@ -1661,7 +1661,7 @@
 .ats-form-section > h3,
 .ats-section-title h3 {
   margin: 0 0 16px;
-  color: var(--navy);
+  color:var(--sana-brand-text);
   font-size: var(--type-component);
 }
 .ats-section-title {
@@ -1693,7 +1693,7 @@
   align-content: start;
   display: grid;
   gap: var(--sana-space-1);
-  color: var(--sana-teal);
+  color:var(--sana-brand-text);
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
 }
@@ -1752,7 +1752,7 @@
 }
 .ats-check-list h3 {
   margin: 0;
-  color: var(--navy);
+  color:var(--sana-brand-text);
 }
 .ats-check-list > p {
   margin: 8px 0 8px;
@@ -1876,14 +1876,14 @@
 .ats-template-edit-form .ats-field textarea { line-height: var(--leading-relaxed); }
 .ats-template-stage-editor { border: 1px solid var(--line); border-radius: var(--sana-radius-control); padding: var(--sana-space-6); margin: 32px 0 0; background: var(--sana-white); }
 .ats-template-stage-editor > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sana-space-3); margin-bottom: 24px; padding-bottom: var(--sana-space-4); border-bottom: 1px solid var(--line); }
-.ats-template-stage-editor > header h3 { margin: 0; color: var(--navy); font-size: var(--type-section); }
+.ats-template-stage-editor > header h3 { margin: 0; color:var(--sana-brand-text); font-size: var(--type-section); }
 .ats-template-stage-editor > header .ats-editor-actions { margin-top: 0; }
 .ats-stage-toggles { display: flex; flex-wrap: wrap; gap: var(--sana-space-3) var(--sana-space-8); margin-top: 24px; }
 .ats-stage-toggles label,
 .ats-criterion-actions label,
-.ats-template-assignment > label { display: inline-flex; align-items: center; gap: var(--sana-space-2); color: var(--sana-teal); font-size: var(--type-label); font-weight: var(--weight-semibold); }
+.ats-template-assignment > label { display: inline-flex; align-items: center; gap: var(--sana-space-2); color:var(--sana-brand-text); font-size: var(--type-label); font-weight: var(--weight-semibold); }
 .ats-stage-subsection { margin-top: 32px; padding-top: var(--sana-space-6); border-top: 1px solid var(--line); }
-.ats-stage-subsection > h4 { margin: 0 0 16px; color: var(--navy); font-size: var(--type-component); font-weight: var(--weight-bold); }
+.ats-stage-subsection > h4 { margin: 0 0 16px; color:var(--sana-brand-text); font-size: var(--type-component); font-weight: var(--weight-bold); }
 .ats-template-assignment { display: flex; align-items: end; gap: var(--sana-space-4); margin-bottom: 16px; flex-wrap: wrap; padding: var(--sana-space-4) var(--sana-space-4); background: var(--sana-white); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
 .ats-template-assignment .ats-field { flex: 1; min-width: 180px; }
 .ats-template-assignment > label { min-height: 40px; }

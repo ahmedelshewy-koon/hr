@@ -31,8 +31,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        {/* Apply the saved Light/Dark choice before first paint so there is no flash. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("hr-theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}` }} />
         {/* Keep icons in the initial head: streamed metadata can land in the body. */}
         <link rel="icon" type="image/png" href="/favicon.png?v=sana-1" />
         <link rel="shortcut icon" href="/favicon.png?v=sana-1" />

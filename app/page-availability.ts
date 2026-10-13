@@ -3,11 +3,11 @@ export const PAGE_MODULES: Record<string, string[]> = {
   employees: ["employees"], leave: ["leave_management"], attendance: ["attendance"],
   recruitment: ["recruitment"], lifecycle: ["onboarding", "offboarding"],
   assets: ["assets"], learning: ["learning"], org: ["organization_chart"], blueprint: ["staffing_blueprint"], decisions: ["administrative_decisions"], users: ["users"],
-  reports: ["reports"], payroll: ["payroll"], cost_centers: ["payroll"], hr_settings: ["system_settings"], settings: ["system_settings"],
+  reports: ["reports"], payroll: ["payroll"], cost_centers: ["payroll"], plans: ["system_settings"], integrations: ["system_settings"], hr_settings: ["system_settings"], settings: ["system_settings"],
 };
 
 export function filterAvailablePages<T extends string>(granted: T[], roleName: string, availability: Record<string, unknown>, hrDataScope?: string | null): T[] {
-  return granted.filter(page => (!(page==="settings"||page==="hr_settings")||["Super Admin","HR Manager"].includes(roleName)) && (page!=="cost_centers"||["Super Admin","HR Manager"].includes(roleName)) && (page!=="hr_settings"||roleName==="Super Admin"||hrDataScope!=="assigned") && ((page === "settings" && roleName === "Super Admin") || availability[page] !== false));
+  return granted.filter(page => (!(page==="settings"||page==="hr_settings")||["Super Admin","HR Manager"].includes(roleName)) && (page!=="plans"&&page!=="integrations"||roleName==="Super Admin") && (page!=="cost_centers"||["Super Admin","HR Manager"].includes(roleName)) && (page!=="hr_settings"||roleName==="Super Admin"||hrDataScope!=="assigned") && ((page === "settings" && roleName === "Super Admin") || availability[page] !== false));
 }
 
 export function validatePageToggle(roleName: string, page: unknown, enabled: unknown) {

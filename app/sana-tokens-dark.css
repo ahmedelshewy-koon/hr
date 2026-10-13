@@ -1,0 +1,59 @@
+/* SANA Dark Mode tokens. Companion to sana-tokens.css (Light Mode).
+   Rule: every token here ends in -dark, so nothing here can override or be
+   confused with a Light token. Scoped to [data-theme="dark"]; imported by globals.css and
+   mapped onto the shared names by sana-dark-theme.css.
+   Source: docs/SANA_DARK_MASTER_PROMPT.md */
+[data-theme="dark"] {
+  --sana-bg-dark-start:#031212; --sana-bg-dark-end:#083934;
+  --sana-bg-dark:linear-gradient(180deg,var(--sana-bg-dark-start),var(--sana-bg-dark-end));
+  --sana-shell-dark:#111B1B;
+
+  --sana-card-dark-start:#021615; --sana-card-dark-end:#000000;
+  --sana-card-dark:linear-gradient(135deg,var(--sana-card-dark-start),var(--sana-card-dark-end));
+  --sana-topbar-dark:linear-gradient(135deg,var(--sana-bg-dark-start),var(--sana-bg-dark-end));
+  --sana-table-dark:#000C0C;
+
+  --sana-border-dark:#073028;
+  --sana-border-dark-inner:#021914;
+  --sana-switch-border-dark:#073028;
+
+  --sana-primary-dark:linear-gradient(100deg,#1C7B61,#0B4237);
+  --sana-primary-hover-dark:#0B4237;
+  --sana-secondary-bg-dark:#111B1B;
+  --sana-secondary-border-dark:#25C6A3;
+  --sana-secondary-text-dark:#25C6A3;
+
+  --sana-hover-dark:#0B4237;
+
+  --sana-sidebar-active-bg-dark:#F4F3EF;
+  --sana-sidebar-active-text-dark:#0B4237;
+  --sana-sidebar-hover-bg-dark:#0B4237;
+  --sana-sidebar-hover-text-dark:#FFFFFF;
+  --sana-sidebar-item-height-dark:55px;
+  --sana-sidebar-item-gap-dark:24px;
+
+  --sana-heading-dark:#FFFFFF;
+  --sana-text-dark:#FFFFFF;
+  --sana-text-2-dark:rgba(255,255,255,.78);
+  --sana-text-3-dark:rgba(255,255,255,.62);
+
+  --sana-radius-shell-dark:16px;
+  --sana-radius-card-dark:24px;
+  --sana-radius-control-dark:32px;
+  --sana-radius-nav-dark:16px;
+  --sana-radius-switch-dark:16px;
+
+  --sana-shadow-card-dark:0 0 8px 0 rgba(161,236,221,.16);
+
+  /* Surfaces / states that the theme layer maps onto the shared semantic names. */
+  --sana-canvas-dark:rgba(255,255,255,.05);
+  --sana-modal-dark:#000000;
+  --sana-overlay-dark:rgba(0,0,0,.64);
+  --sana-focus-dark:#79CBAA;
+  --sana-icon-bg-dark:#D9FBF3;
+  --sana-icon-fg-dark:#0B4237;
+  --sana-accent-text-dark:#95E0D1;
+  --sana-success-dark:#2FD27A; --sana-warning-dark:#F0A02E;
+  --sana-danger-dark:#FF7B7B; --sana-info-dark:#5AAEFF;
+  --sana-chart-1-dark:#79CBAA; --sana-chart-2-dark:#95E0D1; --sana-chart-3-dark:#D9FBF3;
+}

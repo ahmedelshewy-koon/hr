@@ -6,7 +6,7 @@ import { Activity, Check, Clock3, Download, Fingerprint, Link2, RefreshCw, Searc
 import "./biometric-workspace.css";
 import type { Row } from "./ui-types";
 
-type Payload = { devices: Row[]; users: Row[]; syncs: Row[]; summary: Row; records: Row[]; page: number; pageSize: number; total: number; canManageDevices?: boolean; setupUnavailable?: boolean; agents?: Row[]; allDevices?: Row[] };
+type Payload = { devices: Row[]; users: Row[]; syncs: Row[]; summary: Row; records: Row[]; page: number; pageSize: number; total: number; canManageDevices?: boolean; setupUnavailable?: boolean; agents?: Row[]; allDevices?: Row[]; ingestSources?: Row[] };
 type Props = { rtl: boolean; employees: Row[]; notify: (message: string) => void; onMapped: () => void };
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const dateTime = (value: unknown, rtl: boolean, timezone = "Africa/Cairo") => {

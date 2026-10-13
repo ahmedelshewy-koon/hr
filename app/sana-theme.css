@@ -1,5 +1,5 @@
 /* Final shared presentation layer. Feature CSS retains its behavior/layout rules. */
-:root {
+:root, .landing {
   --navy:var(--sana-teal);--navy2:var(--sana-teal);
   --blue:var(--sana-teal);--accent-blue:var(--sana-teal-mid);
   --light-blue:var(--sana-canvas);--light:var(--sana-canvas);
@@ -21,31 +21,31 @@
 
 /* CRM composition: continuous dark navigation, neutral inset workspace, white header. */
 .app[dir]{padding:24px;gap:0;background:var(--sana-page-bg);background-attachment:fixed}
-.app[dir] .sidebar{inset-block:0;inset-inline-start:0;width:264px;padding:24px 16px;color:var(--sana-white);background:transparent;border:0;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.app[dir] .sidebar{inset-block:0;inset-inline-start:0;width:264px;padding:24px 16px;color:var(--sana-on-fill);background:transparent;border:0;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
 .app[dir] .main{margin-inline-start:264px;background:var(--sana-shell);border-radius:var(--sana-radius-shell);padding:24px;min-height:calc(100dvh - 48px)}
 .app[dir] .content{padding:24px 0 0;max-width:1600px}
 .app[dir] .topbar{height:64px;min-height:64px;top:24px;padding:16px 24px;margin:0;background:var(--sana-white);border:1px solid var(--sana-line);border-radius:var(--sana-radius-card);box-shadow:var(--sana-shadow)}
 .topbar::before{display:none}
-.sana-module-label{display:flex;align-items:center;gap:16px;color:var(--sana-teal)}
+.sana-module-label{display:flex;align-items:center;gap:16px;color:var(--sana-brand-text)}
 .sana-module-label span{padding-inline-start:16px;border-inline-start:1px solid var(--sana-line);color:var(--sana-muted);font-size:var(--type-secondary)}
 .app[dir] .sidebar .brand{height:64px;padding:0 32px;margin:0 0 24px;border-radius:0;background:transparent}
 .sana-brand-mark{height:1.85em;width:auto;align-self:center;flex:none;margin-inline-end:0}
-.sana-brand{display:inline-flex;align-items:center;gap:8px;direction:ltr;white-space:nowrap;font-size:24px;font-weight:700;color:var(--sana-teal);letter-spacing:.02em}
+.sana-brand{display:inline-flex;align-items:center;gap:8px;direction:ltr;white-space:nowrap;font-size:24px;font-weight:700;color:var(--sana-brand-text);letter-spacing:.02em}
 html .sana-brand .sana-brand-wordmark{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:3.6em;margin:0;font-size:inherit;color:inherit;letter-spacing:0;line-height:1}
 html .sana-brand .sana-brand-ar{display:block;margin:0;text-align:center;font-family:"Alexandria","IBM Plex Sans Arabic",sans-serif;font-size:1.2em;font-weight:700;line-height:1.1;color:inherit;letter-spacing:0}
 html .sana-brand .sana-brand-en{display:block;text-align:center;margin:0;padding:0 0 0 .26em;font-family:Arial,sans-serif;font-size:.42em;font-weight:700;line-height:1;color:inherit;letter-spacing:.26em}
-.sidebar .brand .sana-brand{display:inline-flex;color:var(--sana-white);font-size:24px;margin:0}
-.sana-brand i{font-style:normal;font-weight:400;color:var(--sana-teal-mid)}
-.sidebar .brand .sidebar-collapse,.sidebar .brand .mobile-close{background:transparent;color:var(--sana-line);border-color:transparent}
+.sidebar .brand .sana-brand{display:inline-flex;color:var(--sana-on-fill);font-size:24px;margin:0}
+.sana-brand i{font-style:normal;font-weight:400;color:var(--sana-accent-text)}
+.sidebar .brand .sidebar-collapse,.sidebar .brand .mobile-close{background:transparent;color:var(--sana-on-fill-soft);border-color:transparent}
 .app[dir] .sidebar nav{gap:16px;padding:0;scrollbar-gutter:auto;scrollbar-color:var(--sana-teal-mid) transparent}
-.app[dir] .sidebar nav button{flex:0 0 44px;min-height:44px;max-height:none;padding:0 16px;gap:16px;color:var(--sana-line);border:0;border-radius:var(--sana-radius-nav);font-size:var(--type-nav)!important}
+.app[dir] .sidebar nav button{flex:0 0 44px;min-height:44px;max-height:none;padding:0 16px;gap:16px;color:var(--sana-on-fill-soft);border:0;border-radius:var(--sana-radius-nav);font-size:var(--type-nav)!important}
 .app[dir] .sidebar nav button svg{color:inherit;width:20px;height:20px;stroke-width:1.5}
-.app[dir] .sidebar nav button:hover,.app[dir] .sidebar-bottom>button:hover{background:var(--sana-teal);color:var(--sana-white)}
-.app[dir] .sidebar nav button.active{background:var(--sana-canvas);color:var(--sana-teal);box-shadow:none}
+.app[dir] .sidebar nav button:hover,.app[dir] .sidebar-bottom>button:hover{background:var(--sana-teal);color:var(--sana-on-fill)}
+.app[dir] .sidebar nav button.active{background:var(--sana-canvas);color:var(--sana-brand-text);box-shadow:none}
 .sidebar nav button.active::after,.sidebar nav button.nav-group-start::before,.sidebar-bottom::before{display:none}
 .app[dir] .sidebar nav button.nav-group-start{margin-top:0}
 .app[dir] .sidebar-bottom{background:transparent;border-color:var(--sana-teal-mid)}
-.app[dir] .sidebar-bottom>button,.app[dir] .workspace-label{color:var(--sana-line)}
+.app[dir] .sidebar-bottom>button,.app[dir] .workspace-label{color:var(--sana-on-fill-soft)}
 .workspace-label{letter-spacing:0}
 .global-search{background:var(--sana-white);border-color:var(--sana-line);border-radius:var(--sana-radius-pill);color:var(--sana-muted)}
 .global-search kbd{border-radius:16px;color:var(--sana-muted)}
@@ -59,11 +59,11 @@ html .sana-brand .sana-brand-en{display:block;text-align:center;margin:0;padding
 .app :is(p,small){color:var(--sana-muted)}
 .app :is(.ats-empty,.assets-empty,.learning-empty,.attendance-empty)>svg{color:var(--sana-text-2)}
 .panel,.stat-card{border:1px solid var(--sana-line);border-radius:var(--sana-radius-card);background:var(--sana-white);box-shadow:var(--sana-shadow)}
-.app :is(.primary,.login-submit){background:var(--sana-button);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-white);box-shadow:none}
+.app :is(.primary,.login-submit){background:var(--sana-button);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-on-fill);box-shadow:none}
 .app .primary:hover{background:var(--sana-hover);border-color:var(--sana-hover)}
 .app .primary:active{background:var(--sana-hover);filter:brightness(.9)}
-.app .outline{background:var(--sana-canvas);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-teal);box-shadow:none}
-.app .outline:hover{background:var(--sana-hover);color:var(--sana-white)}
+.app .outline{background:var(--sana-canvas);border:1px solid var(--sana-teal);border-radius:var(--sana-radius-button);color:var(--sana-brand-text);box-shadow:none}
+.app .outline:hover{background:var(--sana-hover);color:var(--sana-on-fill)}
 .app .outline:not(:focus-visible){outline-style:none}
 .app :is(.primary,.outline,.ghost,.select-button,.text-button){font-size:var(--type-body)!important}
 .app :is(button,input,select,textarea):focus-visible{outline:2px solid var(--sana-teal-mid);outline-offset:3px}
@@ -117,7 +117,7 @@ html .sana-brand .sana-brand-en{display:block;text-align:center;margin:0;padding
 .app .rp-chart .good{--tone:var(--sana-chart-1)}
 .app .rp-chart .warn{--tone:var(--sana-chart-2)}
 .app .rp-chart .bad{--tone:var(--sana-chart-3)}
-.auth-loading{background:var(--sana-page-bg);color:var(--sana-white)}
+.auth-loading{background:var(--sana-page-bg);color:var(--sana-on-fill)}
 .login-page{--login-blue:var(--sana-teal);--login-blue-2:var(--sana-teal-mid)}
 .login-page{background:var(--sana-page-bg)}
 .login-page .login-card{background:var(--sana-white);border:1px solid var(--sana-line);border-radius:var(--sana-radius-large);box-shadow:var(--sana-shadow);backdrop-filter:none}
@@ -180,8 +180,8 @@ html .sana-brand .sana-brand-en{display:block;text-align:center;margin:0;padding
 
 /* Expanded sidebar header: logo at the start, collapse button at the end in its own visible 36px tile (it used to float over the logo). */
 .app:not(.sidebar-collapsed)[dir] .sidebar .brand{justify-content:flex-start;gap:8px;padding:0 8px}
-.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse{position:static;transform:none;order:3;margin:0;margin-inline-start:auto;flex:none;width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--sana-line)}
-.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse:hover{background:color-mix(in srgb,var(--sana-white) 18%,transparent);color:var(--sana-white);border-color:var(--sana-line);transform:none}
+.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse{position:static;transform:none;order:3;margin:0;margin-inline-start:auto;flex:none;width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--sana-on-fill-soft)}
+.app:not(.sidebar-collapsed)[dir] .sidebar .brand .sidebar-collapse:hover{background:color-mix(in srgb,var(--sana-white) 18%,transparent);color:var(--sana-on-fill);border-color:var(--sana-line);transform:none}
 .app:not(.sidebar-collapsed)[dir] .sidebar .brand .sana-brand{font-size:28px;gap:8px;min-width:0;flex:0 1 auto}
 html .app .sidebar .brand .sidebar-collapse{border:0;border-radius:10px;box-shadow:none}
 html .app .sidebar .brand .sidebar-collapse:not(:focus-visible){outline:none}
@@ -191,7 +191,7 @@ html .app .sidebar .brand .sidebar-collapse:focus-visible{outline:2px solid var(
 
 /* Locked design tokens: page gradient behind the app, hover state, secondary button. */
 html,body{background:var(--sana-page-bg) fixed var(--sana-page-start)}
-.app :is(.icon-btn,.menu-btn,.select-button,.ghost,.tabs button,.row-actions button,.round-more,.round-check,.filterbar button,.notification-item,.view-notifications,.text-button):hover{background:var(--sana-hover);color:var(--sana-white);border-color:var(--sana-hover)}
+.app :is(.icon-btn,.menu-btn,.select-button,.ghost,.tabs button,.row-actions button,.round-more,.round-check,.filterbar button,.notification-item,.view-notifications,.text-button):hover{background:var(--sana-hover);color:var(--sana-on-fill);border-color:var(--sana-hover)}
 .app :is(.icon-btn,.menu-btn,.select-button,.ghost,.tabs button,.row-actions button,.filterbar button,.notification-item,.text-button):hover :is(svg,span,b,small){color:inherit}
 .app .tabs button.active:hover{background:transparent;color:var(--sana-hover)}
 .app :is(.panel,.stat-card,.drawer,.modal-card,.password-card,.profile-pop,.notification-pop){background:var(--sana-white);border-color:var(--sana-line);box-shadow:var(--sana-shadow)}
@@ -202,10 +202,10 @@ html,body{background:var(--sana-page-bg) fixed var(--sana-page-start)}
 .app :is(button,a):is(.tr,.row,.my-task-link):hover,
 .app .dashboard-my-tasks :is(.my-tasks-open,.my-tasks-filters button):hover,
 .app .portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover,
-.portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover{background:var(--sana-hover);border-color:var(--sana-hover);color:var(--sana-white)}
+.portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover{background:var(--sana-hover);border-color:var(--sana-hover);color:var(--sana-on-fill)}
 .app :is(tr,.tr,li,article,div,section)[role=button]:not(.employee-card-head):hover :is(b,span,small,em,svg,strong,h3,p):not(.status):not(.badge),
 .app :is(button,a):is(.attendance-row,.tr,.row):hover :is(b,span,small,em,svg,strong,p):not(.status):not(.badge),
-.portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover :is(b,span,small,em,svg,strong):not(.status):not(.portal-status){color:var(--sana-white)}
+.portal-shell :is(.portal-action-grid button,.portal-request-list>button,.portal-view-all):hover :is(b,span,small,em,svg,strong):not(.status):not(.portal-status){color:var(--sana-on-fill)}
 .app .dashboard-my-tasks .my-task-card:hover{border-color:var(--sana-hover)}
 .app a:not([class]):hover{color:var(--sana-hover)}
 .app :is(.data-table .tr:not(.th):hover,tbody tr:hover){background:var(--sana-canvas)}

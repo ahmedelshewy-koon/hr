@@ -7,7 +7,7 @@
 }
 .ats-page .ats-nav { background: var(--sana-white); padding: var(--sana-space-1); border: 1px solid var(--line); border-radius: var(--sana-radius-control); }
 .ats-page .ats-nav button { padding: var(--sana-space-2) var(--sana-space-4); border-radius: var(--sana-radius-button); flex: 0 0 auto; min-height: 40px; }
-.ats-page .ats-nav button.active { background: var(--light-blue); color: var(--blue); }
+.ats-page .ats-nav button.active { background: var(--light-blue); color:var(--sana-brand-text); }
 .ats-page .ats-nav button.active::after { display: none; }
 .ats-page .ats-inline-tabs button, .ats-page .ats-detail-tabs button { padding: var(--sana-space-3) var(--sana-space-3); flex-shrink: 0; }
 .ats-page .ats-inline-tabs button.active::after, .ats-page .ats-detail-tabs button.active::after { bottom: 0; }

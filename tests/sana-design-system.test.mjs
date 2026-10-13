@@ -5,7 +5,15 @@ import test from 'node:test';
 const app = new URL('../app/', import.meta.url);
 test('SANA presentation tokens resolve without missing references or cycles', async () => {
   const source = await readFile(new URL('sana-tokens.css', app), 'utf8');
-  const tokens = new Map([...source.matchAll(/(--sana-[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2]]));
+  const read = text => new Map([...text.matchAll(/(--sana-[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2]]));
+  const light = read(source);
+  const dark = read(await readFile(new URL('sana-tokens-dark.css', app), 'utf8'));
+  // Light and Dark never share a token: every Dark name is -dark suffixed and none collides with a Light name.
+  for (const name of dark.keys()) {
+    assert.ok(name.endsWith('-dark') || /-dark-/.test(name), `Dark token ${name} must be -dark suffixed`);
+    assert.ok(!light.has(name), `Dark token ${name} collides with a Light token`);
+  }
+  const tokens = new Map([...light, ...dark]);
   function resolve(name, chain = []) {
     assert.ok(tokens.has(name), `Missing token ${name}`);
     assert.ok(!chain.includes(name), `Cyclic token: ${[...chain, name].join(' → ')}`);

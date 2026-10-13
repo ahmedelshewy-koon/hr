@@ -12,7 +12,7 @@
 .settings-subnav-primary{padding-block-end:var(--sana-space-3);margin-block-end:16px;border-block-end:1px solid var(--line)}
 .settings-subnav-primary button{block-size:40px;padding-inline:var(--sana-space-3);border:1px solid var(--line);background:var(--surface);color:var(--sana-text);border-radius:var(--sana-radius-button);font-size:var(--type-body)}
 .settings-subnav-primary button:hover{background:var(--neutral-bg)}
-.settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-white)}
+.settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-on-fill)}
 .settings-subnav-primary button.active em{background:color-mix(in srgb, var(--sana-white) 22%, transparent)}
 .settings-subnav-secondary{inline-size:max-content;padding:var(--sana-space-1);margin-block-end:16px;background:var(--neutral-bg);border-radius:var(--sana-radius-control)}
 .settings-subnav-secondary button{block-size:32px;padding-inline:var(--sana-space-3);border:0;background:transparent;color:var(--muted);border-radius:var(--sana-radius-button);font-size:var(--type-secondary)}
@@ -27,7 +27,7 @@
 .org-settings-intro .settings-subnav-primary button{flex:0 1 auto;justify-content:center;gap:var(--sana-space-2);block-size:auto;min-block-size:44px;padding:var(--sana-space-2) var(--sana-space-4);border:1px solid transparent;border-radius:var(--sana-radius-pill);background:transparent;color:var(--muted);font-size:var(--type-secondary);line-height:1.5;transition:background-color .16s ease,color .16s ease,box-shadow .16s ease}
 .org-settings-intro .settings-subnav-primary button svg{flex:none;inline-size:17px;block-size:17px;stroke-width:1.8}
 .org-settings-intro .settings-subnav-primary button:hover{background:var(--surface);color:var(--sana-text)}
-.org-settings-intro .settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-white);font-weight:var(--weight-bold);box-shadow:var(--sana-shadow)}
+.org-settings-intro .settings-subnav-primary button.active{background:var(--navy);border-color:var(--navy);color:var(--sana-on-fill);font-weight:var(--weight-bold);box-shadow:var(--sana-shadow)}
 .org-settings-intro .settings-subnav-primary button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
 .org-settings-context{margin:16px 8px 0;padding-inline-start:var(--sana-space-3);border-inline-start:2px solid var(--line);color:var(--muted);font-size:var(--type-secondary);line-height:1.75}
 @media(max-width:720px){

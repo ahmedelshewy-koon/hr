@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Landmark, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
+  Landmark, Tags, Plug, LogOut, Activity, Bell, BriefcaseBusiness, Building2, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleUserRound,
   Clock3, Download, Eye, FileText, Globe2, GripVertical, KeyRound,
   Languages, LayoutDashboard, LayoutGrid, List, Lock, Menu, Minus, MoreHorizontal, Network,
@@ -60,7 +60,9 @@ import { DashboardInsights } from "./dashboard-insights";
 import { DashboardTeamTasks } from "./dashboard-team-tasks";
 import "./sana-theme.css";
 import "./sana-system.css";
+import { ThemeToggle } from "./theme-toggle";
 import "./employee-portal-dashboard.css";
+import "./sana-dark-theme.css";
 import type { Row } from "./ui-types";
 
 type Lang = "en" | "ar";
@@ -70,7 +72,7 @@ const NAV_GROUP: Record<Page, number> = {
   dashboard: 0, portal: 0, approvals: 0,
   employees: 1, leave: 1, attendance: 1, decisions: 1, recruitment: 1, lifecycle: 1,
   assets: 2, learning: 2, org: 2, blueprint: 2,
-  users: 3, reports: 3, payroll: 3, cost_centers: 3, hr_settings: 3, settings: 3,
+  users: 3, reports: 3, payroll: 3, cost_centers: 3, plans: 3, integrations: 3, hr_settings: 3, settings: 3,
 };
 const NAV_GROUP_LABELS = { ar: ["الرئيسية", "شؤون الموظفين", "التنظيم والتطوير", "المالية والإدارة"], en: ["Main", "People", "Organization & growth", "Finance & admin"] };
 type RoleId ="hr_manager" | "department_manager" | "employee" | "super_admin";
@@ -109,14 +111,14 @@ const copy = {
   en: {
     dashboard: PAGE_LABELS.dashboard.en, portal: PAGE_LABELS.portal.en, approvals: PAGE_LABELS.approvals.en,
     employees: PAGE_LABELS.employees.en, leave: PAGE_LABELS.leave.en, attendance: PAGE_LABELS.attendance.en, decisions: PAGE_LABELS.decisions.en,
-    recruitment:PAGE_LABELS.recruitment.en,lifecycle:PAGE_LABELS.lifecycle.en,assets:PAGE_LABELS.assets.en,learning:PAGE_LABELS.learning.en,org: PAGE_LABELS.org.en, blueprint: PAGE_LABELS.blueprint.en, users: PAGE_LABELS.users.en, reports:PAGE_LABELS.reports.en, payroll: PAGE_LABELS.payroll.en, cost_centers: PAGE_LABELS.cost_centers.en, hr_settings: PAGE_LABELS.hr_settings.en, settings: PAGE_LABELS.settings.en,
+    recruitment:PAGE_LABELS.recruitment.en,lifecycle:PAGE_LABELS.lifecycle.en,assets:PAGE_LABELS.assets.en,learning:PAGE_LABELS.learning.en,org: PAGE_LABELS.org.en, blueprint: PAGE_LABELS.blueprint.en, users: PAGE_LABELS.users.en, reports:PAGE_LABELS.reports.en, payroll: PAGE_LABELS.payroll.en, cost_centers: PAGE_LABELS.cost_centers.en, plans: PAGE_LABELS.plans.en, integrations: PAGE_LABELS.integrations.en, hr_settings: PAGE_LABELS.hr_settings.en, settings: PAGE_LABELS.settings.en,
     search: "Search anything...", greeting: "Good morning", subtitle: "Here’s what’s happening with your team today.",
     newRequest: "New request", viewAll: "View all", pending: "Pending approvals",
   },
   ar: {
     dashboard: PAGE_LABELS.dashboard.ar, portal: PAGE_LABELS.portal.ar, approvals: PAGE_LABELS.approvals.ar,
     employees: PAGE_LABELS.employees.ar, leave: PAGE_LABELS.leave.ar, attendance: PAGE_LABELS.attendance.ar, decisions: PAGE_LABELS.decisions.ar,
-    recruitment:PAGE_LABELS.recruitment.ar,lifecycle:PAGE_LABELS.lifecycle.ar,assets:PAGE_LABELS.assets.ar,learning:PAGE_LABELS.learning.ar,org: PAGE_LABELS.org.ar, blueprint: PAGE_LABELS.blueprint.ar, users: PAGE_LABELS.users.ar, reports:PAGE_LABELS.reports.ar, payroll: PAGE_LABELS.payroll.ar, cost_centers: PAGE_LABELS.cost_centers.ar, hr_settings: PAGE_LABELS.hr_settings.ar, settings: PAGE_LABELS.settings.ar,
+    recruitment:PAGE_LABELS.recruitment.ar,lifecycle:PAGE_LABELS.lifecycle.ar,assets:PAGE_LABELS.assets.ar,learning:PAGE_LABELS.learning.ar,org: PAGE_LABELS.org.ar, blueprint: PAGE_LABELS.blueprint.ar, users: PAGE_LABELS.users.ar, reports:PAGE_LABELS.reports.ar, payroll: PAGE_LABELS.payroll.ar, cost_centers: PAGE_LABELS.cost_centers.ar, plans: PAGE_LABELS.plans.ar, integrations: PAGE_LABELS.integrations.ar, hr_settings: PAGE_LABELS.hr_settings.ar, settings: PAGE_LABELS.settings.ar,
     search: "ابحث في النظام...", greeting: "صباح الخير", subtitle: "إليك ملخص فريقك لهذا اليوم.",
     newRequest: "طلب جديد", viewAll: "عرض الكل", pending: "طلبات بانتظار الاعتماد",
   },
@@ -129,6 +131,8 @@ import { DecisionPrompt, DecisionsPage } from "./decisions-page";
 import { ApprovalWorkflowSettings } from './approval-workflow-settings';
 import { BlueprintWorkspace } from './blueprint-workspace';
 import { CostCentersWorkspace } from './cost-centers-workspace';
+import { PlansWorkspace } from './plans-workspace';
+import { IntegrationsWorkspace } from './integrations-workspace';
 import { useOrganizationAccess } from './settings/use-organization-snapshot';
 import { OrganizationChart } from './organization-chart';
 import { createLatestLoader, onHrDataChanged } from './organization/latest-loader';
@@ -318,7 +322,7 @@ export function HRApp() {
 
   const role=roleIdFromName(authUser?.role_name);
   const rolePages:Record<RoleId,Page[]>={
-    super_admin:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","blueprint","users","reports","payroll","cost_centers","hr_settings","settings"],
+    super_admin:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","blueprint","users","reports","payroll","cost_centers","plans","integrations","hr_settings","settings"],
     hr_manager:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","blueprint","users","reports","payroll","cost_centers"],
     department_manager:["dashboard","portal","approvals","employees","leave","attendance","decisions","recruitment","lifecycle","assets","learning","org","reports"],
     employee:["dashboard","portal","lifecycle","learning"],
@@ -342,6 +346,8 @@ export function HRApp() {
     { id: "reports" as Page, label: t.reports, icon: Download },
     { id: "payroll" as Page, label: t.payroll, icon: Wallet },
     { id: "cost_centers" as Page, label: t.cost_centers, icon: Landmark },
+    { id: "plans" as Page, label: t.plans, icon: Tags },
+    { id: "integrations" as Page, label: t.integrations, icon: Plug },
     { id: "hr_settings" as Page, label: t.hr_settings, icon: SlidersHorizontal },
     { id: "settings" as Page, label: t.settings, icon: Settings },
   ].filter(item=>(Array.isArray(authUser?.allowed_pages)?authUser.allowed_pages:rolePages[role]).includes(item.id))
@@ -384,6 +390,7 @@ export function HRApp() {
           <div className="mobile-title">{currentTitle}</div>
           <div className="sana-module-label"><b>{currentTitle||"SANA HR"}</b></div>
           <div className="top-actions">
+            <ThemeToggle rtl={rtl} />
             <button className="language" onClick={() => {const next=lang === "en" ? "ar" : "en";setLang(next);window.localStorage.setItem("hr-language",next);}}><Languages size={16} />{lang === "en" ? "العربية" : "English"}</button>
             {visiblePage==="dashboard"&&<CountryFlagFilter rtl={rtl} selected={dashboardCountries} available={dashboardAvailableCountries} onChange={setDashboardCountries} onOpen={()=>setNotificationsOpen(false)}/>}
             <NotificationButton rtl={rtl} open={notificationsOpen} toggle={()=>setNotificationsOpen(value=>!value)}/>
@@ -422,6 +429,8 @@ export function HRApp() {
           {visiblePage === "reports" && <ReportsWorkspace rtl={rtl} notify={notify}/>}
           {visiblePage === "payroll" && <PayrollPage rtl={rtl} notify={notify} />}
           {visiblePage === "cost_centers" && <CostCentersWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "plans" && <PlansWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "integrations" && <IntegrationsWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "hr_settings" && <HrSettingsPage rtl={rtl} notify={notify} />}
           {visiblePage === "settings" && <SettingsPage rtl={rtl} notify={notify} />}
         </div>

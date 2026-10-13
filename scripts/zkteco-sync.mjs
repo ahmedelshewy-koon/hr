@@ -72,7 +72,7 @@ async function run() {
       try {
         // Devices assigned to an office connector are read by that connector (scripts/biometric-agent), not here.
         // Filtered here, not in SQL, so this keeps working on a database that predates migration 0032.
-        const devices = (await db.prepare("SELECT * FROM attendance_devices WHERE enabled=1 ORDER BY id").all()).results.filter(device => !device.agent_id);
+        const devices = (await db.prepare("SELECT * FROM attendance_devices WHERE enabled=1 ORDER BY id").all()).results.filter(device => !device.agent_id && !device.source_id);
         for (const device of devices) await syncDevice(db, device, !watch);
       } catch (error) {
         console.error(new Date().toISOString() + " [ZKTeco] Database unavailable: " + String(error?.code || "configuration/connection error"));

@@ -5,7 +5,7 @@
 .page-availability-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--sana-space-3); padding: 0 var(--sana-space-4) var(--sana-space-4); }
 .page-availability-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sana-space-3); border: 1px solid var(--sana-line); border-radius: var(--sana-radius-control); padding: var(--sana-space-4); }
 .page-availability-row h3 { margin: 0 0 8px; font-size: 14px; }
-.page-availability-row small { color: var(--sana-teal-mid); line-height: 1.6; }
+.page-availability-row small { color:var(--sana-accent-text); line-height: 1.6; }
 .page-availability-row button { flex-shrink: 0; }
 .page-availability-row button:focus-visible { outline: 3px solid var(--sana-teal-mid); outline-offset: 3px; }
 .page-availability-row button:disabled { opacity: .55; cursor: wait; }

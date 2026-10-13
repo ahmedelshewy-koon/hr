@@ -1,6 +1,6 @@
 .country-flag-filter { position: relative; display: inline-flex; }
 .country-flag-trigger { position: relative; cursor: pointer; }
-.country-flag-trigger[aria-expanded="true"] { color: var(--sana-teal-mid); border-color: color-mix(in srgb, var(--sana-teal-mid) 35%, transparent); }
+.country-flag-trigger[aria-expanded="true"] { color:var(--sana-accent-text); border-color: color-mix(in srgb, var(--sana-teal-mid) 35%, transparent); }
 .country-flag-trigger { width: auto; min-width: 40px; padding: 0 var(--sana-space-2); display: inline-flex; align-items: center; justify-content: center; gap: var(--sana-space-1); }
 .country-flag-mini { display: block; width: 26px; height: 18px; border-radius: var(--sana-radius-detail); overflow: hidden; box-shadow: var(--sana-shadow); }
 .country-flag-mini svg { display: block; width: 100%; height: 100%; }
@@ -8,15 +8,15 @@
 .country-flag-pop { flex-wrap: wrap; width: 304px; max-width: calc(100vw - 32px); max-height: min(420px, 70vh); overflow-y: auto; }
 .country-flag-pop .country-flag { width: 80px; }
 .country-flag-name { white-space: normal; text-align: center; }
-.country-flag-all { flex-basis: 100%; border: 1px solid var(--sana-line); border-radius: var(--sana-radius-control); background: var(--sana-white); padding: var(--sana-space-2); color: var(--sana-teal); cursor: pointer; }
-.country-flag-all[aria-pressed="true"] { color: var(--sana-teal-mid); background: var(--sana-canvas); border-color: var(--sana-teal-mid); }
+.country-flag-all { flex-basis: 100%; border: 1px solid var(--sana-line); border-radius: var(--sana-radius-control); background: var(--sana-white); padding: var(--sana-space-2); color:var(--sana-brand-text); cursor: pointer; }
+.country-flag-all[aria-pressed="true"] { color:var(--sana-accent-text); background: var(--sana-canvas); border-color: var(--sana-teal-mid); }
 .country-flag-pop { position: absolute; top: calc(100% + 12px); inset-inline-end: 0; z-index: 60; display: flex; gap: var(--sana-space-3); padding: var(--sana-space-3); background: var(--sana-surface); -webkit-backdrop-filter: none; backdrop-filter: none; border:1px solid var(--sana-border); border-radius: var(--sana-radius-card); box-shadow: var(--sana-shadow-card); animation: country-flag-pop-in .16s ease-out; }
 @keyframes country-flag-pop-in { from { opacity: 0; transform: translateY(-6px); } }
-.country-flag { display: grid; justify-items: center; gap: var(--sana-space-2); padding: 0; border: 0; background: transparent; color: var(--sana-teal-mid); font-size: var(--type-label); opacity: .68; transition: opacity .15s ease, transform .15s ease; }
+.country-flag { display: grid; justify-items: center; gap: var(--sana-space-2); padding: 0; border: 0; background: transparent; color:var(--sana-accent-text); font-size: var(--type-label); opacity: .68; transition: opacity .15s ease, transform .15s ease; }
 .country-flag-art { position: relative; display: block; width: 64px; height: 44px; padding: 0; border: 1px solid var(--card-border, var(--sana-line)); border-radius: var(--sana-radius-control); background: var(--sana-white); transition: border-color .15s ease, box-shadow .15s ease; }
 .country-flag-art svg { display: block; width: 100%; height: 100%; border-radius: var(--sana-radius-control); }
 .country-flag:hover { opacity: 1; transform: translateY(-1px); }
 .country-flag:focus-visible { outline: 3px solid var(--sana-teal-mid); outline-offset: 4px; border-radius: var(--sana-radius-control); }
-.country-flag.selected { opacity: 1; color: var(--sana-teal-mid); font-weight: var(--weight-semibold); }
+.country-flag.selected { opacity: 1; color:var(--sana-accent-text); font-weight: var(--weight-semibold); }
 .country-flag.selected .country-flag-art { border-color: var(--sana-teal-mid); box-shadow: var(--sana-shadow); }
-.country-flag-check { position: absolute; inset-block-start: -7px; inset-inline-end: -7px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--sana-radius-pill); background: var(--sana-teal-mid); color: var(--sana-white); box-shadow: var(--sana-shadow); }
+.country-flag-check { position: absolute; inset-block-start: -7px; inset-inline-end: -7px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--sana-radius-pill); background: var(--sana-teal-mid); color:var(--sana-on-fill); box-shadow: var(--sana-shadow); }

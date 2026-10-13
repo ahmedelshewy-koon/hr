@@ -1,0 +1,207 @@
+/* SANA Dark Mode: theme layer. Loaded last; every rule is scoped to html[data-theme="dark"].
+   Values come only from the -dark tokens in sana-tokens-dark.css. Light Mode never reads this file's output.
+   Visual only: no layout, content or behaviour is changed here. */
+
+/* 1. Remap the shared semantic names to their Dark values (same names, so feature CSS follows automatically). */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --sana-text:var(--sana-text-dark); --sana-heading:var(--sana-heading-dark); --sana-ink:var(--sana-text-dark);
+  --sana-text-2:var(--sana-text-2-dark); --sana-muted:var(--sana-text-3-dark); --sana-disabled:rgba(255,255,255,.38);
+  --sana-white:var(--sana-shell-dark);
+  --sana-canvas:var(--sana-canvas-dark); --sana-canvas-warm:var(--sana-canvas-dark);
+  --sana-line:var(--sana-border-dark); --sana-border:var(--sana-border-dark); --sana-switch-border:var(--sana-switch-border-dark);
+  --sana-shell:var(--sana-shell-dark); --sana-surface:var(--sana-shell-dark);
+  --sana-secondary-bg:var(--sana-secondary-bg-dark); --sana-secondary-border:var(--sana-secondary-border-dark); --sana-secondary-text:var(--sana-secondary-text-dark);
+  --sana-hover:var(--sana-hover-dark); --sana-sidebar-hover:var(--sana-sidebar-hover-bg-dark);
+  --sana-shadow:var(--sana-shadow-card-dark); --sana-shadow-card:var(--sana-shadow-card-dark); --sana-shadow-popover:var(--sana-shadow-card-dark);
+  --sana-overlay:var(--sana-overlay-dark);
+  --sana-sidebar-item-height:var(--sana-sidebar-item-height-dark); --sana-sidebar-item-gap:var(--sana-sidebar-item-gap-dark);
+  --sana-radius-switch:var(--sana-radius-switch-dark);
+  --sana-brand-text:var(--sana-text-dark); --sana-accent-text:var(--sana-accent-text-dark);
+  --sana-on-fill-soft:var(--sana-text-2-dark); --sana-on-fill-canvas:var(--sana-text-dark);
+  --sana-success:var(--sana-success-dark); --sana-warning:var(--sana-warning-dark);
+  --sana-danger:var(--sana-danger-dark); --sana-info:var(--sana-info-dark);
+  --sana-success-bg:color-mix(in srgb,var(--sana-success-dark) 18%,#000);
+  --sana-warning-bg:color-mix(in srgb,var(--sana-warning-dark) 18%,#000);
+  --sana-danger-bg:color-mix(in srgb,var(--sana-danger-dark) 18%,#000);
+  --sana-info-bg:color-mix(in srgb,var(--sana-info-dark) 18%,#000);
+  --sana-chart-1:var(--sana-chart-1-dark); --sana-chart-2:var(--sana-chart-2-dark); --sana-chart-3:var(--sana-chart-3-dark);
+  --sana-page-bg:var(--sana-bg-dark);
+  --sana-page-start:var(--sana-bg-dark-start); --sana-page-end:var(--sana-bg-dark-end);
+  --sana-button:var(--sana-primary-dark);
+}
+
+/* 2. Text hierarchy: white-based everywhere. */
+html[data-theme="dark"] .app { color:var(--sana-text-dark); }
+html[data-theme="dark"] .app :is(h1,h2,h3,h4,.dashboard-title,.sana-module-label b) { color:var(--sana-heading-dark); }
+html[data-theme="dark"] .app :is(.data-table .tr.th,thead th) { color:var(--sana-text-2-dark); }
+html[data-theme="dark"] .app .chart-actions>span { color:var(--sana-text-dark); }
+html[data-theme="dark"] .sana-brand { color:var(--sana-text-dark); }
+
+/* 3. App shell and topbar. */
+html[data-theme="dark"] .app[dir] .main { background:var(--sana-shell-dark); border-radius:var(--sana-radius-shell-dark); }
+html[data-theme="dark"] .app[dir] .topbar { background:var(--sana-shell-dark); border:1px solid var(--sana-border-dark); }
+
+/* 4. Cards: gradient #021615 -> #000, 24px, #073028 border, soft shadow. */
+html[data-theme="dark"] .app :is(.panel,.stat-card,.attendance-kpis>button,.sana-dashboard-kpis>button,.profile-pop,.notification-pop,.filterbar,.employee-card,.org-card,.portal-card) {
+  background:var(--sana-card-dark); border-color:var(--sana-border-dark); border-radius:var(--sana-radius-card-dark); box-shadow:var(--sana-shadow-card-dark);
+}
+html[data-theme="dark"] .login-page .login-card { background:var(--sana-card-dark); border-color:var(--sana-border-dark); box-shadow:var(--sana-shadow-card-dark); }
+
+/* 5. Tables and dense data surfaces. */
+html[data-theme="dark"] .app :is(.data-table,table) { background:var(--sana-table-dark); }
+html[data-theme="dark"] .app :is(.data-table .tr.th,thead th) { background:var(--sana-table-dark); }
+html[data-theme="dark"] .app :is(.data-table .tr,td,th,tbody tr) { border-color:var(--sana-border-dark-inner); }
+html[data-theme="dark"] .app :is(.data-table .tr:not(.th):hover,tbody tr:hover) { background:var(--sana-hover-dark); }
+html[data-theme="dark"] .app .chart { background:repeating-linear-gradient(to bottom,transparent 0,transparent 37px,var(--sana-border-dark-inner) 38px); }
+
+/* 6. Buttons. Primary gradient is inherited from --sana-button; secondary is #111B1B / #25C6A3. */
+html[data-theme="dark"] .app :is(.primary,.login-submit) { background:var(--sana-primary-dark); color:var(--sana-text-dark); border-color:transparent; }
+html[data-theme="dark"] .app .primary:hover,html[data-theme="dark"] .app .primary:active { background:var(--sana-primary-hover-dark); border-color:transparent; filter:none; }
+html[data-theme="dark"] .app .outline {
+  background:var(--sana-secondary-bg-dark); border-color:var(--sana-secondary-border-dark); color:var(--sana-secondary-text-dark);
+}
+html[data-theme="dark"] .app .outline:hover { background:var(--sana-hover-dark); border-color:var(--sana-secondary-border-dark); color:var(--sana-text-dark); }
+
+/* 7. Inputs, selects, dropdowns. */
+html[data-theme="dark"] .app :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea),
+html[data-theme="dark"] .login-page .login-input { background-color:var(--sana-shell-dark); border-color:var(--sana-border-dark); color:var(--sana-text-dark); }
+html[data-theme="dark"] .app :is(input,select,textarea):disabled { background:var(--sana-canvas-dark); color:var(--sana-text-3-dark); }
+html[data-theme="dark"] .app :is(input,select,textarea):focus-visible,html[data-theme="dark"] .app button:focus-visible { outline-color:var(--sana-focus-dark); }
+html[data-theme="dark"] .app :is(option,optgroup) { background:var(--sana-shell-dark); color:var(--sana-text-dark); }
+html[data-theme="dark"] .app input:is([type=checkbox],[type=radio],[type=range]) { accent-color:var(--sana-primary-hover-dark); }
+
+/* 8. Switch bar / segmented control. */
+html[data-theme="dark"] .app .tabs { background:var(--sana-shell-dark); border-color:var(--sana-switch-border-dark); border-radius:var(--sana-radius-switch-dark); }
+html[data-theme="dark"] .app .tabs button { color:var(--sana-text-2-dark); }
+html[data-theme="dark"] .app .tabs button:hover { background:var(--sana-hover-dark); color:var(--sana-text-dark); }
+html[data-theme="dark"] .app .tabs button.active,html[data-theme="dark"] .app .tabs button.active:hover { background:var(--sana-primary-dark); color:var(--sana-text-dark); }
+
+/* 9. Sidebar: 55px items, 24px gap, active = #F4F3EF with #0B4237 text/icon, hover = #0B4237 with white. */
+html[data-theme="dark"] .app[dir] .sidebar nav button { color:var(--sana-text-2-dark); }
+html[data-theme="dark"] .app[dir] .sidebar nav button:hover,html[data-theme="dark"] .app[dir] .sidebar-bottom>button:hover { background:var(--sana-sidebar-hover-bg-dark); color:var(--sana-sidebar-hover-text-dark); }
+html[data-theme="dark"] .app[dir] .sidebar nav button:hover svg { color:var(--sana-sidebar-hover-text-dark); }
+html[data-theme="dark"] .app[dir] .sidebar nav button.active,html[data-theme="dark"] .app[dir] .sidebar nav button.active:hover { background:var(--sana-sidebar-active-bg-dark); color:var(--sana-sidebar-active-text-dark); }
+html[data-theme="dark"] .app[dir] .sidebar nav button.active svg,html[data-theme="dark"] .app[dir] .sidebar nav button.active:hover svg { color:var(--sana-sidebar-active-text-dark); }
+
+/* 10. Modals / drawers: near-black flat surface, #073028 border, black blurred backdrop. */
+html[data-theme="dark"] .app :is(.drawer,.modal-card,.password-card,.modal-dialog),html[data-theme="dark"] .modal-dialog { background:var(--sana-modal-dark); border:1px solid var(--sana-border-dark); box-shadow:var(--sana-shadow-card-dark); }
+html[data-theme="dark"] .modal-scrim { background:var(--sana-overlay-dark); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+html[data-theme="dark"] .app .drawer-head,html[data-theme="dark"] .app .drawer-footer { border-color:var(--sana-border-dark); }
+
+/* 11. Icon backgrounds: light green tiles with dark-green glyphs. */
+html[data-theme="dark"] .app :is(.stat-icon,.stat-icon.blue,.stat-icon.green,.stat-icon.violet,.stat-icon.orange,.attendance-kpis>button>span) { background:var(--sana-icon-bg-dark); color:var(--sana-icon-fg-dark); }
+
+/* 12. Status chips keep semantic colours; neutral chips are tonal white. */
+html[data-theme="dark"] .app :is(.status.green,.status.approved,.status.active,.status.blue,.status.violet) { color:var(--sana-text-dark); }
+
+/* 13. Sidebar section labels / separators are foreground on the dark glass, not surfaces. */
+html[data-theme="dark"] .sidebar nav .nav-group-label { color:var(--sana-text-3-dark); }
+html[data-theme="dark"] .app.sidebar-collapsed .sidebar nav .nav-group-label { background:var(--sana-border-dark); }
+
+/* 14. Empty states and nested data blocks sit on the internal data surface. */
+html[data-theme="dark"] .app :is(.empty,.empty-state) { background:var(--sana-table-dark); }
+
+/* 15. Integrations workbench keeps its own layout and variables; only the palette follows the theme. */
+html[data-theme="dark"] :is(.pm,.pm-modal) {
+  --pm-bg:var(--sana-modal-dark); --pm-soft:var(--sana-shell-dark); --pm-sel:var(--sana-hover-dark); --pm-line:var(--sana-border-dark);
+  --pm-text:var(--sana-text-dark); --pm-muted:var(--sana-text-3-dark); --pm-hover:var(--sana-canvas-dark);
+  --pm-blue:var(--sana-accent-text-dark); --pm-orange:var(--sana-chart-1-dark); --pm-green:var(--sana-success-dark); --pm-red:var(--sana-danger-dark);
+  box-shadow:var(--sana-shadow-card-dark);
+}
+html[data-theme="dark"] :is(.pm,.pm-modal) :is(.pm-send,.pm-new) { background:var(--sana-primary-dark); color:var(--sana-text-dark); }
+html[data-theme="dark"] :is(.pm,.pm-modal) :is(.pm-send,.pm-new):hover { background:var(--sana-primary-hover-dark); }
+
+/* 16. Selected segmented / sub-navigation items always use the primary gradient. */
+html[data-theme="dark"] .app :is(.settings-subnav-primary button.active,.settings-subnav-secondary button.active) { background:var(--sana-primary-dark); border-color:transparent; color:var(--sana-text-dark); }
+
+/* 17. KPI / stat icon chips (icon-only wrappers inside KPI cards) get the light green tile. Report tone chips keep their semantic tint. */
+html[data-theme="dark"] .app :is(.learning-kpi,.mini-stats,.location-stat,[class*="kpi"],.stat-card) :is(span,div,i,b):has(>svg:only-child):not([class*="rp-"] *) { background:var(--sana-icon-bg-dark); color:var(--sana-icon-fg-dark); }
+html[data-theme="dark"] .app :is(.mini-stats,.location-stat)>:is(div,section)>svg:first-child,html[data-theme="dark"] .app .location-stat>svg:first-child { background:var(--sana-icon-bg-dark); color:var(--sana-icon-fg-dark); }
+
+/* 18. Login: the hero sits on the dark gradient in both modes, so its foreground stays white. */
+html[data-theme="dark"] .login-page { --lg-accent:var(--sana-text-dark); }
+html[data-theme="dark"] .login-page .login-footer { color:var(--sana-text-2-dark); border-top-color:var(--sana-border-dark); }
+html[data-theme="dark"] .login-page :is(.login-back,.login-brand-tag) { background:var(--sana-canvas-dark); border-color:var(--sana-border-dark); color:var(--sana-text-dark); }
+
+/* ==========================================================================
+   19. Correction pass: main content only. The sidebar rules above are approved and are not touched here.
+   Rhythm: 24px between major rows, 16px between sibling cards and inside cards, 8px between related items.
+   ========================================================================== */
+
+/* 19.1 Compact type scale for the content area (tokens are read by feature CSS). */
+html[data-theme="dark"] {
+  --type-page:24px; --type-section:16px; --type-component:14px; --type-body-large:15px; --type-kpi:20px; --type-table:13px;
+}
+html[data-theme="dark"] .app .content :is(h2,h3,h4) { font-weight:600 !important; }
+html[data-theme="dark"] .app .content h3 { font-size:var(--type-component) !important; font-weight:500 !important; }
+html[data-theme="dark"] .app .content :is(.stat-value,.attendance-kpis>button>b,.rp-kpi b,.asset-kpi b,.bp-kpis b,.ats-kpis strong,.lifecycle-kpi b,.lifecycle-kpi strong) { font-weight:600 !important; }
+html[data-theme="dark"] .app .content :is(p,small,.eyebrow,td small) { font-weight:400; }
+html[data-theme="dark"] .app .content :is(.primary,.outline,.ghost,.select-button,.text-button) { font-size:14px !important; font-weight:500 !important; }
+html[data-theme="dark"] .app .content :is(.data-table .tr.th,thead th) { font-size:12px !important; font-weight:500 !important; }
+html[data-theme="dark"] .app .content :is(td,.data-table .tr:not(.th)) { font-size:13px; }
+
+/* 19.2 Topbar: compact, quiet frame, no glow. The 24px ring only masks scrolling content behind the sticky bar. */
+html[data-theme="dark"] .app[dir] .topbar { height:72px; min-height:72px; padding:16px 24px; border-color:var(--sana-border-dark); box-shadow:0 0 0 24px var(--sana-shell-dark); }
+@media (min-width:761px) and (max-width:1100px) { html[data-theme="dark"] .app[dir] .topbar { box-shadow:0 0 0 16px var(--sana-shell-dark); } }
+@media (max-width:760px) { html[data-theme="dark"] .app[dir] .topbar { height:auto; min-height:64px; padding:8px 16px; box-shadow:none; } }
+
+/* 19.3 Shadows: only main card containers carry the single, subtle card shadow. */
+html[data-theme="dark"] { --sana-shadow:none; --sana-shadow-popover:none; }
+html[data-theme="dark"] .app .content :where(*:not(:focus-visible)) { box-shadow:none; }
+html[data-theme="dark"] .app .content :is(.panel,.stat-card,.attendance-kpis>button,.sana-dashboard-kpis>button,.employee-card,.mini-stats>div,.location-stat,.lifecycle-kpi,.lifecycle-panel,.learning-kpi,.rp-kpi,.asset-kpi,.ats-kpis>*) { box-shadow:var(--sana-shadow-card-dark); }
+html[data-theme="dark"] .app .content :is(.panel,.lifecycle-panel,.stat-card,.employee-card) :is(.panel,.stat-card,.employee-card,.lifecycle-kpi,.mini-stats>div) { box-shadow:none; }
+
+/* 19.4 Surface hierarchy: shell #111B1B, main card gradient, dense internal surface #000C0C. */
+html[data-theme="dark"] .app .content :is(.panel,.lifecycle-panel) :is(.panel,.empty,.empty-state,.data-table,table,.reporting-canvas) { background:var(--sana-table-dark); border-color:var(--sana-border-dark-inner); }
+html[data-theme="dark"] .app .content .reporting-canvas { background:var(--sana-table-dark); border:1px solid var(--sana-border-dark-inner); border-radius:var(--sana-radius-card-dark); }
+html[data-theme="dark"] .app .content .reporting-card { background:var(--sana-card-dark); border-color:var(--sana-border-dark); box-shadow:none; }
+html[data-theme="dark"] .app .content .reporting-card :is(.chart-avatar) { box-shadow:none; }
+html[data-theme="dark"] .app .content .employee-photo { box-shadow:none; }
+
+/* 19.5 Tables: dense, quiet, 16px cell padding. */
+html[data-theme="dark"] .app .content :is(td,th) { padding:12px 16px; }
+html[data-theme="dark"] .app .content :is(.data-table .tr,td,th,tbody tr) { border-color:var(--sana-border-dark-inner); }
+
+/* 19.6 Vertical rhythm: 24px between the major rows of every page; cards in one row keep 16px. */
+html[data-theme="dark"] .app .content > :only-child { row-gap:24px; }
+html[data-theme="dark"] .app .content :is(.stat-grid,.dashboard-grid,.dashboard-grid.lower,.sana-dashboard-kpis) { margin-bottom:24px; }
+html[data-theme="dark"] .app .content :is(.stat-grid,.dashboard-grid,.sana-dashboard-kpis,.attendance-kpis,.lifecycle-kpis,.ats-kpis,.mini-stats) { gap:16px; }
+html[data-theme="dark"] .app .content .org-control-row { margin-bottom:0; }
+
+/* 19.7 Utility controls are quiet; only real secondary CTAs keep the #25C6A3 outline. */
+html[data-theme="dark"] .app :is(.chart-actions,.filterbar,.panel-head,.org-control-row) .outline,
+html[data-theme="dark"] .app .outline.small,
+html[data-theme="dark"] .app .outline:has(:is(.lucide-refresh-cw,.lucide-printer,.lucide-minus,.lucide-plus,.lucide-rotate-ccw,.lucide-crosshair,.lucide-funnel,.lucide-filter,.lucide-download,.lucide-chevron-down,.lucide-search)) {
+  background:transparent; border-color:var(--sana-border-dark); color:var(--sana-text-2-dark);
+}
+html[data-theme="dark"] .app :is(.chart-actions,.filterbar,.panel-head,.org-control-row) .outline:hover,
+html[data-theme="dark"] .app .outline.small:hover,
+html[data-theme="dark"] .app .outline:has(:is(.lucide-refresh-cw,.lucide-printer,.lucide-minus,.lucide-plus,.lucide-rotate-ccw,.lucide-crosshair,.lucide-funnel,.lucide-filter,.lucide-download,.lucide-chevron-down,.lucide-search)):hover {
+  background:var(--sana-hover-dark); border-color:var(--sana-border-dark); color:var(--sana-text-dark);
+}
+html[data-theme="dark"] .app .content .org-control-row { gap:8px; }
+
+/* 19.8 Icon tiles: 40px, 20px glyph, light green. */
+html[data-theme="dark"] .app :is(.stat-icon,.attendance-kpis>button>span) { width:40px; height:40px; min-width:40px; }
+html[data-theme="dark"] .app .content :is(.learning-kpi,.mini-stats,.location-stat,[class*="kpi"],.stat-card) :is(span,div,i,b):has(>svg:only-child):not([class*="rp-"] *) { width:40px; height:40px; min-width:40px; display:inline-grid; place-items:center; }
+html[data-theme="dark"] .app .content :is(.learning-kpi,.mini-stats,.location-stat,[class*="kpi"],.stat-card) :is(span,div,i,b):has(>svg:only-child) > svg { width:20px; height:20px; }
+html[data-theme="dark"] .app .content :is(.mini-stats,.location-stat)>:is(div,section)>svg:first-child,html[data-theme="dark"] .app .content .location-stat>svg:first-child { box-sizing:border-box; width:40px; height:40px; padding:10px; border-radius:50%; }
+
+/* 19.9 Segmented controls stay compact. */
+html[data-theme="dark"] .app .tabs { padding:4px; gap:4px; }
+html[data-theme="dark"] .app .tabs button { padding:8px 16px; font-size:13px; }
+html[data-theme="dark"] .app .content .employees-page-shell > * { margin-block:0; }
+
+/* 19.10 KPI cards use the main-card gradient so they read as cards, not as outlines on the shell. */
+html[data-theme="dark"] .app .content :is(.ats-kpis>*,.lifecycle-kpi,.learning-kpi,.rp-kpi,.asset-kpi,.bp-kpis>*,.mini-stats>div,.location-stat) { background:var(--sana-card-dark); border-color:var(--sana-border-dark); border-radius:var(--sana-radius-card-dark); }
+
+/* 20. Gradient direction: major dark surfaces use the 135deg diagonal (card token), the header uses the diagonal brand gradient. */
+html[data-theme="dark"] .app[dir] .topbar { background:var(--sana-topbar-dark); }
+
+/* 21. "My tasks": outer frame = gradient card, inner content areas = #000C0C. */
+html[data-theme="dark"] .app .dashboard-my-tasks { background:var(--sana-card-dark); }
+html[data-theme="dark"] .app .dashboard-my-tasks .my-tasks-header { background:transparent; border-bottom-color:var(--sana-border-dark-inner); }
+html[data-theme="dark"] .app .dashboard-my-tasks :is(.my-tasks-overview,.my-task-card) { background:var(--sana-table-dark); border-color:var(--sana-border-dark-inner); box-shadow:none; }
+html[data-theme="dark"] .app .dashboard-my-tasks :is(.my-tasks-message,.my-tasks-loading) { margin:0 16px 16px; border:1px solid var(--sana-border-dark-inner); border-radius:16px; background:var(--sana-table-dark); }
+html[data-theme="dark"] .app .dashboard-my-tasks .my-task-skeleton { background:linear-gradient(105deg,var(--sana-canvas-dark) 30%,rgba(255,255,255,.09) 45%,var(--sana-canvas-dark) 60%); background-size:250% 100%; }

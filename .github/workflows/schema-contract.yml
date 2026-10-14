@@ -20,6 +20,8 @@ jobs:
         run: |
           node --experimental-strip-types ops/export-schema-contract.mjs > /tmp/hr-schema-contract.json
           python3 -m json.tool /tmp/hr-schema-contract.json > /dev/null
+          diff -u ops/hr-schema-contract.json /tmp/hr-schema-contract.json
+          bash -n ops/hr-schema-audit.sh ops/test-vps-bridge-on-clone.sh
           node -e 'const x=require("/tmp/hr-schema-contract.json"); console.log("HR_TABLES="+x.tables.length); console.log("HR_COLUMNS="+x.tables.reduce((n,t)=>n+t.columns.length,0));'
       - name: Print schema contract for committing to the audit branch
         run: node -e 'const x=require("/tmp/hr-schema-contract.json"); console.log("HR_SCHEMA_CONTRACT_JSON="+JSON.stringify(x));'

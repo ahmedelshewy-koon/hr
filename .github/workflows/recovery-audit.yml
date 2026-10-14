@@ -1,7 +1,5 @@
 name: HR VPS migration-file recovery audit (read-only)
 on:
-  push:
-    branches: [ci/bootstrap-hr-checks]
   workflow_dispatch:
 permissions:
   contents: read

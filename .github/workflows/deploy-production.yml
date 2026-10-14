@@ -1,5 +1,7 @@
 name: Deploy HR to production (gated)
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,7 +23,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - run: npm ci --include=dev
       - name: Run full HR regression suite (required gate)
         run: npm test
       - name: Check entire migration source chain (required gate)
@@ -44,15 +46,17 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
           printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 0600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-      - name: Retrieve vetted VPS self-host compatibility overlay
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: Check version-controlled VPS files and schema contract
         run: |
           set -euo pipefail
-          SCP=(scp -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15)
-          "${SCP[@]}" sana-deploy@209.42.23.12:/opt/sanaa-hr/app/vite.config.ts vite.config.ts
-          mkdir -p worker
-          "${SCP[@]}" sana-deploy@209.42.23.12:/opt/sanaa-hr/app/worker/vps-cloudflare-env.ts worker/vps-cloudflare-env.ts
-          echo '0da363bfc46c43903b1b72fe7ce6ddf8d434849d0a29ebccfe83e25fedb6424e  worker/vps-cloudflare-env.ts' | sha256sum --check
-          grep -q 'VPS_SELF_HOST' vite.config.ts
+          test -s worker/vps-cloudflare-env.ts
+          test -s vite.config.ts
+          test -s ops/hr-schema-contract.json
+          test -s ops/hr-schema-audit.sh
+          bash -n ops/hr-schema-audit.sh
+          node --experimental-strip-types ops/export-schema-contract.mjs > /tmp/hr-expected-schema.json
+          diff -u ops/hr-schema-contract.json /tmp/hr-expected-schema.json
       - name: Build VPS-compatible HR release
         env:
           VPS_SELF_HOST: '1'

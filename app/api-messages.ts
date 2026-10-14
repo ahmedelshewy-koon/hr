@@ -8,6 +8,11 @@
  */
 
 const EXACT: Record<string, string> = {
+  "You cannot delete your own account": "لا يمكنك حذف حسابك الشخصي",
+  "HR can delete employee and department-manager accounts only": "يمكن للموارد البشرية حذف حسابات الموظفين ومديري الأقسام فقط",
+  "The last active system administrator cannot be deleted": "لا يمكن حذف آخر مدير نظام نشط",
+  "Reassign this user's HR responsibility before deletion": "أعد تعيين مسؤوليات الموارد البشرية لهذا المستخدم قبل حذفه",
+  "Unable to create user account": "تعذر إنشاء حساب المستخدم",
   "Recurring element overlaps a confirmed payroll run": "يتداخل البند المتكرر مع مسير رواتب معتمد",
   "Existing recurring element overlaps a locked month or confirmed run": "يتداخل البند المتكرر الحالي مع شهر مقفل أو مسير معتمد",
   "Confirmed payroll run blocks variable entry changes": "يمنع مسير الرواتب المعتمد تعديل البنود المتغيرة",

@@ -379,6 +379,13 @@
       "when": 1791321000000,
       "tag": "0053_payroll_rebuild",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791972248259,
+      "tag": "0054_deleted_employee_email",
+      "breakpoints": true
     }
   ]
 }

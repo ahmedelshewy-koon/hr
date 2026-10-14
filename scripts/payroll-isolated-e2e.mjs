@@ -36,7 +36,7 @@ try {
   if (restore.status !== 0) throw Error(`schema restore failed: ${restore.stderr.slice(0, 2000)}`);
   const db = postgres(clone.toString(), { max: 1, prepare: false, ssl: false });
   try {
-    for (const migration of ["0052_timesheet_management.sql", "0053_payroll_rebuild.sql"]) {
+    for (const migration of ["0052_timesheet_management.sql", "0053_payroll_rebuild.sql", "0054_deleted_employee_email.sql"]) {
       const sql = fs.readFileSync(`drizzle-postgres/${migration}`, "utf8").replaceAll("--> statement-breakpoint", "");
       await db.unsafe(sql);
     }
@@ -44,7 +44,7 @@ try {
     if (!state.timesheets || !state.payroll || !state.page_permissions) throw Error("Isolated migration tables missing");
     const defaults=await db`SELECT absence_notice,value FROM deduction_rules WHERE rule_type='absence' AND status='active' ORDER BY absence_notice`;
     if(defaults.length!==2||defaults[0].absence_notice!=="with_notice"||Number(defaults[0].value)!==1||defaults[1].absence_notice!=="without_notice"||Number(defaults[1].value)!==2)throw Error("Default notice deduction rules are missing");
-    console.log("Fresh local schema clone migrated through 0053; Timesheet, Payroll and page permission tables verified.");
+    console.log("Fresh local schema clone migrated through 0054; Timesheet, Payroll and page permission tables verified.");
     if (process.argv.includes("--columns")) {
       const columns = await db`SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('users','employees','roles','salary_structures','payroll_variable_entries','timesheets','payroll_month_locks','deduction_rules') AND is_nullable='NO' AND column_default IS NULL ORDER BY table_name,ordinal_position`;
       console.log(columns.map(row => `${row.table_name}.${row.column_name}`).join("\n"));
@@ -146,7 +146,33 @@ try {
         if(escalated.escalated!==1)throw Error('Three-day request escalation did not advance the manager stage');
         const [next]=await db`SELECT current_user_id,current_step FROM approval_workflow_runs WHERE source_type='employee_request' AND source_id=${requestRow.id}`;
         if(Number(next.current_user_id)!==Number(hrUsers[0])||Number(next.current_step)!==1)throw Error('Request did not escalate to KSA HR level zero');
-        console.log("Isolated E2E: WFH and saved attendance -> deduction post/rollback/repost -> month lock -> stale run safeguard -> recalculation/confirmation -> fake ERP invoice; KSA HR chain and three-day escalation passed.");
+        const {deleteUserAccount,deleteEmployeeAccounts,provisionEmployeeAccount,deletedUserEmail}=await import('../app/users/account-lifecycle.ts');
+        const [employeeRole]=await db`INSERT INTO roles(name) VALUES('Employee') RETURNING id`;
+        const accountInput={email:'payroll-employee@example.invalid',employeeId:employee.id,roleId:employeeRole.id,passwordHash:'isolated-test-hash'};
+        const originalAccount=await serviceDb.transaction(tx=>provisionEmployeeAccount(tx,accountInput));
+        await db`INSERT INTO audit_logs(user_id,action,module,record_type,record_id) VALUES(${originalAccount},'create','users','user',${String(originalAccount)})`;
+        const originalToken=await createPortalSession({id:originalAccount,email:accountInput.email,session_version:1});
+        await registerPortalSession(serviceDb,originalToken,originalAccount);
+        if(!await serviceDb.transaction(tx=>deleteUserAccount(tx,originalAccount)))throw Error('User account was not deleted');
+        const [removed]=await db`SELECT status,email,password_hash,session_version FROM users WHERE id=${originalAccount}`;
+        if(removed.status!=='deleted'||removed.email!==deletedUserEmail(originalAccount)||removed.password_hash!==null||Number(removed.session_version)!==2)throw Error('Deleted account remained usable or retained its unique email');
+        const [sessionCount]=await db`SELECT COUNT(*)::int AS count FROM portal_session_activity WHERE user_id=${originalAccount}`;
+        if(Number(sessionCount.count)!==0)throw Error('Deleted account retained an active session');
+        const replacement=await serviceDb.transaction(tx=>provisionEmployeeAccount(tx,accountInput));
+        if(replacement===originalAccount)throw Error('New login inherited the deleted user audit identity');
+        const [historicalAudit]=await db`SELECT user_id FROM audit_logs WHERE user_id=${originalAccount} AND action='create' AND module='users' LIMIT 1`;
+        if(Number(historicalAudit?.user_id)!==originalAccount)throw Error('Historical user audit reference was lost');
+        const linkedDeleted=await serviceDb.transaction(tx=>deleteEmployeeAccounts(tx,employee.id));
+        if(linkedDeleted.length!==1||linkedDeleted[0]!==replacement)throw Error('Employee deletion did not delete its current login');
+        await db`UPDATE employees SET employment_status='deleted' WHERE id=${employee.id}`;
+        const [history]=await db`SELECT COUNT(*)::int AS count FROM payroll_run_lines WHERE employee_id=${employee.id}`;
+        if(Number(history.count)===0)throw Error('Employee deletion lost historical payroll lines');
+        const [newEmployee]=await db`INSERT INTO employees(employee_code,name_en,name_ar,work_email,start_date,country) VALUES('E-T-REHIRE','Payroll Rehire','اختبار','payroll-employee@example.invalid','2026-10-01','Egypt') RETURNING id`;
+        const newLogin=await serviceDb.transaction(tx=>provisionEmployeeAccount(tx,{...accountInput,employeeId:newEmployee.id}));
+        if(newLogin===replacement||newLogin===originalAccount)throw Error('Rehired employee inherited a deleted login identity');
+        const [oldEmployee]=await db`SELECT work_email FROM employees WHERE id=${employee.id}`;
+        if(oldEmployee.work_email!==accountInput.email)throw Error('Former employee work email was not preserved');
+        console.log("Isolated E2E: WFH and saved attendance -> deductions -> month lock -> Payroll Run -> fake ERP; KSA escalation and user/employee account deletion with retained history passed.");
       } finally { await serviceDb.close(); }
     }
   } finally { await db.end(); }

@@ -91,7 +91,7 @@ export async function saveEmployeeProfile(db:TransactionDatabase,employeeId:numb
   await db.prepare(`UPDATE employees SET ${columns.map(c=>`${c}=?,`).join('')}updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(...columns.map(c=>updates[c]),employeeId).run();
   await persistAssignment(db,employeeId,assignment,payload,before);
   if(Number(assignment.department_id||0)!==Number(before.department_id||0)||Number(assignment.manager_id||0)!==Number(before.manager_id||0))await refreshReportingLevels(db,employeeId);
-  if(payload.workEmail!==undefined&&updates.work_email!==before.work_email)await db.prepare('UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE id=(SELECT id FROM users WHERE employee_id=? ORDER BY (lower(email)=lower(?)) DESC,id LIMIT 1)').bind(updates.work_email,employeeId,String(before.work_email||'')).run();
+  if(payload.workEmail!==undefined&&updates.work_email!==before.work_email)await db.prepare('UPDATE users SET email=?,updated_at=CURRENT_TIMESTAMP WHERE id=(SELECT id FROM users WHERE employee_id=? AND status<>\'deleted\' ORDER BY (lower(email)=lower(?)) DESC,id LIMIT 1)').bind(updates.work_email,employeeId,String(before.work_email||'')).run();
   if(afterSave)await afterSave(db);
   const after=await db.prepare('SELECT * FROM employees WHERE id=?').bind(employeeId).first<Row>();
   await db.prepare("INSERT INTO audit_logs(user_id,action,module,record_type,record_id,previous_value,new_value,ip_address) VALUES (?,'update','employees','employee',?,?,?,?)").bind(actor.id,String(employeeId),JSON.stringify(before),JSON.stringify(after),actor.ip??null).run();

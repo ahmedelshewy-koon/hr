@@ -116,7 +116,7 @@ export const employees = pgTable(
   },
   (t) => [
     uniqueIndex("idx_employees_employee_code").on(t.employeeCode),
-    uniqueIndex("idx_employees_work_email").on(t.workEmail),
+    uniqueIndex("idx_employees_work_email").on(t.workEmail).where(sql`employment_status <> 'deleted'`),
     index("idx_employees_department_status").on(
       t.departmentId,
       t.employmentStatus,

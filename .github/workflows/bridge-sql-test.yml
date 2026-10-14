@@ -1,0 +1,55 @@
+name: HR additive schema bridge SQL validation
+on:
+  push:
+    branches: [ci/bootstrap-hr-checks]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hr_ci
+          POSTGRES_PASSWORD: hr_ci
+          POSTGRES_DB: hr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hr_ci -d hr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: hr_ci
+      PGPASSWORD: hr_ci
+      PGDATABASE: hr_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Create minimum existing VPS attendance schema
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE TABLE attendance_devices (id serial PRIMARY KEY, country text);'
+      - name: Apply additive bridge twice to test idempotence
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f ops/vps-additive-compatibility-bridge.sql
+          psql -X -v ON_ERROR_STOP=1 -f ops/vps-additive-compatibility-bridge.sql
+      - name: Confirm required constraints and objects
+        run: |
+          psql -X -At -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM pg_class WHERE relname IN ('attendance_ingest_sources','subscription_plans','integrations','integration_requests') AND relkind='r') <> 4 THEN
+              RAISE EXCEPTION 'Bridge tables are missing';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_attendance_devices_source') THEN
+              RAISE EXCEPTION 'Missing ingest-source unique index';
+            END IF;
+          END $$;
+          SQL

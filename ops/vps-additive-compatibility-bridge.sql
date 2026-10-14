@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS public.integration_requests (
 CREATE INDEX IF NOT EXISTS idx_integration_requests_integration
     ON public.integration_requests USING btree (integration_id);
 
-DO $
+DO $$
 DECLARE
     missing text;
 BEGIN

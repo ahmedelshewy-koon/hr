@@ -1,0 +1,47 @@
+name: HR CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hr-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build and test (no deployment)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Compile and run tests
+        run: npm test
+      - name: Check migration journal integrity
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root = 'drizzle-postgres/';
+          const journal = JSON.parse(fs.readFileSync(root + 'meta/_journal.json', 'utf8'));
+          const missing = journal.entries.filter(e => !fs.existsSync(root + e.tag + '.sql'));
+          if (missing.length) {
+            console.error('Migration SQL files missing from journal:', missing.map(e => e.tag).join(', '));
+            process.exitCode = 1;
+          } else {
+            console.log('All journal SQL migration files exist');
+          }
+          NODE

@@ -1,0 +1,76 @@
+name: Deploy HR to production (gated)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sanaa-hr-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Run full HR regression suite (required gate)
+        run: npm test
+      - name: Check entire migration source chain (required gate)
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root='drizzle-postgres/';
+          const entries=JSON.parse(fs.readFileSync(root+'meta/_journal.json','utf8')).entries;
+          const missing=entries.filter(x=>!fs.existsSync(root+x.tag+'.sql'));
+          if(missing.length) throw Error('Missing SQL: '+missing.map(x=>x.tag).join(', '));
+          NODE
+      - name: Configure verified SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SANA_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SANA_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+      - name: Retrieve vetted VPS self-host compatibility overlay
+        run: |
+          set -euo pipefail
+          SCP=(scp -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15)
+          "${SCP[@]}" sana-deploy@209.42.23.12:/opt/sanaa-hr/app/vite.config.ts vite.config.ts
+          mkdir -p worker
+          "${SCP[@]}" sana-deploy@209.42.23.12:/opt/sanaa-hr/app/worker/vps-cloudflare-env.ts worker/vps-cloudflare-env.ts
+          echo '0da363bfc46c43903b1b72fe7ce6ddf8d434849d0a29ebccfe83e25fedb6424e  worker/vps-cloudflare-env.ts' | sha256sum --check
+          grep -q 'VPS_SELF_HOST' vite.config.ts
+      - name: Build VPS-compatible HR release
+        env:
+          VPS_SELF_HOST: '1'
+        run: |
+          npm run build
+          test -d dist
+      - name: Package release
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          tar --exclude='./.git' --exclude='./dist.bad-*' --exclude='./release' --exclude='./.next' --exclude='./.wrangler' --exclude='./.env*' -cf - . | tar -C release -xf -
+          test -f release/package.json
+          test -d release/dist
+          tar -C release -czf "hr-${GITHUB_SHA}.tar.gz" .
+      - name: Upload and activate HR release
+        run: |
+          set -euo pipefail
+          scp -o StrictHostKeyChecking=yes -o BatchMode=yes "hr-${GITHUB_SHA}.tar.gz" \
+            sana-deploy@209.42.23.12:/home/sana-deploy/incoming/
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes sana-deploy@209.42.23.12 \
+            "sudo -n /usr/local/sbin/sana-hr-deploy ${GITHUB_SHA}"

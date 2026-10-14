@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS public.subscription_plans (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subscription_plans_code
+    ON public.subscription_plans USING btree (upper(code));
 CREATE TABLE IF NOT EXISTS public.integrations (
     id serial PRIMARY KEY,
     name text NOT NULL,
@@ -75,7 +77,10 @@ CREATE TABLE IF NOT EXISTS public.integration_requests (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-DO $$
+CREATE INDEX IF NOT EXISTS idx_integration_requests_integration
+    ON public.integration_requests USING btree (integration_id);
+
+DO $
 DECLARE
     missing text;
 BEGIN

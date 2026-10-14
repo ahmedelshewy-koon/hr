@@ -1,0 +1,28 @@
+name: HR schema contract (read-only)
+on:
+  push:
+    branches: [ci/bootstrap-hr-checks]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Verify and export entire HR expected PostgreSQL schema
+        run: |
+          node --experimental-strip-types ops/export-schema-contract.mjs > /tmp/hr-schema-contract.json
+          python3 -m json.tool /tmp/hr-schema-contract.json > /dev/null
+          node -e 'const x=require("/tmp/hr-schema-contract.json"); console.log("HR_TABLES="+x.tables.length); console.log("HR_COLUMNS="+x.tables.reduce((n,t)=>n+t.columns.length,0));'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hr-schema-contract
+          path: /tmp/hr-schema-contract.json
+          if-no-files-found: error

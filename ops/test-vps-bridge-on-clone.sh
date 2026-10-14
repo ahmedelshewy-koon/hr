@@ -14,7 +14,7 @@ BACKUP="$(find /root/sanaa-hr-cicd-backups -maxdepth 1 -name 'hr-before-upgrade-
 [[ -n "$BACKUP" ]] || { echo "No verified HR backup found" >&2; exit 1; }
 BACKUP="/root/sanaa-hr-cicd-backups/$BACKUP"
 
-docker exec "$CT" pg_restore --list >/dev/null < "$BACKUP"
+pg_restore --list "$BACKUP" >/dev/null
 docker inspect -f '{{.State.Running}}' "$CT" | grep -qx true
 systemctl is-active --quiet sanaa-hr.service
 image="$(docker inspect -f '{{.Config.Image}}' "$CT")"
@@ -54,7 +54,7 @@ after="$(docker exec "$name" psql -X -U postgres -d hr_clone -At -c 'SELECT coun
 [[ "$after" == "$before" ]] || { echo "Migration ledger modified unexpectedly" >&2; exit 1; }
 
 echo "Checking table/column existence in disposable DB..."
-docker exec "$name" psql -X -U postgres -d hr_clone -v ON_ERROR_STOP=1 -P pager=off <<'SQL'
+docker exec -i "$name" psql -X -U postgres -d hr_clone -v ON_ERROR_STOP=1 -P pager=off <<'SQL'
 SELECT name, to_regclass('public.' || name) IS NOT NULL AS exists
 FROM (VALUES ('attendance_ingest_sources'), ('subscription_plans'),
  ('integrations'), ('integration_requests')) t(name);

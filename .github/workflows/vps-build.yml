@@ -11,14 +11,13 @@ jobs:
     timeout-minutes: 35
     env:
       VPS_SELF_HOST: '1'
-      NODE_ENV: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      - run: npm ci --include=dev
       - name: Build HR using committed VPS compatibility shim
         run: npm run build
       - name: Verify generated production output

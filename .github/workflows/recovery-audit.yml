@@ -40,5 +40,13 @@ jobs:
           for f in /opt/sanaa-hr/app/vite.config.ts /opt/sanaa-hr/app/worker/vps-cloudflare-env.ts; do
             if [ -f "$f" ]; then sha256sum "$f"; else echo "MISSING $f"; fi
           done
+          echo "===== BEGIN VITE CONFIG BASE64 ====="
+          base64 -w0 /opt/sanaa-hr/app/vite.config.ts
+          echo
+          echo "===== END VITE CONFIG BASE64 ====="
+          echo "===== BEGIN CLOUDFLARE SHIM BASE64 ====="
+          base64 -w0 /opt/sanaa-hr/app/worker/vps-cloudflare-env.ts
+          echo
+          echo "===== END CLOUDFLARE SHIM BASE64 ====="
           echo "===== PRODUCTION FILE INVENTORY COMPLETE ====="
           SH

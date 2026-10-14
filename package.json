@@ -9,7 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --import ./tests/register-workers-loader.mjs --test tests/*.test.mjs",
     "lint": "eslint app db worker tests vite.config.ts drizzle.config.ts next.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

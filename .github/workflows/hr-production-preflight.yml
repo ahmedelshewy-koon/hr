@@ -1,0 +1,39 @@
+name: HR deployment VPS read-only preflight
+on:
+  push:
+    branches: [ci/bootstrap-hr-checks]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  production-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Configure SSH
+        env:
+          KEY: ${{ secrets.SANA_DEPLOY_KEY }}
+          HOSTS: ${{ secrets.SANA_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$KEY" && test -n "$HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+      - name: Verify HR deploy environment read only
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 sana-deploy@209.42.23.12 'bash -s' <<'SH'
+          set -euo pipefail
+          echo "DEPLOY_USER=$(id -un)"
+          systemctl is-active sanaa-hr.service
+          echo "=== UNIT EXEC AND PATHS ==="
+          systemctl show sanaa-hr.service -p ExecStart -p WorkingDirectory -p User -p Group -p ReadWritePaths -p ReadOnlyPaths -p BindPaths -p RootDirectory -p RootImage -p EnvironmentFiles -p ProtectSystem -p PrivateTmp -p NoNewPrivileges
+          echo "=== HR DIRECTORY STATUS ==="
+          stat -c '%n type=%F mode=%a owner=%U group=%G' /opt/sanaa-hr /opt/sanaa-hr/app /opt/sanaa-hr/releases
+          echo "=== DEPLOYER PRESENT ==="
+          test -x /usr/local/sbin/sana-hr-deploy
+          echo "=== SSH INBOX ==="
+          test -w /home/sana-deploy/incoming
+          echo "=== READY ==="
+          SH

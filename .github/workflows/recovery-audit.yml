@@ -1,0 +1,50 @@
+name: HR VPS migration-file recovery audit (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Configure verified SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SANA_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SANA_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: List historical migration SQL and VPS self-host files (no secrets)
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 sana-deploy@209.42.23.12 'bash -s' <<'SH'
+          set -euo pipefail
+          echo "===== ACTIVE HR SERVICE ====="
+          systemctl is-active sanaa-hr.service
+          echo "===== HISTORICAL MIGRATION SQL INVENTORY ====="
+          for dir in /opt/sanaa-hr/upstream-migrations-* /opt/sanaa-hr/app.previous-* /opt/sanaa-hr/releases/* /opt/sanaa-hr/app; do
+            if [ -d "$dir" ]; then
+              printf '\nDIRECTORY: %s\n' "$dir"
+              find "$dir" -maxdepth 5 -type f -name '*.sql' -printf '%P\n' 2>/dev/null | sort | grep -E '(^|/)(00(3[1-9]|4[0-9]|5[01])_)' | head -n 70 || true
+            fi
+          done
+          echo "===== BUILD COMPATIBILITY INVENTORY ====="
+          for f in /opt/sanaa-hr/app/vite.config.ts /opt/sanaa-hr/app/worker/vps-cloudflare-env.ts; do
+            if [ -f "$f" ]; then sha256sum "$f"; else echo "MISSING $f"; fi
+          done
+          echo "===== BEGIN VITE CONFIG BASE64 ====="
+          base64 -w0 /opt/sanaa-hr/app/vite.config.ts
+          echo
+          echo "===== END VITE CONFIG BASE64 ====="
+          echo "===== BEGIN CLOUDFLARE SHIM BASE64 ====="
+          base64 -w0 /opt/sanaa-hr/app/worker/vps-cloudflare-env.ts
+          echo
+          echo "===== END CLOUDFLARE SHIM BASE64 ====="
+          echo "===== PRODUCTION FILE INVENTORY COMPLETE ====="
+          SH

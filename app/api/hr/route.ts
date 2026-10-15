@@ -917,7 +917,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can synchronize biometric devices",{status:403});
       const deviceId=Number(payload.deviceId);if(!deviceId)throw new Response("Attendance device is required",{status:400});
-      const device=await d1.prepare("SELECT id,name FROM attendance_devices WHERE id=? AND enabled=1").bind(deviceId).first<Row>();if(!device)throw new Response("Attendance device not found",{status:404});
+      const device=await d1.prepare("SELECT id,name FROM attendance_devices WHERE id=? AND enabled=1 AND source_id IS NULL").bind(deviceId).first<Row>();if(!device)throw new Response("Attendance device not found",{status:404});
       const active=await d1.prepare("SELECT id,status FROM attendance_device_syncs WHERE device_id=? AND status IN ('queued','running') ORDER BY requested_at DESC,id DESC LIMIT 1").bind(deviceId).first<Row>();
       if(active)return Response.json({ok:true,id:active.id,status:active.status,alreadyQueued:true});
       const queued=await d1.prepare("INSERT INTO attendance_device_syncs (device_id,status,trigger,requested_by_user_id,requested_at) VALUES (?,'queued','manual',?,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING RETURNING id,status").bind(deviceId,user.id).first<Row>();
@@ -928,7 +928,8 @@ export async function POST(request: Request) {
     if(action==="sync_attendance_now") {
       await authorize(d1,user,"attendance","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can synchronize biometric devices",{status:403});
-      const devices=(await d1.prepare("SELECT id,name FROM attendance_devices WHERE enabled=1 ORDER BY id").all<Row>()).results;
+      // API sources push their punches themselves; a queued pull for them would never be picked up.
+      const devices=(await d1.prepare("SELECT id,name FROM attendance_devices WHERE enabled=1 AND source_id IS NULL ORDER BY id").all<Row>()).results;
       if(!devices.length)throw new Response("No biometric device is configured",{status:404});
       const syncIds:number[]=[];
       for(const device of devices){
@@ -983,7 +984,8 @@ export async function POST(request: Request) {
         const device=await d1.prepare("SELECT id,name,model,ip_address,port,source_id FROM attendance_devices WHERE "+(sourceId?"source_id=?":"id=?")).bind(sourceId||id||0).first<Row>();
         if(!device&&!(sourceId&&await d1.prepare("SELECT id FROM attendance_ingest_sources WHERE id=?").bind(sourceId).first()))throw new Response("Attendance device not found",{status:404});
         const deviceId=device?Number(device.id):0;
-        if(deviceId&&await d1.prepare("SELECT id FROM attendance_device_syncs WHERE device_id=? AND status IN ('queued','running')").bind(deviceId).first())throw new Response("A sync is waiting or running for this device. Disable the device and try again in a minute.",{status:409});
+        // Only a sync a connector is actively running blocks deletion; a queued one nobody picked up (stopped connector) is deleted with the device.
+        if(deviceId&&await d1.prepare("SELECT id FROM attendance_device_syncs WHERE device_id=? AND status='running' AND started_at>now()-interval '10 minutes'").bind(deviceId).first())throw new Response("A sync is waiting or running for this device. Disable the device and try again in a minute.",{status:409});
         const punches=deviceId?Number((await d1.prepare("SELECT count(*)::integer AS n FROM attendance_device_punches WHERE device_id=?").bind(deviceId).first<Row>())?.n||0):0;
         await d1.transaction(async tx=>{
           if(deviceId){

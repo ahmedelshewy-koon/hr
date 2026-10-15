@@ -261,6 +261,7 @@ const EXACT: Record<string, string> = {
   "Invalid time zone": "المنطقة الزمنية غير صحيحة",
   "Invalid office connector": "رابط المكتب غير صحيح",
   "Office connector not found": "لم يتم العثور على رابط المكتب",
+  "Ingest source not found": "لم يتم العثور على مصدر استقبال بيانات البصمة",
   "A device with this IP address and port already exists": "يوجد جهاز بنفس عنوان IP والبورت بالفعل",
   "Connector name is required": "اسم رابط المكتب مطلوب",
   "Request is too large": "حجم الطلب أكبر من المسموح",

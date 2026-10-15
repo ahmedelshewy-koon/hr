@@ -1,0 +1,28 @@
+name: HR VPS self-host production build
+on:
+  push:
+    branches: [ci/bootstrap-hr-checks]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  self-host-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      VPS_SELF_HOST: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Build HR using committed VPS compatibility shim
+        run: npm run build
+      - name: Verify generated production output
+        run: |
+          set -euo pipefail
+          test -d dist
+          test -s worker/vps-cloudflare-env.ts
+          grep -q 'VPS_SELF_HOST' vite.config.ts

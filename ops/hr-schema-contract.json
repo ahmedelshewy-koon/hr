@@ -1,0 +1,1892 @@
+{
+  "schema_version": "hr-vps-contract-v1",
+  "tables": [
+    {
+      "name": "administrative_decision_recipients",
+      "schema": "public",
+      "columns": [
+        "acknowledged_at",
+        "acknowledged_by_user_id",
+        "created_at",
+        "decision_id",
+        "employee_id",
+        "id"
+      ]
+    },
+    {
+      "name": "administrative_decisions",
+      "schema": "public",
+      "columns": [
+        "body",
+        "created_at",
+        "created_by_user_id",
+        "decision_number",
+        "decision_type",
+        "effective_date",
+        "id",
+        "status",
+        "title",
+        "updated_at",
+        "withdrawn_at",
+        "withdrawn_by_user_id"
+      ]
+    },
+    {
+      "name": "approval_workflow_runs",
+      "schema": "public",
+      "columns": [
+        "company_id",
+        "created_at",
+        "current_step",
+        "current_user_id",
+        "department_id",
+        "employee_id",
+        "id",
+        "request_type",
+        "source_id",
+        "source_type",
+        "state",
+        "steps_json",
+        "updated_at",
+        "version",
+        "workflow_id"
+      ]
+    },
+    {
+      "name": "approval_workflow_versions",
+      "schema": "public",
+      "columns": [
+        "active",
+        "changed_by",
+        "created_at",
+        "id",
+        "steps_json",
+        "version",
+        "workflow_id"
+      ]
+    },
+    {
+      "name": "approval_workflows",
+      "schema": "public",
+      "columns": [
+        "active",
+        "company_id",
+        "department_id",
+        "id",
+        "request_type",
+        "steps_json",
+        "updated_at",
+        "updated_by",
+        "version"
+      ]
+    },
+    {
+      "name": "approvals",
+      "schema": "public",
+      "columns": [
+        "action",
+        "actor_user_id",
+        "created_at",
+        "id",
+        "reason",
+        "request_id",
+        "stage"
+      ]
+    },
+    {
+      "name": "asset_assignments",
+      "schema": "public",
+      "columns": [
+        "asset_id",
+        "assigned_at",
+        "assigned_by_user_id",
+        "assigned_condition",
+        "assigned_notes",
+        "created_at",
+        "employee_id",
+        "id",
+        "return_condition",
+        "return_notes",
+        "returned_at",
+        "returned_by_user_id"
+      ]
+    },
+    {
+      "name": "assets",
+      "schema": "public",
+      "columns": [
+        "asset_code",
+        "asset_condition",
+        "brand_model",
+        "category",
+        "created_at",
+        "created_by_user_id",
+        "id",
+        "name",
+        "notes",
+        "reference_date",
+        "serial_number",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_agents",
+      "schema": "public",
+      "columns": [
+        "agent_version",
+        "created_at",
+        "created_by_user_id",
+        "enabled",
+        "id",
+        "last_ip",
+        "last_seen_at",
+        "name",
+        "token_hash",
+        "token_hint",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_correction_actions",
+      "schema": "public",
+      "columns": [
+        "action",
+        "actor_user_id",
+        "after_values",
+        "before_values",
+        "correction_id",
+        "created_at",
+        "id",
+        "reason",
+        "stage"
+      ]
+    },
+    {
+      "name": "attendance_corrections",
+      "schema": "public",
+      "columns": [
+        "attendance_date",
+        "correction_type",
+        "created_at",
+        "current_stage",
+        "daily_attendance_id",
+        "employee_id",
+        "id",
+        "notes",
+        "original_values",
+        "reason",
+        "requested_by_user_id",
+        "requested_values",
+        "resolved_at",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_device_punches",
+      "schema": "public",
+      "columns": [
+        "attendance_log_id",
+        "device_id",
+        "device_user_id",
+        "employee_id",
+        "id",
+        "imported_at",
+        "punch_serial",
+        "punch_type",
+        "punched_at",
+        "raw_data",
+        "verify_type"
+      ]
+    },
+    {
+      "name": "attendance_device_syncs",
+      "schema": "public",
+      "columns": [
+        "completed_at",
+        "device_id",
+        "error",
+        "id",
+        "punches_found",
+        "punches_imported",
+        "requested_at",
+        "requested_by_user_id",
+        "started_at",
+        "status",
+        "trigger",
+        "unmatched_users",
+        "users_found"
+      ]
+    },
+    {
+      "name": "attendance_device_users",
+      "schema": "public",
+      "columns": [
+        "card_number",
+        "created_at",
+        "device_id",
+        "device_uid",
+        "device_user_id",
+        "display_name",
+        "employee_id",
+        "enabled",
+        "id",
+        "last_seen_at",
+        "privilege",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_devices",
+      "schema": "public",
+      "columns": [
+        "agent_id",
+        "created_at",
+        "device_time",
+        "enabled",
+        "id",
+        "ip_address",
+        "last_error",
+        "last_seen_at",
+        "last_sync_at",
+        "log_count",
+        "model",
+        "name",
+        "port",
+        "source_id",
+        "status",
+        "sync_interval_seconds",
+        "timezone",
+        "updated_at",
+        "user_count"
+      ]
+    },
+    {
+      "name": "attendance_exceptions",
+      "schema": "public",
+      "columns": [
+        "attendance_date",
+        "correction_id",
+        "created_at",
+        "daily_attendance_id",
+        "details_json",
+        "employee_id",
+        "exception_type",
+        "id",
+        "resolved_at",
+        "resolved_by_user_id",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_ingest_sources",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "enabled",
+        "id",
+        "key_hash",
+        "key_hint",
+        "last_error",
+        "last_ip",
+        "last_seen_at",
+        "name",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "attendance_logs",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "device",
+        "employee_id",
+        "event_at",
+        "event_type",
+        "id",
+        "location",
+        "source"
+      ]
+    },
+    {
+      "name": "attendance_types",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "end_time",
+        "id",
+        "late_allowance_minutes",
+        "name_ar",
+        "name_en",
+        "shift_based",
+        "start_time",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "audit_logs",
+      "schema": "public",
+      "columns": [
+        "action",
+        "created_at",
+        "id",
+        "ip_address",
+        "module",
+        "new_value",
+        "previous_value",
+        "record_id",
+        "record_type",
+        "user_id"
+      ]
+    },
+    {
+      "name": "blueprint_company_types",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "id",
+        "is_system",
+        "name_ar",
+        "name_en",
+        "sort_order",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "blueprint_departments",
+      "schema": "public",
+      "columns": [
+        "blueprint_id",
+        "created_at",
+        "id",
+        "kind",
+        "name_ar",
+        "name_en",
+        "parent_id",
+        "required",
+        "sort_order",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "blueprint_positions",
+      "schema": "public",
+      "columns": [
+        "blueprint_id",
+        "created_at",
+        "department_id",
+        "description_ar",
+        "description_en",
+        "headcount",
+        "id",
+        "parent_position_id",
+        "per_branch",
+        "required",
+        "seniority",
+        "sort_order",
+        "title_ar",
+        "title_en",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "branches",
+      "schema": "public",
+      "columns": [
+        "city",
+        "code",
+        "country",
+        "created_at",
+        "id",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "candidate_applications",
+      "schema": "public",
+      "columns": [
+        "applied_at",
+        "candidate_id",
+        "communication_status",
+        "created_at",
+        "current_stage_id",
+        "decision_at",
+        "id",
+        "job_id",
+        "recruiter_employee_id",
+        "rejection_notes",
+        "rejection_reason",
+        "rejection_stage_id",
+        "screening_answers_json",
+        "screening_flags_json",
+        "source",
+        "stage_entered_at",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "candidate_cv_parsed_data",
+      "schema": "public",
+      "columns": [
+        "confidence",
+        "corrected_at",
+        "corrected_by_user_id",
+        "corrected_json",
+        "created_at",
+        "document_id",
+        "extracted_json",
+        "id",
+        "parsed_at",
+        "parser_version",
+        "raw_text",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "candidate_documents",
+      "schema": "public",
+      "columns": [
+        "application_id",
+        "candidate_id",
+        "content_type",
+        "created_at",
+        "document_type",
+        "id",
+        "name",
+        "object_key",
+        "parsing_confidence",
+        "parsing_error",
+        "parsing_status",
+        "size_bytes",
+        "updated_at",
+        "uploaded_by_user_id",
+        "version"
+      ]
+    },
+    {
+      "name": "candidate_match_results",
+      "schema": "public",
+      "columns": [
+        "application_id",
+        "candidate_profile_version",
+        "classification",
+        "concerns_json",
+        "created_at",
+        "created_by_user_id",
+        "cv_document_version",
+        "id",
+        "job_requirements_version",
+        "missing_requirements_json",
+        "overall_score",
+        "partial_matches_json",
+        "status",
+        "strong_matches_json",
+        "suggested_questions_json",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "candidate_requirement_scores",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "evidence",
+        "evidence_status",
+        "id",
+        "match_result_id",
+        "rationale",
+        "requirement_id",
+        "score",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "candidate_stage_history",
+      "schema": "public",
+      "columns": [
+        "action",
+        "actor_user_id",
+        "application_id",
+        "created_at",
+        "from_stage_id",
+        "id",
+        "reason",
+        "to_stage_id"
+      ]
+    },
+    {
+      "name": "candidates",
+      "schema": "public",
+      "columns": [
+        "certifications_json",
+        "converted_employee_id",
+        "created_at",
+        "created_by_user_id",
+        "current_company",
+        "current_job_title",
+        "education_json",
+        "email",
+        "human_corrected_at",
+        "id",
+        "job_id",
+        "languages_json",
+        "location",
+        "merged_into_candidate_id",
+        "name",
+        "notes",
+        "phone",
+        "profile_version",
+        "projects_json",
+        "resume_document_id",
+        "skills_json",
+        "source",
+        "stage",
+        "total_experience",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "companies",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "employee_code_prefix",
+        "id",
+        "name",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "company_branches",
+      "schema": "public",
+      "columns": [
+        "branch_id",
+        "company_id",
+        "id"
+      ]
+    },
+    {
+      "name": "cost_centers",
+      "schema": "public",
+      "columns": [
+        "code",
+        "company_id",
+        "created_at",
+        "debit_account",
+        "description",
+        "id",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "daily_attendance",
+      "schema": "public",
+      "columns": [
+        "actual_in",
+        "actual_out",
+        "attendance_type",
+        "created_at",
+        "early_minutes",
+        "employee_id",
+        "id",
+        "late_minutes",
+        "note",
+        "overtime_minutes",
+        "required_minutes",
+        "scheduled_in",
+        "scheduled_out",
+        "status",
+        "updated_at",
+        "work_date",
+        "worked_minutes"
+      ]
+    },
+    {
+      "name": "deduction_rules",
+      "schema": "public",
+      "columns": [
+        "absence_notice",
+        "created_at",
+        "deduction_type",
+        "id",
+        "max_minutes",
+        "min_minutes",
+        "name_ar",
+        "name_en",
+        "overtime_multiplier",
+        "rule_type",
+        "status",
+        "updated_at",
+        "value"
+      ]
+    },
+    {
+      "name": "departments",
+      "schema": "public",
+      "columns": [
+        "branch_scope",
+        "company_id",
+        "created_at",
+        "id",
+        "manager_employee_id",
+        "name_ar",
+        "name_en",
+        "organization_kind",
+        "parent_id",
+        "status",
+        "unit_type",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "document_categories",
+      "schema": "public",
+      "columns": [
+        "allowed_mime_types",
+        "code",
+        "country",
+        "created_at",
+        "description",
+        "employee_can_upload",
+        "employee_can_view",
+        "employment_type",
+        "id",
+        "manager_can_view",
+        "max_size_bytes",
+        "name_ar",
+        "name_en",
+        "required_document",
+        "requires_expiry",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "document_versions",
+      "schema": "public",
+      "columns": [
+        "content_type",
+        "created_at",
+        "document_id",
+        "id",
+        "name",
+        "object_key",
+        "size_bytes",
+        "uploaded_by_user_id",
+        "version"
+      ]
+    },
+    {
+      "name": "documents",
+      "schema": "public",
+      "columns": [
+        "archived_at",
+        "category",
+        "content_type",
+        "created_at",
+        "document_number",
+        "employee_id",
+        "expiry_date",
+        "id",
+        "issue_date",
+        "name",
+        "object_key",
+        "replaced_document_id",
+        "size_bytes",
+        "status",
+        "updated_at",
+        "uploaded_by_user_id",
+        "version"
+      ]
+    },
+    {
+      "name": "employee_emergency_contacts",
+      "schema": "public",
+      "columns": [
+        "alternate_phone",
+        "created_at",
+        "employee_id",
+        "id",
+        "is_primary",
+        "name",
+        "phone",
+        "relationship",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "employee_job_history",
+      "schema": "public",
+      "columns": [
+        "branch_id",
+        "change_reason",
+        "company_id",
+        "created_at",
+        "department_id",
+        "employee_id",
+        "end_date",
+        "id",
+        "job_title_id",
+        "position_id",
+        "section_id",
+        "start_date"
+      ]
+    },
+    {
+      "name": "employee_leave_types",
+      "schema": "public",
+      "columns": [
+        "assigned_by_user_id",
+        "created_at",
+        "employee_id",
+        "id",
+        "leave_type_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "employee_lifecycles",
+      "schema": "public",
+      "columns": [
+        "completed_at",
+        "completed_by_user_id",
+        "created_at",
+        "deactivate_account_on_completion",
+        "employee_id",
+        "exit_interview",
+        "id",
+        "last_working_date",
+        "lifecycle_type",
+        "notes",
+        "reason_type",
+        "started_by_user_id",
+        "status",
+        "template_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "employee_medical_insurance",
+      "schema": "public",
+      "columns": [
+        "card_number",
+        "created_at",
+        "dependents",
+        "employee_id",
+        "end_date",
+        "id",
+        "notes",
+        "plan_id",
+        "start_date",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "employees",
+      "schema": "public",
+      "columns": [
+        "address",
+        "assignment_effective_date",
+        "avatar_url",
+        "bank_account_number",
+        "bank_iban",
+        "bank_name",
+        "birth_date",
+        "branch_id",
+        "check_in_time",
+        "check_out_time",
+        "company_id",
+        "cost_center_id",
+        "country",
+        "created_at",
+        "department_id",
+        "employee_code",
+        "employment_status",
+        "employment_type",
+        "end_date",
+        "fingerprint_code",
+        "fingerprint_required",
+        "gender",
+        "grace_minutes",
+        "grade_id",
+        "hr_user_id",
+        "id",
+        "identification_number",
+        "job_title_id",
+        "legacy_employee_code",
+        "manager_id",
+        "marital_status",
+        "name_ar",
+        "name_en",
+        "nationality",
+        "nationality_country",
+        "organizational_level",
+        "passport_number",
+        "personal_phone",
+        "position_id",
+        "profile_notes",
+        "religion",
+        "remote_days",
+        "required_daily_minutes",
+        "salary",
+        "salary_country",
+        "salary_currency",
+        "schedule_type",
+        "section_id",
+        "start_date",
+        "team_id",
+        "updated_at",
+        "work_days",
+        "work_email",
+        "work_location",
+        "work_location_id",
+        "work_phone"
+      ]
+    },
+    {
+      "name": "holidays",
+      "schema": "public",
+      "columns": [
+        "attendance_types",
+        "country",
+        "created_at",
+        "days",
+        "holiday_date",
+        "id",
+        "name_ar",
+        "name_en",
+        "notes",
+        "original_date",
+        "original_date_behavior",
+        "recurrence_type",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "hr_responsibility_rules",
+      "schema": "public",
+      "columns": [
+        "branch_id",
+        "company_id",
+        "created_at",
+        "hr_user_id",
+        "id",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "hr_responsibles",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "status",
+        "updated_at",
+        "user_id"
+      ]
+    },
+    {
+      "name": "insurance_rates",
+      "schema": "public",
+      "columns": [
+        "country",
+        "effective_from",
+        "employee_rate",
+        "employer_rate",
+        "id"
+      ]
+    },
+    {
+      "name": "integration_requests",
+      "schema": "public",
+      "columns": [
+        "body",
+        "body_type",
+        "created_at",
+        "description",
+        "headers",
+        "id",
+        "integration_id",
+        "method",
+        "name",
+        "params",
+        "path",
+        "path_vars",
+        "sort_order",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "integrations",
+      "schema": "public",
+      "columns": [
+        "auth_config",
+        "auth_type",
+        "base_url",
+        "created_at",
+        "default_headers",
+        "description",
+        "id",
+        "name",
+        "updated_at",
+        "variables"
+      ]
+    },
+    {
+      "name": "interview_evaluation_scores",
+      "schema": "public",
+      "columns": [
+        "comments",
+        "created_at",
+        "criterion_id",
+        "evaluation_id",
+        "id",
+        "score",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_evaluations",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "id",
+        "interview_id",
+        "interviewer_employee_id",
+        "notes",
+        "overall_score",
+        "participant_id",
+        "recommendation",
+        "status",
+        "submitted_at",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_participants",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "employee_id",
+        "id",
+        "interview_id",
+        "required",
+        "role_key",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_plan_stages",
+      "schema": "public",
+      "columns": [
+        "aggregation_weight",
+        "created_at",
+        "duration_minutes",
+        "id",
+        "independent_evaluations",
+        "name_ar",
+        "name_en",
+        "passing_guidance",
+        "plan_id",
+        "required_feedback",
+        "sort_order",
+        "source_template_stage_id",
+        "stage_key",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_plans",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "id",
+        "job_id",
+        "name",
+        "source_template_id",
+        "status",
+        "updated_at",
+        "version"
+      ]
+    },
+    {
+      "name": "interview_questions",
+      "schema": "public",
+      "columns": [
+        "competency",
+        "created_at",
+        "created_by_user_id",
+        "department_id",
+        "evaluation_guidance",
+        "id",
+        "interview_stage",
+        "interviewer_role",
+        "job_family",
+        "job_id",
+        "question",
+        "question_type",
+        "score_max",
+        "score_min",
+        "seniority",
+        "skill",
+        "status",
+        "updated_at",
+        "what_good_looks_like"
+      ]
+    },
+    {
+      "name": "interview_scorecard_criteria",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "description",
+        "id",
+        "name_ar",
+        "name_en",
+        "plan_stage_id",
+        "required",
+        "sort_order",
+        "updated_at",
+        "weight"
+      ]
+    },
+    {
+      "name": "interview_stage_interviewers",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "employee_id",
+        "id",
+        "plan_stage_id",
+        "required",
+        "role_key",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_stage_questions",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "id",
+        "plan_stage_id",
+        "question_id",
+        "required",
+        "sort_order",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_template_scorecard_criteria",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "description",
+        "id",
+        "name_ar",
+        "name_en",
+        "required",
+        "sort_order",
+        "template_stage_id",
+        "updated_at",
+        "weight"
+      ]
+    },
+    {
+      "name": "interview_template_stage_interviewers",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "employee_id",
+        "id",
+        "required",
+        "role_key",
+        "template_stage_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_template_stage_questions",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "id",
+        "question_id",
+        "required",
+        "sort_order",
+        "template_stage_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_template_stages",
+      "schema": "public",
+      "columns": [
+        "aggregation_weight",
+        "created_at",
+        "duration_minutes",
+        "id",
+        "independent_evaluations",
+        "name_ar",
+        "name_en",
+        "passing_guidance",
+        "required_feedback",
+        "sort_order",
+        "stage_key",
+        "template_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interview_templates",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "department_id",
+        "description",
+        "id",
+        "job_family",
+        "job_id",
+        "name",
+        "scope_type",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "interviews",
+      "schema": "public",
+      "columns": [
+        "application_id",
+        "candidate_id",
+        "created_at",
+        "created_by_user_id",
+        "duration_minutes",
+        "end_at",
+        "feedback",
+        "id",
+        "interview_type",
+        "interviewer_employee_id",
+        "location",
+        "meeting_method",
+        "notes",
+        "plan_stage_id",
+        "rating",
+        "recommendation",
+        "scheduled_at",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "job_grades",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "id",
+        "name_ar",
+        "name_en",
+        "sort_order",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "job_offers",
+      "schema": "public",
+      "columns": [
+        "application_id",
+        "approval_status",
+        "candidate_id",
+        "created_at",
+        "created_by_user_id",
+        "decided_by_user_id",
+        "department_id",
+        "id",
+        "job_id",
+        "joining_date",
+        "manager_employee_id",
+        "notes",
+        "offer_date",
+        "position",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "job_openings",
+      "schema": "public",
+      "columns": [
+        "closing_date",
+        "created_at",
+        "created_by_user_id",
+        "created_date",
+        "department_id",
+        "description",
+        "employment_type",
+        "hiring_manager_employee_id",
+        "id",
+        "job_title_id",
+        "location",
+        "openings_count",
+        "published_at",
+        "recruiter_employee_id",
+        "requirements",
+        "requirements_version",
+        "responsibilities",
+        "status",
+        "summary",
+        "title",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "job_requirements",
+      "schema": "public",
+      "columns": [
+        "active",
+        "category",
+        "created_at",
+        "description",
+        "id",
+        "job_id",
+        "minimum_value",
+        "name",
+        "notes",
+        "priority",
+        "sort_order",
+        "updated_at",
+        "version",
+        "weight"
+      ]
+    },
+    {
+      "name": "job_screening_questions",
+      "schema": "public",
+      "columns": [
+        "answer_type",
+        "created_at",
+        "id",
+        "importance",
+        "job_id",
+        "knockout_rule_json",
+        "options_json",
+        "question",
+        "sort_order",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "job_titles",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "department_id",
+        "id",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "leave_balances",
+      "schema": "public",
+      "columns": [
+        "employee_id",
+        "entitlement",
+        "id",
+        "leave_type_id",
+        "pending",
+        "used",
+        "year"
+      ]
+    },
+    {
+      "name": "leave_rollovers",
+      "schema": "public",
+      "columns": [
+        "carried_amount",
+        "created_at",
+        "employee_id",
+        "expires_at",
+        "from_year",
+        "id",
+        "leave_type_id",
+        "run_by_user_id",
+        "source_available",
+        "to_year"
+      ]
+    },
+    {
+      "name": "leave_types",
+      "schema": "public",
+      "columns": [
+        "attachment_required",
+        "code",
+        "created_at",
+        "default_days",
+        "hr_approval",
+        "id",
+        "manager_approval",
+        "name_ar",
+        "name_en",
+        "paid",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "lifecycle_tasks",
+      "schema": "public",
+      "columns": [
+        "completed_at",
+        "completed_by_user_id",
+        "created_at",
+        "due_date",
+        "employee_id",
+        "id",
+        "lifecycle_id",
+        "notes",
+        "owner_user_id",
+        "required",
+        "status",
+        "title",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "lifecycle_template_tasks",
+      "schema": "public",
+      "columns": [
+        "due_offset_days",
+        "id",
+        "owner_type",
+        "owner_user_id",
+        "required",
+        "sort_order",
+        "template_id",
+        "title"
+      ]
+    },
+    {
+      "name": "lifecycle_templates",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "id",
+        "lifecycle_type",
+        "name",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "loans_advances",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "employee_id",
+        "id",
+        "issued_at",
+        "monthly_installment",
+        "remaining_amount",
+        "status",
+        "total_amount"
+      ]
+    },
+    {
+      "name": "medical_insurance_plans",
+      "schema": "public",
+      "columns": [
+        "company_contribution",
+        "coverage_type",
+        "created_at",
+        "currency",
+        "description",
+        "employee_contribution",
+        "family_coverage",
+        "id",
+        "max_coverage",
+        "name_ar",
+        "name_en",
+        "provider",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "notifications",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "dedupe_key",
+        "entity_id",
+        "entity_type",
+        "id",
+        "message_key",
+        "read_at",
+        "target_path",
+        "title_key",
+        "type",
+        "user_id"
+      ]
+    },
+    {
+      "name": "organization_branch_scopes",
+      "schema": "public",
+      "columns": [
+        "branch_id",
+        "department_id",
+        "id"
+      ]
+    },
+    {
+      "name": "payroll_items",
+      "schema": "public",
+      "columns": [
+        "absence_deduction",
+        "basic_salary",
+        "employee_id",
+        "id",
+        "insurance_deduction",
+        "loan_deduction",
+        "net_salary",
+        "overtime_amount",
+        "payroll_run_id",
+        "tax_deduction",
+        "total_allowances",
+        "unpaid_leave_deduction"
+      ]
+    },
+    {
+      "name": "payroll_runs",
+      "schema": "public",
+      "columns": [
+        "approved_at",
+        "approved_by",
+        "country",
+        "created_at",
+        "id",
+        "locked_at",
+        "month",
+        "status",
+        "year"
+      ]
+    },
+    {
+      "name": "performance_comments",
+      "schema": "public",
+      "columns": [
+        "author_user_id",
+        "comment",
+        "created_at",
+        "id",
+        "review_id",
+        "stage"
+      ]
+    },
+    {
+      "name": "performance_cycles",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by_user_id",
+        "cycle_type",
+        "department_ids",
+        "end_date",
+        "hr_review_required",
+        "id",
+        "name",
+        "rating_scale_id",
+        "start_date",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "performance_goals",
+      "schema": "public",
+      "columns": [
+        "actual_result",
+        "created_at",
+        "created_by_user_id",
+        "description",
+        "employee_rating",
+        "id",
+        "manager_rating",
+        "measurement_type",
+        "progress",
+        "result",
+        "review_id",
+        "target",
+        "title",
+        "updated_at",
+        "weight"
+      ]
+    },
+    {
+      "name": "performance_rating_scales",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "id",
+        "labels_json",
+        "max_score",
+        "min_score",
+        "name",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "performance_reviews",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "cycle_id",
+        "employee_id",
+        "final_score",
+        "finalized_at",
+        "finalized_by_user_id",
+        "hr_rating",
+        "hr_review",
+        "id",
+        "manager_employee_id",
+        "manager_rating",
+        "manager_review",
+        "self_rating",
+        "self_review",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "permissions",
+      "schema": "public",
+      "columns": [
+        "action",
+        "allowed",
+        "id",
+        "module",
+        "role_id"
+      ]
+    },
+    {
+      "name": "positions",
+      "schema": "public",
+      "columns": [
+        "code",
+        "company_id",
+        "created_at",
+        "department_id",
+        "grade_id",
+        "id",
+        "is_ceo",
+        "job_title_id",
+        "name_ar",
+        "name_en",
+        "section_id",
+        "status",
+        "team_id",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "recruitment_stages",
+      "schema": "public",
+      "columns": [
+        "active",
+        "created_at",
+        "id",
+        "job_id",
+        "name_ar",
+        "name_en",
+        "sort_order",
+        "stage_key",
+        "stage_type",
+        "terminal",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "requests",
+      "schema": "public",
+      "columns": [
+        "amount",
+        "balance_effect",
+        "balance_year",
+        "created_at",
+        "currency",
+        "current_stage",
+        "details_json",
+        "employee_id",
+        "from_date",
+        "id",
+        "leave_type_id",
+        "notes",
+        "reason",
+        "request_code",
+        "request_date",
+        "request_time",
+        "requested_days",
+        "status",
+        "to_date",
+        "type",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "roles",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "description",
+        "id",
+        "is_system",
+        "name",
+        "name_ar",
+        "name_en",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "salary_allowances",
+      "schema": "public",
+      "columns": [
+        "amount",
+        "id",
+        "percentage",
+        "salary_structure_id",
+        "type"
+      ]
+    },
+    {
+      "name": "salary_structures",
+      "schema": "public",
+      "columns": [
+        "basic_salary",
+        "country",
+        "created_at",
+        "currency",
+        "effective_from",
+        "effective_to",
+        "employee_id",
+        "id"
+      ]
+    },
+    {
+      "name": "security_rate_limits",
+      "schema": "public",
+      "columns": [
+        "bucket_key",
+        "count",
+        "updated_at",
+        "window_started_at"
+      ]
+    },
+    {
+      "name": "staffing_blueprints",
+      "schema": "public",
+      "columns": [
+        "applied_at",
+        "approved_at",
+        "branches_count",
+        "business_model",
+        "company_id",
+        "company_type_id",
+        "country",
+        "created_at",
+        "created_by",
+        "description_ar",
+        "description_en",
+        "expected_employees",
+        "id",
+        "is_default",
+        "kind",
+        "name_ar",
+        "name_en",
+        "size",
+        "source_blueprint_id",
+        "status",
+        "updated_at",
+        "updated_by"
+      ]
+    },
+    {
+      "name": "subscription_plans",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "currency",
+        "description_ar",
+        "description_en",
+        "duration_months",
+        "features_ar",
+        "features_en",
+        "id",
+        "is_featured",
+        "max_employees",
+        "name_ar",
+        "name_en",
+        "price",
+        "show_on_landing",
+        "sort_order",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "system_settings",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "id",
+        "setting_key",
+        "updated_at",
+        "updated_by_user_id",
+        "value_json"
+      ]
+    },
+    {
+      "name": "tax_brackets",
+      "schema": "public",
+      "columns": [
+        "country",
+        "effective_from",
+        "id",
+        "max_amount",
+        "min_amount",
+        "rate"
+      ]
+    },
+    {
+      "name": "training_courses",
+      "schema": "public",
+      "columns": [
+        "course_type",
+        "created_at",
+        "created_by_user_id",
+        "description",
+        "duration_hours",
+        "end_date",
+        "id",
+        "instructor_employee_id",
+        "instructor_name",
+        "mandatory",
+        "provider",
+        "start_date",
+        "status",
+        "title",
+        "updated_at",
+        "validity_months"
+      ]
+    },
+    {
+      "name": "training_enrollments",
+      "schema": "public",
+      "columns": [
+        "assigned_by_user_id",
+        "certificate_document_id",
+        "certificate_expiry",
+        "certificate_issued_at",
+        "certificate_json",
+        "certificate_number",
+        "completed_by_user_id",
+        "completion_date",
+        "course_id",
+        "created_at",
+        "due_date",
+        "employee_id",
+        "evaluation_json",
+        "id",
+        "score",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "training_materials",
+      "schema": "public",
+      "columns": [
+        "content_type",
+        "course_id",
+        "created_at",
+        "created_by_user_id",
+        "file_name",
+        "id",
+        "kind",
+        "object_key",
+        "size_bytes",
+        "title",
+        "updated_at",
+        "url"
+      ]
+    },
+    {
+      "name": "users",
+      "schema": "public",
+      "columns": [
+        "auth_user_id",
+        "created_at",
+        "email",
+        "employee_id",
+        "failed_login_attempts",
+        "hr_data_scope",
+        "id",
+        "last_login_at",
+        "locked_until",
+        "must_change_password",
+        "password_changed_at",
+        "password_hash",
+        "role_id",
+        "session_version",
+        "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "work_locations",
+      "schema": "public",
+      "columns": [
+        "branch_id",
+        "code",
+        "created_at",
+        "id",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
+      ]
+    }
+  ]
+}

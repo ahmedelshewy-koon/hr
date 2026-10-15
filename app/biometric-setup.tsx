@@ -2,7 +2,7 @@
 
 import { localizeApiMessage } from "./api-messages";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Copy, KeyRound, Pencil, Plus, Power, Server, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, KeyRound, Pencil, Plus, Power, Server, Trash2, X } from "lucide-react";
 import type { Row } from "./ui-types";
 
 type Props = { rtl: boolean; agents: Row[]; devices: Row[]; sources?: Row[]; notify: (message: string) => void; onChanged: () => void; onClose: () => void };
@@ -67,6 +67,14 @@ export function BiometricSetup({ rtl, agents, devices, sources = [], notify, onC
     void run(async () => { const result = await post({ action: "rotate_attendance_ingest_key", sourceId: source.id }); setPushKey({ source: String(source.name), key: result.key }); });
   };
   const toggleSource = (source: Row) => void run(async () => { await post({ action: "set_attendance_ingest_enabled", sourceId: source.id, enabled: !Number(source.enabled) }); });
+  const removeDevice = (target: Row, isSource: boolean) => {
+    const punches = Number(target.log_count) || 0;
+    const message = isSource
+      ? t(`Delete "${target.name}"? Its API key stops working and its ${punches} stored punches are removed. Attendance already calculated stays. This cannot be undone.`, `حذف «${target.name}»؟ سيتوقف مفتاح الـ API وتُحذف ${punches} بصمة مخزنة عليه، ويبقى الحضور المحسوب سابقًا. لا يمكن التراجع.`)
+      : t(`Delete device "${target.name}"? Its ${punches} stored punches are removed. Attendance already calculated stays. This cannot be undone.`, `حذف الجهاز «${target.name}»؟ ستُحذف ${punches} بصمة مخزنة عليه، ويبقى الحضور المحسوب سابقًا. لا يمكن التراجع.`);
+    if (!window.confirm(message)) return;
+    void run(async () => { await post({ action: "delete_attendance_device", ...(isSource ? { sourceId: target.id } : { id: target.id }) }); notify(t("Deleted.", "تم الحذف.")); });
+  };
   const copyText = async (value: string) => { try { await navigator.clipboard.writeText(value); notify(t("Copied.", "تم النسخ.")); } catch { notify(t("Copy failed; select the text and copy it manually.", "تعذر النسخ؛ حدد النص وانسخه يدويًا.")); } };
   const copy = async () => { try { await navigator.clipboard.writeText(command!.text); setCopied(true); } catch { setCopied(false); } };
   const editDevice = (device?: Row) => {
@@ -144,6 +152,7 @@ export function BiometricSetup({ rtl, agents, devices, sources = [], notify, onC
               <span className={Number(source.enabled) && recent ? "bio-linked" : "bio-warning"}>{!Number(source.enabled) ? t("Disabled", "معطل") : recent ? t("Receiving", "يستقبل") : t("Idle", "خامل")}</span>
               <button className="outline" disabled={busy} onClick={() => rotateSource(source)}><KeyRound size={14}/>{t("New key", "مفتاح جديد")}</button>
               <button className="outline" disabled={busy} onClick={() => toggleSource(source)}><Power size={14}/>{Number(source.enabled) ? t("Disable", "تعطيل") : t("Enable", "تفعيل")}</button>
+              <button className="outline" disabled={busy} onClick={() => removeDevice(source, true)}><Trash2 size={14}/>{t("Delete", "حذف")}</button>
             </div>; })}
             <div className="bio-setup-add"><input value={sourceName} onChange={event => setSourceName(event.target.value)} placeholder={t("Source name, e.g. ZK Egypt", "اسم المصدر، مثل: بصمة مصر")}/><select value={sourceCountry} onChange={event => setSourceCountry(event.target.value)} aria-label={t("Country", "الدولة")}>{Object.keys(COUNTRY_TIMEZONES).map(name => <option key={name} value={name}>{name}</option>)}</select><button className="outline" disabled={busy || !sourceName.trim()} onClick={() => void createSource()}><Plus size={15}/>{t("Create source", "إنشاء مصدر")}</button></div>
           </section>
@@ -153,6 +162,7 @@ export function BiometricSetup({ rtl, agents, devices, sources = [], notify, onC
               <div><b>{device.name}</b><small dir="ltr">{device.ip_address}:{device.port}</small><small>{agentLabel(device.agent_id) || t("Sync service on the app server", "خدمة على خادم البرنامج")}</small></div>
               <span className={!Number(device.enabled) ? "bio-warning" : device.status === "online" ? "bio-linked" : "bio-warning"}>{!Number(device.enabled) ? t("Disabled", "معطل") : device.status === "online" ? t("Connected", "متصل") : t("Not connected", "غير متصل")}</span>
               <button className="outline" disabled={busy} onClick={() => editDevice(device)}><Pencil size={14}/>{t("Edit", "تعديل")}</button>
+              <button className="outline" disabled={busy} onClick={() => removeDevice(device, false)}><Trash2 size={14}/>{t("Delete", "حذف")}</button>
             </div>)}
             {!devices.length && <p className="bio-setup-hint">{t("No device yet. Add one with its IP address and port.", "لا يوجد جهاز بعد. أضف جهازًا بعنوان IP والبورت.")}</p>}
           </section>

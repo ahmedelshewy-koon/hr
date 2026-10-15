@@ -142,6 +142,7 @@ const EXACT: Record<string, string> = {
   "Invalid office connector": "رابط المكتب غير صحيح",
   "Office connector not found": "لم يتم العثور على رابط المكتب",
   "Ingest source not found": "لم يتم العثور على مصدر استقبال بيانات البصمة",
+  "A sync is waiting or running for this device. Disable the device and try again in a minute.": "توجد مزامنة قيد الانتظار أو التنفيذ لهذا الجهاز. عطّل الجهاز وحاول بعد دقيقة.",
   "A device with this IP address and port already exists": "يوجد جهاز بنفس عنوان IP والبورت بالفعل",
   "Connector name is required": "اسم رابط المكتب مطلوب",
   "Request is too large": "حجم الطلب أكبر من المسموح",

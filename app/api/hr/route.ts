@@ -901,7 +901,7 @@ export async function POST(request: Request) {
       const rows=ids.length?(await d1.prepare(`SELECT s.id,s.status,s.error,d.name AS device_name FROM attendance_device_syncs s JOIN attendance_devices d ON d.id=s.device_id WHERE s.id IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<Row>()).results:[];
       return Response.json({syncs:rows});
     }
-    if(["save_attendance_device","create_attendance_agent","rotate_attendance_agent_token","set_attendance_agent_enabled","create_attendance_ingest_source","rotate_attendance_ingest_key","set_attendance_ingest_enabled"].includes(action)) {
+    if(["save_attendance_device","create_attendance_agent","rotate_attendance_agent_token","set_attendance_agent_enabled","create_attendance_ingest_source","rotate_attendance_ingest_key","set_attendance_ingest_enabled","delete_attendance_device"].includes(action)) {
       await authorize(d1,user,"attendance","edit");
       if(user.role_name!=="Super Admin")throw new Response("Only a system administrator can configure biometric devices",{status:403});
       if(action==="create_attendance_ingest_source"){
@@ -931,6 +931,28 @@ export async function POST(request: Request) {
         await d1.prepare("UPDATE attendance_devices SET enabled=?,updated_at=CURRENT_TIMESTAMP WHERE source_id=?").bind(enabled,sourceId).run();
         await audit(d1,request,user,enabled?"biometric_ingest_source_enabled":"biometric_ingest_source_disabled","attendance","attendance_ingest_source",String(sourceId),{enabled:source.enabled},{enabled});
         return Response.json({ok:true});
+      }
+      if(action==="delete_attendance_device"){
+        // An API source is deleted with its virtual device so the key stops working; a normal device is addressed by id.
+        const sourceId=Number(payload.sourceId)||null,id=Number(payload.id)||null;
+        const device=await d1.prepare("SELECT id,name,model,ip_address,port,source_id FROM attendance_devices WHERE "+(sourceId?"source_id=?":"id=?")).bind(sourceId||id||0).first<Row>();
+        if(!device&&!(sourceId&&await d1.prepare("SELECT id FROM attendance_ingest_sources WHERE id=?").bind(sourceId).first()))throw new Response("Attendance device not found",{status:404});
+        const deviceId=device?Number(device.id):0;
+        // Only a sync a connector is actively running blocks deletion; a queued one nobody picked up (stopped connector) is deleted with the device.
+        if(deviceId&&await d1.prepare("SELECT id FROM attendance_device_syncs WHERE device_id=? AND status='running' AND started_at>now()-interval '10 minutes'").bind(deviceId).first())throw new Response("A sync is waiting or running for this device. Disable the device and try again in a minute.",{status:409});
+        const punches=deviceId?Number((await d1.prepare("SELECT count(*)::integer AS n FROM attendance_device_punches WHERE device_id=?").bind(deviceId).first<Row>())?.n||0):0;
+        await d1.transaction(async tx=>{
+          if(deviceId){
+            await tx.prepare("DELETE FROM attendance_device_punches WHERE device_id=?").bind(deviceId).run();
+            await tx.prepare("DELETE FROM attendance_device_users WHERE device_id=?").bind(deviceId).run();
+            await tx.prepare("DELETE FROM attendance_device_syncs WHERE device_id=?").bind(deviceId).run();
+            await tx.prepare("DELETE FROM attendance_devices WHERE id=?").bind(deviceId).run();
+          }
+          const linked=sourceId||(device?.source_id?Number(device.source_id):null);
+          if(linked)await tx.prepare("DELETE FROM attendance_ingest_sources WHERE id=?").bind(linked).run();
+        });
+        await audit(d1,request,user,"biometric_device_deleted","attendance","attendance_device",String(deviceId||sourceId),device,{punchesRemoved:punches,sourceId:sourceId||device?.source_id||null});
+        return Response.json({ok:true,punchesRemoved:punches});
       }
       if(action==="save_attendance_device"){
         const id=Number(payload.id)||null,input=parseDeviceInput(payload);

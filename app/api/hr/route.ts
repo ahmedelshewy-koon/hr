@@ -871,7 +871,7 @@ export async function POST(request: Request) {
       await authorize(d1,user,"attendance","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can synchronize biometric devices",{status:403});
       const deviceId=Number(payload.deviceId);if(!deviceId)throw new Response("Attendance device is required",{status:400});
-      const device=await d1.prepare("SELECT id,name FROM attendance_devices WHERE id=? AND enabled=1").bind(deviceId).first<Row>();if(!device)throw new Response("Attendance device not found",{status:404});
+      const device=await d1.prepare("SELECT id,name FROM attendance_devices WHERE id=? AND enabled=1 AND source_id IS NULL").bind(deviceId).first<Row>();if(!device)throw new Response("Attendance device not found",{status:404});
       const active=await d1.prepare("SELECT id,status FROM attendance_device_syncs WHERE device_id=? AND status IN ('queued','running') ORDER BY requested_at DESC,id DESC LIMIT 1").bind(deviceId).first<Row>();
       if(active)return Response.json({ok:true,id:active.id,status:active.status,alreadyQueued:true});
       const queued=await d1.prepare("INSERT INTO attendance_device_syncs (device_id,status,trigger,requested_by_user_id,requested_at) VALUES (?,'queued','manual',?,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING RETURNING id,status").bind(deviceId,user.id).first<Row>();
@@ -882,7 +882,8 @@ export async function POST(request: Request) {
     if(action==="sync_attendance_now") {
       await authorize(d1,user,"attendance","edit");
       if(!["Super Admin","HR Manager"].includes(user.role_name))throw new Response("Only HR can synchronize biometric devices",{status:403});
-      const devices=(await d1.prepare("SELECT id,name FROM attendance_devices WHERE enabled=1 ORDER BY id").all<Row>()).results;
+      // API sources push their punches themselves; a queued pull for them would never be picked up.
+      const devices=(await d1.prepare("SELECT id,name FROM attendance_devices WHERE enabled=1 AND source_id IS NULL ORDER BY id").all<Row>()).results;
       if(!devices.length)throw new Response("No biometric device is configured",{status:404});
       const syncIds:number[]=[];
       for(const device of devices){

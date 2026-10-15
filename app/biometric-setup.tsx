@@ -88,7 +88,7 @@ export function BiometricSetup({ rtl, agents, devices, sources = [], notify, onC
     <aside className="drawer attendance-drawer biometric-setup" role="dialog" aria-modal="true" aria-labelledby="bio-setup-title">
       <header><div><small>{t("BIOMETRIC SETUP", "إعداد البصمة")}</small><h2 id="bio-setup-title">{form ? (form.id ? t("Edit device", "تعديل الجهاز") : t("Add device", "إضافة جهاز")) : t("Devices & office connector", "الأجهزة ورابط المكتب")}</h2><p>{form ? t("The office connector reads the device at this address on the office network.", "رابط المكتب يقرأ الجهاز على هذا العنوان داخل شبكة المكتب.") : t("The HR app is online and the device is on the office network, so a small connector on an office computer reads the device and sends the records here.", "البرنامج على الإنترنت والجهاز على شبكة المكتب، لذلك يقرأ «رابط المكتب» الجهاز من كمبيوتر داخل الشبكة ويرسل البيانات للبرنامج.")}</p></div><button className="icon-btn" disabled={busy} onClick={onClose} aria-label={t("Close", "إغلاق")}><X/></button></header>
       <div className="attendance-form">
-        {error && <div className="form-error" role="alert">{error}</div>}
+        {error && <div className="form-error" role="alert" ref={element => element?.scrollIntoView({ block: "nearest", behavior: "smooth" })}>{error}</div>}
         {form ? <>
           <label><span>{t("Device name", "اسم الجهاز")}</span><input value={form.name} onChange={event => field("name", event.target.value)} placeholder={t("Main entrance", "البوابة الرئيسية")} ref={focusOnMount}/></label>
           <div className="bio-setup-pair">

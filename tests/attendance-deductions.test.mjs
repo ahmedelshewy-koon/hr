@@ -45,11 +45,12 @@ test("period totals add wage-days, fixed amounts and weighted overtime hours", (
   assert.equal(summarizeAttendanceDeductions([], [{ status: "absent" }, { status: "absent" }], 1.5).wageDays, 2, "no absence rule keeps one day per absence");
 });
 
-test("payroll and the attendance report both read the deduction rules", async () => {
+test("payroll reads posted timesheet deductions and the attendance report reads the deduction rules", async () => {
   const read = file => readFile(new URL(file, import.meta.url), "utf8");
   const [payroll, report, panel] = await Promise.all([read("../app/api/hr/route.ts"), read("../app/attendance/attendance-report.ts"), read("../app/attendance-report-panel.tsx")]);
-  assert.match(payroll, /summarizeAttendanceDeductions\(deductionRules, attendanceRows, overtimeMultiplier\)/);
-  assert.match(payroll, /attendanceCost\.wageDays \* dailyRate \+ attendanceCost\.fixedAmount/);
+  // Timesheet Management: payroll runs read only the values posted from the Deduction Summary (no auto-calculation).
+  assert.match(payroll, /FROM payroll_variable_entries WHERE employee_id=\? AND period_key=\?/);
+  assert.match(payroll, /postedAmount\("delay"\) \+ postedAmount\("absence"\)/);
   assert.match(report, /withDeductions\(rules, records\.results\)/);
   assert.match(panel, /deduction_wage_days/);
 });

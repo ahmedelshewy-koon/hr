@@ -5,7 +5,7 @@ const COOKIE_NAME = "koon_portal_session";
 const DEFAULT_SESSION_SECONDS = 60 * 60 * 8;
 export { hashPassword } from './password-hash';
 
-export type PortalSession = { userId: number; email: string; sessionVersion: number; exp: number };
+export type PortalSession = { userId: number; email: string; sessionVersion: number; exp: number; sid?: string };
 
 function runtimeValue(key: "KOON_LOGIN_EMAIL" | "KOON_LOGIN_PASSWORD_HASH" | "KOON_AUTH_SECRET") {
   const workerValue = (env as unknown as Record<string, unknown>)[key];
@@ -39,6 +39,18 @@ async function hmac(value: string) {
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
 }
 
+async function sessionHash(token:string) { return toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)))); }
+function sessionToken(request:Request) { return request.headers.get("cookie")?.split(";").map(part=>part.trim()).find(part=>part.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length+1)||""; }
+export async function registerPortalSession(db:PostgresDatabase,token:string,userId:number) {
+  const ready=await db.prepare("SELECT to_regclass('public.portal_session_activity') IS NOT NULL AS ready").first<{ready:boolean}>();
+  if(ready?.ready) await db.prepare("INSERT INTO portal_session_activity(token_hash,user_id) VALUES(?,?) ON CONFLICT(token_hash) DO UPDATE SET last_activity_at=now()").bind(await sessionHash(token),userId).run();
+}
+export async function revokePortalSession(db:PostgresDatabase,request:Request) {
+  const token=sessionToken(request);if(!token)return;
+  const ready=await db.prepare("SELECT to_regclass('public.portal_session_activity') IS NOT NULL AS ready").first<{ready:boolean}>();
+  if(ready?.ready) await db.prepare("DELETE FROM portal_session_activity WHERE token_hash=?").bind(await sessionHash(token)).run();
+}
+
 export function portalLoginEmail() { return runtimeValue("KOON_LOGIN_EMAIL").toLowerCase(); }
 
 export async function verifyPassword(password: string, encodedHash: string) {
@@ -56,7 +68,7 @@ export async function verifyBootstrapPassword(password: string) { return verifyP
 
 export async function createPortalSession(user: { id:number; email:string; session_version?:number },sessionSeconds=DEFAULT_SESSION_SECONDS) {
   const safeSeconds=Math.min(86400,Math.max(900,Math.floor(sessionSeconds)));
-  const session:PortalSession = { userId:user.id, email:user.email.toLowerCase(), sessionVersion:Number(user.session_version)||1, exp:Math.floor(Date.now() / 1000) + safeSeconds };
+  const session:PortalSession = { userId:user.id, email:user.email.toLowerCase(), sessionVersion:Number(user.session_version)||1, exp:Math.floor(Date.now() / 1000) + safeSeconds, sid:crypto.randomUUID() };
   const payload = toBase64Url(new TextEncoder().encode(JSON.stringify(session)));
   const signature = toBase64Url(await hmac(payload));
   return `${payload}.${signature}`;
@@ -64,8 +76,7 @@ export async function createPortalSession(user: { id:number; email:string; sessi
 
 export async function readPortalSession(request: Request):Promise<PortalSession|null> {
   try {
-    const cookie = request.headers.get("cookie")?.split(";").map(part=>part.trim()).find(part=>part.startsWith(`${COOKIE_NAME}=`));
-    const token = cookie?.slice(COOKIE_NAME.length + 1);
+    const token = sessionToken(request);
     if (!token) return null;
     const [payload, signature] = token.split(".");
     if (!payload || !signature || !equalBytes(await hmac(payload), fromBase64Url(signature))) return null;
@@ -81,6 +92,11 @@ export async function requirePortalSession(request: Request, d1?: PostgresDataba
   if (d1) {
     const user = await d1.prepare("SELECT id,email,status,session_version FROM users WHERE id=?").bind(session.userId).first<{id:number;email:string;status:string;session_version:number}>();
     if (!user || user.status !== "active" || Number(user.session_version) !== session.sessionVersion || user.email.toLowerCase() !== session.email) throw new Response("Portal login required", { status:401 });
+    const ready=await d1.prepare("SELECT to_regclass('public.portal_session_activity') IS NOT NULL AS ready").first<{ready:boolean}>();
+    if(ready?.ready) {
+      const active=await d1.prepare("UPDATE portal_session_activity SET last_activity_at=now() WHERE token_hash=? AND user_id=? AND last_activity_at>now()-interval '3 hours' RETURNING token_hash").bind(await sessionHash(sessionToken(request)),session.userId).first();
+      if(!active) throw new Response("Session idle timeout",{status:401});
+    }
   }
   return session;
 }

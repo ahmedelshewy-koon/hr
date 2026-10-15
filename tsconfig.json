@@ -36,6 +36,7 @@
     "examples",
     ".next",
     ".vinext",
-    ".wrangler"
+    ".wrangler",
+    "tmp"
   ]
 }

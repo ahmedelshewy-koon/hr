@@ -3,6 +3,8 @@ import { enforceWriteOrigin, hasPermission, requireActor } from '../api-security
 import { requireModule, body } from '../../talent/talent-service';
 import { seesWholeCompany } from '../../employees/hr-data-scope';
 import { deleteHrSetting, HrSettingsError, readHrSettings, saveHrSetting } from '../../hr-settings/catalog';
+import { payrollAccess } from '../../payroll/service';
+import { hasPayrollPage, requirePayrollPage } from '../../payroll/permissions';
 
 /** Structured validation errors keep code/field/message_ar/message_en; apiFailure passes JSON bodies through. */
 const asResponse = (error: unknown) => error instanceof HrSettingsError
@@ -15,7 +17,9 @@ export async function GET(request: Request) { return withDatabase('Unable to loa
   if (!seesWholeCompany(actor)) throw new Response('Forbidden', { status: 403 });
   await requireModule(db, actor, 'system_settings', 'view');
   const settings = await readHrSettings(db);
-  return Response.json({ ...settings, canManage: await hasPermission(db, actor, 'system_settings', 'manage_settings') }, { headers: { 'cache-control': 'no-store' } });
+  let deductionAllowed=false,attendanceAllowed=false;
+  try {await payrollAccess(db,actor);deductionAllowed=await hasPayrollPage(db,actor,'deductionRulesSetup');attendanceAllowed=await hasPayrollPage(db,actor,'attendanceTypeSetup');}catch{/* HR settings may still show unrelated catalogs. */}
+  return Response.json({ ...settings, deductionRules:deductionAllowed?settings.deductionRules:[], attendanceTypes:attendanceAllowed?settings.attendanceTypes:[], canManage: await hasPermission(db, actor, 'system_settings', 'manage_settings') }, { headers: { 'cache-control': 'no-store' } });
 }); }
 
 /** action: 'save' (default; create when record.id is empty) | 'delete'. */
@@ -25,6 +29,8 @@ export async function POST(request: Request) { return withDatabase('Unable to sa
   if (!seesWholeCompany(actor)) throw new Response('Forbidden', { status: 403 });
   await requireModule(db, actor, 'system_settings', 'manage_settings');
   const input = await body(request);
+  if(input.entity==='deductionRules') {await payrollAccess(db,actor);await requirePayrollPage(db,actor,'deductionRulesSetup','edit');}
+  if(input.entity==='attendanceTypes') {await payrollAccess(db,actor);await requirePayrollPage(db,actor,'attendanceTypeSetup','edit');}
   const record = input.record;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Response('Invalid record', { status: 400 });
   const action = String(input.action || 'save');

@@ -4,7 +4,7 @@ import { AddButton, BilingualFields, MasterDataDrawer, MasterDataTable, MasterDa
 import { useDrawerForm } from '../use-drawer-form';
 import { field, nameOf, number, otherNameOf, RowActions, statusOptions, type SectionProps } from './shared';
 
-const RULE_TYPES = [{ value: 'absence', ar: 'غياب', en: 'Absence', tone: 'red' }, { value: 'late_arrival', ar: 'تأخير', en: 'Late Arrival', tone: 'orange' }, { value: 'overtime', ar: 'عمل إضافي', en: 'Overtime', tone: 'green' }];
+const RULE_TYPES = [{ value: 'absence', ar: 'غياب', en: 'Absence', tone: 'red' }, { value: 'late_arrival', ar: 'تأخير', en: 'Late Arrival', tone: 'orange' }, { value: 'early_leave', ar: 'انصراف مبكر', en: 'Early Leave', tone: 'orange' }, { value: 'overtime', ar: 'عمل إضافي', en: 'Overtime', tone: 'green' }];
 const DEDUCTION_TYPES = [{ value: 'fixed_amount', ar: 'مبلغ ثابت', en: 'Fixed amount' }, { value: 'daily_wage_percent', ar: 'نسبة مئوية', en: '% of daily wage' }, { value: 'days_of_wage', ar: 'أيام من الأجر', en: 'Days of wage' }];
 const NOTICE_OPTIONS = [{ value: '', ar: 'كل حالات الغياب', en: 'All absences' }, { value: 'with_notice', ar: 'بإشعار', en: 'With notice' }, { value: 'without_notice', ar: 'بدون إشعار', en: 'Without notice' }];
 const label = (list: { value: string; ar: string; en: string }[], value: unknown, rtl: boolean) => { const item = list.find(entry => entry.value === value); return item ? (rtl ? item.ar : item.en) : '—'; };
@@ -29,7 +29,7 @@ export function DeductionRulesSection({ rtl, data, save, remove }: SectionProps)
     <MasterDataTable caption={rtl ? 'قواعد الخصم والعمل الإضافي' : 'Deduction and overtime rules'} rows={list.shown} rowKey={row => row.id} actionsLabel={rtl ? 'الإجراءات' : 'Actions'}
       emptyTitle={rtl ? 'لا توجد قواعد' : 'No rules yet'} emptyText={rtl ? 'مثال: تأخير من 16 إلى 30 دقيقة يخصم 25٪ من أجر اليوم.' : 'Example: late arrival of 16–30 minutes deducts 25% of the daily wage.'}
       columns={[
-        { key: 'name', header: rtl ? 'القاعدة' : 'Rule', render: row => <span className="settings-name"><b>{nameOf(row, rtl)}</b><small>{otherNameOf(row, rtl)}</small>{row.rule_type === 'absence' && Boolean(row.absence_notice) && <small>{label(NOTICE_OPTIONS, row.absence_notice, rtl)}</small>}</span> },
+        { key: 'name', header: rtl ? 'القاعدة' : 'Rule', render: row => <span className="settings-name"><b>{nameOf(row, rtl)}</b><small>{otherNameOf(row, rtl)}</small>{row.rule_type === 'absence' && Boolean(row.absence_notice) && <StatusBadge rtl={rtl} tone="orange" label={label(NOTICE_OPTIONS, row.absence_notice, rtl)} />}</span> },
         { key: 'type', header: rtl ? 'النوع' : 'Type', render: row => <StatusBadge rtl={rtl} tone={RULE_TYPES.find(item => item.value === row.rule_type)?.tone ?? 'gray'} label={label(RULE_TYPES, row.rule_type, rtl)} /> },
         { key: 'range', header: rtl ? 'نطاق الدقائق' : 'Minute range', render: row => <span dir={rtl ? 'rtl' : 'ltr'}>{range(row)}</span> },
         { key: 'deduction', header: rtl ? 'نوع الخصم' : 'Deduction type', render: row => row.rule_type === 'overtime' ? (rtl ? 'بالساعة' : 'Hourly') : label(DEDUCTION_TYPES, row.deduction_type, rtl) },
@@ -43,8 +43,8 @@ export function DeductionRulesSection({ rtl, data, save, remove }: SectionProps)
       eyebrow={rtl ? 'قاعدة خصم أو عمل إضافي' : 'DEDUCTION / OVERTIME RULE'} title={form.id ? nameOf(form, rtl) : (rtl ? 'قاعدة جديدة' : 'New rule')}>
       <BilingualFields rtl={rtl} nameAr={form.name_ar} nameEn={form.name_en} onChange={(key, next) => drawer.change({ [key]: next })} />
       <SelectField label={rtl ? 'النوع' : 'Type'} required value={form.rule_type} options={RULE_TYPES.map(item => ({ value: item.value, label: rtl ? item.ar : item.en }))} onChange={next => drawer.change({ rule_type: next, deduction_type: next === 'overtime' ? 'hourly' : form.deduction_type === 'hourly' ? 'daily_wage_percent' : form.deduction_type || 'daily_wage_percent', value: next === 'overtime' ? '1' : form.value, min_minutes: next === 'late_arrival' ? form.min_minutes || '0' : '', max_minutes: '', absence_notice: '' })} />
-      {form.rule_type === 'absence' && <SelectField label={rtl ? 'الإشعار' : 'Notice'} value={form.absence_notice} options={NOTICE_OPTIONS.map(item => ({ value: item.value, label: rtl ? item.ar : item.en }))} onChange={next => drawer.change({ absence_notice: next })} />}
-      {(form.rule_type === 'late_arrival' || Boolean(form.min_minutes)) &&
+      {form.rule_type === 'absence' && <div className="form-row"><label className="check-row"><input type="checkbox" checked={form.absence_notice==='with_notice'} onChange={event=>drawer.change({absence_notice:event.target.checked?'with_notice':''})}/><span>{rtl?'بإشعار':'With notice'}</span></label><label className="check-row"><input type="checkbox" checked={form.absence_notice==='without_notice'} onChange={event=>drawer.change({absence_notice:event.target.checked?'without_notice':''})}/><span>{rtl?'بدون إشعار':'Without notice'}</span></label></div>}
+      {(form.rule_type === 'late_arrival' || form.rule_type === 'early_leave' || Boolean(form.min_minutes)) &&
       <div className="form-row">
         <TextField label={rtl ? 'من (دقيقة)' : 'From (minutes)'} type="number" min={0} inputMode="numeric" required value={form.min_minutes} onChange={next => drawer.change({ min_minutes: next })} />
         <TextField label={rtl ? 'إلى (دقيقة)' : 'To (minutes)'} type="number" min={0} inputMode="numeric" value={form.max_minutes} onChange={next => drawer.change({ max_minutes: next })} hint={rtl ? 'اتركه فارغًا لنطاق مفتوح.' : 'Leave empty for an open-ended range.'} />

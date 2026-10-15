@@ -79,15 +79,21 @@ export const employees = pgTable(
     positionId: integer("position_id").references(() => positions.id),
     gradeId: integer("grade_id").references(() => jobGrades.id),
     workLocationId: integer("work_location_id").references(() => workLocations.id),
+    // Timesheet schedule sources (0052): an attendance type's fixed times win over the employee's own shift, then a weekly shift plan.
+    attendanceTypeId: integer("attendance_type_id"),
+    shiftPlanId: integer("shift_plan_id"),
     assignmentEffectiveDate: text("assignment_effective_date"),
     hrUserId: integer("hr_user_id"),
     organizationalLevel: integer("organizational_level").notNull().default(1),
     startDate: text("start_date").notNull(),
     endDate: text("end_date"),
+    terminationDate: text("termination_date"),
+    dopayEmployeeNumber: text("dopay_employee_number"),
     employmentStatus: text("employment_status").notNull().default("active"),
     salary: doublePrecision("salary"),
     salaryCurrency: text("salary_currency").default("SAR"),
     salaryCountry: text("salary_country"),
+    workingBusinessUnitId: integer("working_business_unit_id"),
     costCenterId: integer("cost_center_id").references((): AnyPgColumn => costCenters.id),
     country: text("country").notNull(),
     workLocation: text("work_location"),
@@ -110,7 +116,7 @@ export const employees = pgTable(
   },
   (t) => [
     uniqueIndex("idx_employees_employee_code").on(t.employeeCode),
-    uniqueIndex("idx_employees_work_email").on(t.workEmail),
+    uniqueIndex("idx_employees_work_email").on(t.workEmail).where(sql`employment_status <> 'deleted'`),
     index("idx_employees_department_status").on(
       t.departmentId,
       t.employmentStatus,
@@ -247,6 +253,95 @@ export const permissions = pgTable(
     ),
   ],
 );
+
+/** Optional latest-record per-user restriction layered on top of role grants. */
+export const userPermissions = pgTable("user_permissions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  menuItem: text("menu_item").notNull(),
+  allowed: integer("allowed").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [index("idx_user_permissions_latest").on(t.userId, t.menuItem, t.id)]);
+
+export const portalSessionActivity = pgTable("portal_session_activity", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, {onDelete:"cascade"}),
+  lastActivityAt: timestamp("last_activity_at", {withTimezone:true,mode:"string"}).notNull().defaultNow(),
+  createdAt: timestamp("created_at", {withTimezone:true,mode:"string"}).notNull().defaultNow(),
+}, t => [index("idx_portal_session_activity_user").on(t.userId,t.lastActivityAt)]);
+
+export const payrollErpInvoiceAttempts = pgTable("payroll_erp_invoice_attempts", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull(),
+  batchNumber: text("batch_number").notNull(),
+  businessUnitCode: text("business_unit_code").notNull(),
+  httpStatus: integer("http_status").notNull(),
+  responseBody: text("response_body"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [index("idx_payroll_erp_invoice_attempts_run").on(t.runId, t.id)]);
+
+export const payrollErpReconciliations = pgTable("payroll_erp_reconciliations", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull(),
+  outcome: text("outcome").notNull(),
+  evidenceReference: text("evidence_reference").notNull(),
+  note: text("note"),
+  submittedBy: integer("submitted_by").notNull(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  verifiedBy: integer("verified_by"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "string" }),
+  usedBy: integer("used_by"),
+  usedAt: timestamp("used_at", { withTimezone: true, mode: "string" }),
+}, t => [index("idx_payroll_erp_reconciliations_run").on(t.runId, t.id)]);
+
+export const employeeWfhDays = pgTable("employee_wfh_days", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  wfhDate: text("wfh_date").notNull(),
+  approvedBy: integer("approved_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [uniqueIndex("idx_employee_wfh_days_employee_date").on(t.employeeId, t.wfhDate)]);
+
+export const wfhSessions = pgTable("wfh_sessions", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  workDate: text("work_date").notNull(),
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true, mode: "string" }).notNull(),
+  checkedOutAt: timestamp("checked_out_at", { withTimezone: true, mode: "string" }),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  forcedBy: integer("forced_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [
+  index("idx_wfh_sessions_employee_date").on(t.employeeId, t.workDate),
+  uniqueIndex("idx_wfh_sessions_one_open").on(t.employeeId).where(sql`${t.checkedOutAt} IS NULL`),
+]);
+
+export const savedAttendance = pgTable("saved_attendance", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  employeeCode: text("employee_code").notNull(),
+  workDate: text("work_date").notNull(),
+  checkIn: text("check_in"),
+  checkOut: text("check_out"),
+  workMinutes: integer("work_minutes").notNull().default(0),
+  expectedMinutes: integer("expected_minutes").notNull().default(0),
+  differenceMinutes: integer("difference_minutes").notNull().default(0),
+  status: text("status").notNull(),
+  vacationType: text("vacation_type"),
+  deductionRuleId: integer("deduction_rule_id"),
+  deductionAmount: doublePrecision("deduction_amount").notNull().default(0),
+  absenceHasNotice: integer("absence_has_notice"),
+  isConfirmed: integer("is_confirmed").notNull().default(1),
+  batchId: text("batch_id").notNull(),
+  entryNotificationSent: integer("entry_notification_sent").notNull().default(0),
+  exitNotificationSent: integer("exit_notification_sent").notNull().default(0),
+  deductionNotificationSent: integer("deduction_notification_sent").notNull().default(0),
+  confirmedBy: integer("confirmed_by").notNull().references(() => users.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, t => [
+  uniqueIndex("idx_saved_attendance_employee_date").on(t.employeeId,t.workDate),
+  index("idx_saved_attendance_date").on(t.workDate),
+]);
 
 export const requests = pgTable(
   "requests",
@@ -635,6 +730,8 @@ export const holidays = pgTable(
     days: doublePrecision("days").notNull().default(1),
     originalDate: text("original_date"),
     originalDateBehavior: text("original_date_behavior").default("holiday"),
+    // NULL or empty = every religion; otherwise only employees whose religion matches (0052).
+    religion: text("religion"),
     notes: text("notes"),
     status: text("status").notNull().default("active"),
     ...timestamps,
@@ -1805,12 +1902,26 @@ export const payrollRuns = pgTable(
     year: integer("year").notNull(),
     country: text("country").notNull(),
     status: text("status").notNull().default("draft"),
+    currency: text("currency"),
     approvedBy: integer("approved_by"),
     approvedAt: timestamp("approved_at", {
       withTimezone: true,
       mode: "string",
     }),
     lockedAt: timestamp("locked_at", { withTimezone: true, mode: "string" }),
+    sarCurrencyRate: doublePrecision("sar_currency_rate"),
+    totalGross: doublePrecision("total_gross").notNull().default(0),
+    totalDeductions: doublePrecision("total_deductions").notNull().default(0),
+    totalNet: doublePrecision("total_net").notNull().default(0),
+    employeeCount: integer("employee_count").notNull().default(0),
+    inputFingerprint: text("input_fingerprint"),
+    confirmedBy: integer("confirmed_by"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: "string" }),
+    sentToAccountingBy: integer("sent_to_accounting_by"),
+    sentToAccountingAt: timestamp("sent_to_accounting_at", { withTimezone: true, mode: "string" }),
+    erpPostStartedAt: timestamp("erp_post_started_at", { withTimezone: true, mode: "string" }),
+    erpPostFailedAt: timestamp("erp_post_failed_at", { withTimezone: true, mode: "string" }),
+    erpBatchNumber: text("erp_batch_number"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
@@ -1820,7 +1931,8 @@ export const payrollRuns = pgTable(
       t.month,
       t.year,
       t.country,
-    ),
+    ).where(sql`${t.currency} IS NULL`),
+    uniqueIndex("idx_payroll_runs_period_currency").on(t.month,t.year,t.country,t.currency).where(sql`${t.currency} IS NOT NULL`),
   ],
 );
 
@@ -2013,6 +2125,9 @@ export const attendanceTypes = pgTable(
     startTime: text("start_time"),
     endTime: text("end_time"),
     lateAllowanceMinutes: integer("late_allowance_minutes").notNull().default(0),
+    earlyExitAllowanceMinutes: integer("early_exit_allowance_minutes").notNull().default(0),
+    // Comma-separated weekdays (0 = Sunday) that are rest days for this type; empty = use the employee's own work days (0052).
+    weekendDays: text("weekend_days").notNull().default(""),
     status: text("status").notNull().default("active"),
     ...timestamps,
   },
@@ -2070,9 +2185,15 @@ export const approvalWorkflowVersions = pgTable('approval_workflow_versions', {
 },t=>[unique('approval_workflow_versions_workflow_id_version_key').on(t.workflowId,t.version)]);
 export const approvalWorkflowRuns = pgTable('approval_workflow_runs', {
  id:serial('id').primaryKey(),sourceType:text('source_type').notNull(),sourceId:integer('source_id').notNull(),employeeId:integer('employee_id').notNull().references(()=>employees.id),
- companyId:integer('company_id').notNull().references(()=>companies.id),workflowId:integer('workflow_id').notNull().references(()=>approvalWorkflows.id),version:integer('version').notNull(),requestType:text('request_type').notNull(),departmentId:integer('department_id').references(()=>departments.id),
+ companyId:integer('company_id').notNull().references(()=>companies.id),workflowId:integer('workflow_id').references(()=>approvalWorkflows.id),version:integer('version').notNull(),requestType:text('request_type').notNull(),departmentId:integer('department_id').references(()=>departments.id),
  stepsJson:text('steps_json').notNull(),currentStep:integer('current_step').notNull().default(0),state:text('state').notNull().default('pending'),currentUserId:integer('current_user_id').references(()=>users.id),...timestamps,
 },t=>[unique('approval_workflow_runs_source_type_source_id_key').on(t.sourceType,t.sourceId),index('idx_workflow_current_user').on(t.currentUserId,t.state)]);
+
+export const requestEscalations=pgTable('request_escalations',{
+ id:serial('id').primaryKey(),workflowRunId:integer('workflow_run_id').notNull().references(()=>approvalWorkflowRuns.id),requestId:integer('request_id').notNull().references(()=>requests.id),
+ fromStep:integer('from_step').notNull(),toStep:integer('to_step').notNull(),fromUserId:integer('from_user_id').references(()=>users.id),toUserId:integer('to_user_id').notNull().references(()=>users.id),
+ reason:text('reason').notNull(),createdAt:timestamp('created_at',{withTimezone:true,mode:'string'}).notNull().defaultNow(),
+},t=>[uniqueIndex('idx_request_escalations_run_step').on(t.workflowRunId,t.fromStep)]);
 
 // Company Staffing Blueprint: recommended structure (departments, teams, positions, suggested headcount) per company type and size.
 // Templates (kind='template') are the editable library; a company blueprint (kind='company') is a generated, customised copy.
@@ -2103,3 +2224,198 @@ export const blueprintPositions = pgTable('blueprint_positions', {
  required: integer('required').notNull().default(1), perBranch: integer('per_branch').notNull().default(0), descriptionEn: text('description_en'), descriptionAr: text('description_ar'),
  sortOrder: integer('sort_order').notNull().default(0), ...timestamps,
 },t=>[index('idx_blueprint_positions_blueprint').on(t.blueprintId,t.departmentId)]);
+
+// Timesheet Management (0052). One row per employee per day, calculated from punches, schedules, holidays, leave and WFH.
+// Times are company-local HH:mm text like daily_attendance. daily_attendance keeps feeding the Attendance page and dashboards.
+export const timesheets = pgTable("timesheets", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  workDate: text("work_date").notNull(),
+  scheduledStart: text("scheduled_start"),
+  scheduledEnd: text("scheduled_end"),
+  actualStart: text("actual_start"),
+  actualEnd: text("actual_end"),
+  breakDurationMinutes: integer("break_duration_minutes").notNull().default(0),
+  // 1 = HR set this day's scheduled times by hand, so recalculation keeps scheduled_start/end instead of re-resolving the shift.
+  scheduleOverride: integer("schedule_override").notNull().default(0),
+  // pending | waiting_for_exit | approved | rejected | absent | vacation | holiday | wfh
+  status: text("status").notNull().default("pending"),
+  isAbsent: integer("is_absent").notNull().default(0),
+  absenceReason: text("absence_reason"),
+  // NULL = notice not set (not charged), 1 = with notice, 0 = without notice.
+  absenceHasNotice: integer("absence_has_notice"),
+  // Manual decision recalculation must keep: NULL = follow punches, 'present' = HR cleared the absence, 'absent' = HR marked it.
+  absenceOverride: text("absence_override"),
+  lateMinutes: integer("late_minutes").notNull().default(0),
+  earlyLeaveMinutes: integer("early_leave_minutes").notNull().default(0),
+  overtimeMinutes: integer("overtime_minutes").notNull().default(0),
+  totalWorkMinutes: integer("total_work_minutes").notNull().default(0),
+  deductionAmount: doublePrecision("deduction_amount").notNull().default(0),
+  overtimeAmount: doublePrecision("overtime_amount").notNull().default(0),
+  deductionRuleId: integer("deduction_rule_id"),
+  // JSON list of the deductions behind deduction_amount (late / early leave / absence), each with rule, minutes or days and amount.
+  deductionDetails: text("deduction_details"),
+  deductionNotificationSent: integer("deduction_notification_sent").notNull().default(0),
+  deductionNotificationSentAt: timestamp("deduction_notification_sent_at", { withTimezone: true, mode: "string" }),
+  changedStart: text("changed_start"),
+  changedEnd: text("changed_end"),
+  changedBy: integer("changed_by"),
+  changedAt: timestamp("changed_at", { withTimezone: true, mode: "string" }),
+  managerNote: text("manager_note"),
+  managerNoteBy: integer("manager_note_by"),
+  managerNoteAt: timestamp("manager_note_at", { withTimezone: true, mode: "string" }),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at", { withTimezone: true, mode: "string" }),
+  // holiday name or vacation type shown on the status badge
+  labelEn: text("label_en"),
+  labelAr: text("label_ar"),
+  notes: text("notes"),
+  ...timestamps,
+}, t => [uniqueIndex("idx_timesheets_employee_date").on(t.employeeId, t.workDate), index("idx_timesheets_date_status").on(t.workDate, t.status)]);
+
+// Per-employee exception that lets HR edit days of a confirmed month.
+export const timesheetEditPermissions = pgTable("timesheet_edit_permissions", {
+  id: serial("id").primaryKey(),
+  monthKey: text("month_key").notNull(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  isActive: integer("is_active").notNull().default(1),
+  grantedBy: integer("granted_by"),
+  closedBy: integer("closed_by"),
+  ...timestamps,
+}, t => [uniqueIndex("idx_timesheet_edit_permissions_month_employee").on(t.monthKey, t.employeeId)]);
+
+// Confirm Month: a confirmed (month, payroll country) is read-only except for employees with an active edit permission.
+export const timesheetMonthLocks = pgTable("timesheet_month_locks", {
+  id: serial("id").primaryKey(),
+  monthKey: text("month_key").notNull(),
+  payrollCountry: text("payroll_country").notNull(),
+  confirmed: integer("confirmed").notNull().default(1),
+  confirmedBy: integer("confirmed_by"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: "string" }),
+  unlockedBy: integer("unlocked_by"),
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true, mode: "string" }),
+  ...timestamps,
+}, t => [uniqueIndex("idx_timesheet_month_locks_month_country").on(t.monthKey, t.payrollCountry)]);
+
+// Deduction Summary posts one entry per employee, period and element (delay or absence); payroll reads only these.
+export const payrollVariableEntries = pgTable("payroll_variable_entries", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  periodKey: text("period_key").notNull(),
+  element: text("element").notNull(),
+  elementId: integer("element_id"),
+  quantity: doublePrecision("quantity").notNull().default(0),
+  amount: doublePrecision("amount").notNull().default(0),
+  source: text("source").notNull().default("timesheet"),
+  detailJson: text("detail_json"),
+  postedBy: integer("posted_by"),
+  postedAt: timestamp("posted_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  ...timestamps,
+}, t => [uniqueIndex("idx_payroll_variable_entries_key").on(t.employeeId, t.periodKey, t.element), index("idx_payroll_variable_entries_period").on(t.periodKey)]);
+
+// A payroll attendance period that was sent to payroll; once locked no timesheet day inside it can change.
+export const payrollMonthLocks = pgTable("payroll_month_locks", {
+  id: serial("id").primaryKey(),
+  periodKey: text("period_key").notNull(),
+  payrollCountry: text("payroll_country").notNull(),
+  sentBy: integer("sent_by"),
+  sentAt: timestamp("sent_at", { withTimezone: true, mode: "string" }),
+  employeesCount: integer("employees_count").notNull().default(0),
+  delayTotal: doublePrecision("delay_total").notNull().default(0),
+  absenceTotal: doublePrecision("absence_total").notNull().default(0),
+  locked: integer("locked").notNull().default(0),
+  lockedBy: integer("locked_by"),
+  lockedAt: timestamp("locked_at", { withTimezone: true, mode: "string" }),
+  ...timestamps,
+}, t => [uniqueIndex("idx_payroll_month_locks_period_country").on(t.periodKey, t.payrollCountry)]);
+
+// Payroll rebuild. Legacy payroll_items and salary_structures remain for historical runs.
+export const businessUnits = pgTable("business_units", {
+  id: serial("id").primaryKey(), code: text("code").notNull().unique(), nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(), isActive: integer("is_active").notNull().default(1), ...timestamps,
+});
+export const businessUnitCostCenters = pgTable("business_unit_cost_center_mapping", {
+  id: serial("id").primaryKey(), businessUnitId: integer("business_unit_id").notNull().references(() => businessUnits.id),
+  costCenterId: integer("cost_center_id").notNull().references(() => costCenters.id), payrollDrAccount: text("payroll_dr_account"),
+}, t => [uniqueIndex("idx_bu_cc_mapping").on(t.businessUnitId, t.costCenterId)]);
+export const payrollCurrencies = pgTable("payroll_currencies", {
+  code: text("code").primaryKey(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(),
+  sarRate: doublePrecision("sar_rate").notNull(), isActive: integer("is_active").notNull().default(1), ...timestamps,
+});
+export const payrollHrManagers = pgTable("hr_managers", {
+  id: serial("id").primaryKey(), userId: integer("user_id").notNull().references(() => users.id),
+  region: text("region"), adminOrder: integer("admin_order").notNull().default(0), isActive: integer("is_active").notNull().default(1),
+}, t => [uniqueIndex("idx_hr_manager_user").on(t.userId)]);
+export const payrollHrManagerUnits = pgTable("hr_manager_business_units", {
+  managerId: integer("manager_id").notNull().references(() => payrollHrManagers.id),
+  businessUnitId: integer("business_unit_id").notNull().references(() => businessUnits.id),
+}, t => [uniqueIndex("idx_hr_manager_unit").on(t.managerId, t.businessUnitId)]);
+export const payrollElements = pgTable("payroll_elements", {
+  id: serial("id").primaryKey(), code: text("code").notNull().unique(), nameEn: text("name_en").notNull(), nameAr: text("name_ar").notNull(),
+  elementType: text("element_type").notNull(), classification: text("classification"), calculationType: text("calculation_type").notNull().default("fixed"),
+  defaultAmount: doublePrecision("default_amount").notNull().default(0), formula: text("formula"), sortOrder: integer("sort_order").notNull().default(0),
+  isActive: integer("is_active").notNull().default(1), elementAccount: text("element_account"), elementAccountName: text("element_account_name"),
+  isBasicSalaryElement: integer("is_basic_salary_element").notNull().default(0), isDelayMinutesElement: integer("is_delay_minutes_element").notNull().default(0),
+  isAbsenceElement: integer("is_absence_element").notNull().default(0), ...timestamps,
+});
+export const payrollElementEligibility = pgTable("payroll_element_eligibility", {
+  id: serial("id").primaryKey(), elementId: integer("element_id").notNull().references(() => payrollElements.id),
+  jobTitleId: integer("job_title_id"), departmentId: integer("department_id"),
+});
+export const payrollEmployeeElements = pgTable("payroll_employee_elements", {
+  id: serial("id").primaryKey(), employeeId: integer("employee_id").notNull().references(() => employees.id),
+  elementId: integer("element_id").notNull().references(() => payrollElements.id), amount: doublePrecision("amount").notNull().default(0),
+  effectiveFrom: text("effective_from").notNull(), effectiveTo: text("effective_to"), isActive: integer("is_active").notNull().default(1), notes: text("notes"), ...timestamps,
+});
+export const payrollRunLines = pgTable("payroll_run_lines", {
+  id: serial("id").primaryKey(), runId: integer("run_id").notNull().references(() => payrollRuns.id),
+  employeeId: integer("employee_id").notNull().references(() => employees.id), elementId: integer("element_id").references(() => payrollElements.id),
+  elementCode: text("element_code").notNull(), elementNameEn: text("element_name_en").notNull(), elementNameAr: text("element_name_ar").notNull(),
+  elementType: text("element_type").notNull(), amount: doublePrecision("amount").notNull(), minutes: doublePrecision("minutes").notNull().default(0),
+  currency: text("currency").notNull(), notes: text("notes"),
+  businessUnitCode: text("business_unit_code"), costCenterCode: text("cost_center_code"), departmentCode: text("department_code"),
+  elementAccount: text("element_account"), fallbackAccount: text("fallback_account"), employeeCode: text("employee_code"),
+}, t => [index("idx_payroll_run_lines_run_employee").on(t.runId, t.employeeId)]);
+export const payrollErpSettings = pgTable("payroll_erp_settings", {
+  id: integer("id").primaryKey().default(1), invoiceUrl: text("invoice_url").notNull().default(""), invoiceMethod: text("invoice_method").notNull().default("POST"),
+  batchUrl: text("batch_url").notNull().default(""), batchMethod: text("batch_method").notNull().default("GET"),
+  apiKey: text("api_key").notNull().default(""), defaultStatus: text("default_status").notNull().default("DRAFT"), ...timestamps,
+});
+
+// Weekly shift plans (per weekday start/end/break/off day) and per-date rotating shift assignments.
+export const shiftPlans = pgTable("shift_plans", {
+  id: serial("id").primaryKey(),
+  nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(),
+  status: text("status").notNull().default("active"),
+  ...timestamps,
+});
+export const shiftPlanDetails = pgTable("shift_plan_details", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").notNull().references(() => shiftPlans.id, { onDelete: "cascade" }),
+  weekday: integer("weekday").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  breakMinutes: integer("break_minutes").notNull().default(0),
+  isOff: integer("is_off").notNull().default(0),
+}, t => [uniqueIndex("idx_shift_plan_details_plan_weekday").on(t.planId, t.weekday)]);
+export const shiftAssignments = pgTable("shift_assignments", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  shiftDate: text("shift_date").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  breakMinutes: integer("break_minutes").notNull().default(0),
+  isOff: integer("is_off").notNull().default(0),
+  ...timestamps,
+}, t => [uniqueIndex("idx_shift_assignments_employee_date").on(t.employeeId, t.shiftDate)]);
+
+// A company-wide work-from-home date; payroll_country '' applies to every country.
+export const companyWfhDays = pgTable("company_wfh_days", {
+  id: serial("id").primaryKey(),
+  wfhDate: text("wfh_date").notNull(),
+  payrollCountry: text("payroll_country").notNull().default(""),
+  note: text("note"),
+  createdBy: integer("created_by"),
+  ...timestamps,
+}, t => [uniqueIndex("idx_company_wfh_days_date_country").on(t.wfhDate, t.payrollCountry)]);

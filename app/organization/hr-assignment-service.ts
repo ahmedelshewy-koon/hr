@@ -18,7 +18,7 @@ export async function saveHrAssignment(db: TransactionDatabase, input: Row, acto
   if (!current.includes(String(employee.employment_status))) throw new Response('اختر موظفًا حاليًا', { status: 400 });
   const role = await db.prepare("SELECT id FROM roles WHERE name='HR Manager'").first<{ id: number }>();
   if (!role) throw new Response('دور مدير الموارد البشرية غير موجود', { status: 409 });
-  let user = await db.prepare('SELECT u.id,u.role_id,u.status,u.hr_data_scope,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.employee_id=?').bind(employeeId).first<Row>();
+  let user = await db.prepare('SELECT u.id,u.role_id,u.status,u.hr_data_scope,r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.employee_id=? AND u.status<>\'deleted\' ORDER BY u.id DESC LIMIT 1').bind(employeeId).first<Row>();
   let temporaryPassword: string | null = null;
   if (!user) {
     const email = String(employee.work_email ?? '').trim().toLowerCase();

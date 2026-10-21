@@ -1,6 +1,7 @@
 import { withDatabase } from "../route-helpers";
 import { enforceRateLimit } from "../api-security";
 import { authenticateIngest, ingestFailure, ingestRecords, MAX_INGEST_RECORDS } from "../../attendance/biometric-ingest";
+import { corsPreflightResponse, withIngestCors } from "../../attendance/biometric-cors";
 
 // A whole device history is a few MB of JSON; this leaves headroom without accepting unbounded bodies.
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
@@ -15,7 +16,7 @@ async function withMessage(response: Response) {
 
 /** Called by an external program (for example the ZK integration), authenticated by its API key rather than a session. */
 export async function POST(request: Request) {
-  return withMessage(await withDatabase("Biometric ingest failed", async db => {
+  return withIngestCors(await withMessage(await withDatabase("Biometric ingest failed", async db => {
     await enforceRateLimit(db, request, "biometric-ingest-ip", 3000, 3600);
     const source = await authenticateIngest(db, request);
     await enforceRateLimit(db, request, "biometric-ingest", 1500, 3600, source.id);
@@ -32,5 +33,9 @@ export async function POST(request: Request) {
       await db.prepare("UPDATE attendance_ingest_sources SET last_error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(String(error instanceof Error ? error.message : "Import failed").slice(0, 300), source.id).run().catch(() => undefined);
       throw error;
     }
-  }));
+  })));
+}
+
+export function OPTIONS() {
+  return corsPreflightResponse();
 }

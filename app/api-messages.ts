@@ -99,7 +99,6 @@ const EXACT: Record<string, string> = {
   "Invalid religion": "الديانة غير صالحة",
   "Start time must use HH:mm": "وقت البداية يجب أن يكون بصيغة HH:mm",
   "End time must use HH:mm": "وقت النهاية يجب أن يكون بصيغة HH:mm",
-  "Ingest source not found": "مصدر الاستيراد غير موجود",
   "A sync is waiting or running for this device. Disable the device and try again in a minute.": "توجد مزامنة قيد الانتظار أو التنفيذ لهذا الجهاز. عطّل الجهاز وحاول بعد دقيقة.",
   "Timesheet Management is not set up yet: database migration 0052 has not been applied": "إدارة كشوف الدوام غير مفعّلة بعد: لم يتم تطبيق تحديث قاعدة البيانات 0052",
   "No data to export": "لا توجد بيانات للتصدير",

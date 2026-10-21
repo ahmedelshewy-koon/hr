@@ -318,6 +318,7 @@
       "columns": [
         "code",
         "created_at",
+        "early_exit_allowance_minutes",
         "end_time",
         "id",
         "late_allowance_minutes",
@@ -326,7 +327,8 @@
         "shift_based",
         "start_time",
         "status",
-        "updated_at"
+        "updated_at",
+        "weekend_days"
       ]
     },
     {
@@ -409,6 +411,29 @@
         "name_ar",
         "name_en",
         "status",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "business_unit_cost_center_mapping",
+      "schema": "public",
+      "columns": [
+        "business_unit_id",
+        "cost_center_id",
+        "id",
+        "payroll_dr_account"
+      ]
+    },
+    {
+      "name": "business_units",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "id",
+        "is_active",
+        "name_ar",
+        "name_en",
         "updated_at"
       ]
     },
@@ -580,6 +605,19 @@
         "branch_id",
         "company_id",
         "id"
+      ]
+    },
+    {
+      "name": "company_wfh_days",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "created_by",
+        "id",
+        "note",
+        "payroll_country",
+        "updated_at",
+        "wfh_date"
       ]
     },
     {
@@ -803,11 +841,23 @@
       ]
     },
     {
+      "name": "employee_wfh_days",
+      "schema": "public",
+      "columns": [
+        "approved_by",
+        "created_at",
+        "employee_id",
+        "id",
+        "wfh_date"
+      ]
+    },
+    {
       "name": "employees",
       "schema": "public",
       "columns": [
         "address",
         "assignment_effective_date",
+        "attendance_type_id",
         "avatar_url",
         "bank_account_number",
         "bank_iban",
@@ -821,6 +871,7 @@
         "country",
         "created_at",
         "department_id",
+        "dopay_employee_number",
         "employee_code",
         "employment_status",
         "employment_type",
@@ -854,14 +905,17 @@
         "salary_currency",
         "schedule_type",
         "section_id",
+        "shift_plan_id",
         "start_date",
         "team_id",
+        "termination_date",
         "updated_at",
         "work_days",
         "work_email",
         "work_location",
         "work_location_id",
-        "work_phone"
+        "work_phone",
+        "working_business_unit_id"
       ]
     },
     {
@@ -880,8 +934,28 @@
         "original_date",
         "original_date_behavior",
         "recurrence_type",
+        "religion",
         "status",
         "updated_at"
+      ]
+    },
+    {
+      "name": "hr_manager_business_units",
+      "schema": "public",
+      "columns": [
+        "business_unit_id",
+        "manager_id"
+      ]
+    },
+    {
+      "name": "hr_managers",
+      "schema": "public",
+      "columns": [
+        "admin_order",
+        "id",
+        "is_active",
+        "region",
+        "user_id"
       ]
     },
     {
@@ -1470,6 +1544,114 @@
       ]
     },
     {
+      "name": "payroll_currencies",
+      "schema": "public",
+      "columns": [
+        "code",
+        "created_at",
+        "is_active",
+        "name_ar",
+        "name_en",
+        "sar_rate",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "payroll_element_eligibility",
+      "schema": "public",
+      "columns": [
+        "department_id",
+        "element_id",
+        "id",
+        "job_title_id"
+      ]
+    },
+    {
+      "name": "payroll_elements",
+      "schema": "public",
+      "columns": [
+        "calculation_type",
+        "classification",
+        "code",
+        "created_at",
+        "default_amount",
+        "element_account",
+        "element_account_name",
+        "element_type",
+        "formula",
+        "id",
+        "is_absence_element",
+        "is_active",
+        "is_basic_salary_element",
+        "is_delay_minutes_element",
+        "name_ar",
+        "name_en",
+        "sort_order",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "payroll_employee_elements",
+      "schema": "public",
+      "columns": [
+        "amount",
+        "created_at",
+        "effective_from",
+        "effective_to",
+        "element_id",
+        "employee_id",
+        "id",
+        "is_active",
+        "notes",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "payroll_erp_invoice_attempts",
+      "schema": "public",
+      "columns": [
+        "batch_number",
+        "business_unit_code",
+        "created_at",
+        "http_status",
+        "id",
+        "response_body",
+        "run_id"
+      ]
+    },
+    {
+      "name": "payroll_erp_reconciliations",
+      "schema": "public",
+      "columns": [
+        "evidence_reference",
+        "id",
+        "note",
+        "outcome",
+        "run_id",
+        "submitted_at",
+        "submitted_by",
+        "used_at",
+        "used_by",
+        "verified_at",
+        "verified_by"
+      ]
+    },
+    {
+      "name": "payroll_erp_settings",
+      "schema": "public",
+      "columns": [
+        "api_key",
+        "batch_method",
+        "batch_url",
+        "created_at",
+        "default_status",
+        "id",
+        "invoice_method",
+        "invoice_url",
+        "updated_at"
+      ]
+    },
+    {
       "name": "payroll_items",
       "schema": "public",
       "columns": [
@@ -1488,18 +1670,94 @@
       ]
     },
     {
+      "name": "payroll_month_locks",
+      "schema": "public",
+      "columns": [
+        "absence_total",
+        "created_at",
+        "delay_total",
+        "employees_count",
+        "id",
+        "locked",
+        "locked_at",
+        "locked_by",
+        "payroll_country",
+        "period_key",
+        "sent_at",
+        "sent_by",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "payroll_run_lines",
+      "schema": "public",
+      "columns": [
+        "amount",
+        "business_unit_code",
+        "cost_center_code",
+        "currency",
+        "department_code",
+        "element_account",
+        "element_code",
+        "element_id",
+        "element_name_ar",
+        "element_name_en",
+        "element_type",
+        "employee_code",
+        "employee_id",
+        "fallback_account",
+        "id",
+        "minutes",
+        "notes",
+        "run_id"
+      ]
+    },
+    {
       "name": "payroll_runs",
       "schema": "public",
       "columns": [
         "approved_at",
         "approved_by",
+        "confirmed_at",
+        "confirmed_by",
         "country",
         "created_at",
+        "currency",
+        "employee_count",
+        "erp_batch_number",
+        "erp_post_failed_at",
+        "erp_post_started_at",
         "id",
+        "input_fingerprint",
         "locked_at",
         "month",
+        "sar_currency_rate",
+        "sent_to_accounting_at",
+        "sent_to_accounting_by",
         "status",
+        "total_deductions",
+        "total_gross",
+        "total_net",
         "year"
+      ]
+    },
+    {
+      "name": "payroll_variable_entries",
+      "schema": "public",
+      "columns": [
+        "amount",
+        "created_at",
+        "detail_json",
+        "element",
+        "element_id",
+        "employee_id",
+        "id",
+        "period_key",
+        "posted_at",
+        "posted_by",
+        "quantity",
+        "source",
+        "updated_at"
       ]
     },
     {
@@ -1601,6 +1859,16 @@
       ]
     },
     {
+      "name": "portal_session_activity",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "last_activity_at",
+        "token_hash",
+        "user_id"
+      ]
+    },
+    {
       "name": "positions",
       "schema": "public",
       "columns": [
@@ -1635,6 +1903,21 @@
         "stage_type",
         "terminal",
         "updated_at"
+      ]
+    },
+    {
+      "name": "request_escalations",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "from_step",
+        "from_user_id",
+        "id",
+        "reason",
+        "request_id",
+        "to_step",
+        "to_user_id",
+        "workflow_run_id"
       ]
     },
     {
@@ -1704,6 +1987,33 @@
       ]
     },
     {
+      "name": "saved_attendance",
+      "schema": "public",
+      "columns": [
+        "absence_has_notice",
+        "batch_id",
+        "check_in",
+        "check_out",
+        "confirmed_at",
+        "confirmed_by",
+        "deduction_amount",
+        "deduction_notification_sent",
+        "deduction_rule_id",
+        "difference_minutes",
+        "employee_code",
+        "employee_id",
+        "entry_notification_sent",
+        "exit_notification_sent",
+        "expected_minutes",
+        "id",
+        "is_confirmed",
+        "status",
+        "vacation_type",
+        "work_date",
+        "work_minutes"
+      ]
+    },
+    {
       "name": "security_rate_limits",
       "schema": "public",
       "columns": [
@@ -1711,6 +2021,46 @@
         "count",
         "updated_at",
         "window_started_at"
+      ]
+    },
+    {
+      "name": "shift_assignments",
+      "schema": "public",
+      "columns": [
+        "break_minutes",
+        "created_at",
+        "employee_id",
+        "end_time",
+        "id",
+        "is_off",
+        "shift_date",
+        "start_time",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "shift_plan_details",
+      "schema": "public",
+      "columns": [
+        "break_minutes",
+        "end_time",
+        "id",
+        "is_off",
+        "plan_id",
+        "start_time",
+        "weekday"
+      ]
+    },
+    {
+      "name": "shift_plans",
+      "schema": "public",
+      "columns": [
+        "created_at",
+        "id",
+        "name_ar",
+        "name_en",
+        "status",
+        "updated_at"
       ]
     },
     {
@@ -1790,6 +2140,80 @@
       ]
     },
     {
+      "name": "timesheet_edit_permissions",
+      "schema": "public",
+      "columns": [
+        "closed_by",
+        "created_at",
+        "employee_id",
+        "granted_by",
+        "id",
+        "is_active",
+        "month_key",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "timesheet_month_locks",
+      "schema": "public",
+      "columns": [
+        "confirmed",
+        "confirmed_at",
+        "confirmed_by",
+        "created_at",
+        "id",
+        "month_key",
+        "payroll_country",
+        "unlocked_at",
+        "unlocked_by",
+        "updated_at"
+      ]
+    },
+    {
+      "name": "timesheets",
+      "schema": "public",
+      "columns": [
+        "absence_has_notice",
+        "absence_override",
+        "absence_reason",
+        "actual_end",
+        "actual_start",
+        "approved_at",
+        "approved_by",
+        "break_duration_minutes",
+        "changed_at",
+        "changed_by",
+        "changed_end",
+        "changed_start",
+        "created_at",
+        "deduction_amount",
+        "deduction_details",
+        "deduction_notification_sent",
+        "deduction_notification_sent_at",
+        "deduction_rule_id",
+        "early_leave_minutes",
+        "employee_id",
+        "id",
+        "is_absent",
+        "label_ar",
+        "label_en",
+        "late_minutes",
+        "manager_note",
+        "manager_note_at",
+        "manager_note_by",
+        "notes",
+        "overtime_amount",
+        "overtime_minutes",
+        "schedule_override",
+        "scheduled_end",
+        "scheduled_start",
+        "status",
+        "total_work_minutes",
+        "updated_at",
+        "work_date"
+      ]
+    },
+    {
       "name": "training_courses",
       "schema": "public",
       "columns": [
@@ -1853,6 +2277,17 @@
       ]
     },
     {
+      "name": "user_permissions",
+      "schema": "public",
+      "columns": [
+        "allowed",
+        "created_at",
+        "id",
+        "menu_item",
+        "user_id"
+      ]
+    },
+    {
       "name": "users",
       "schema": "public",
       "columns": [
@@ -1872,6 +2307,20 @@
         "session_version",
         "status",
         "updated_at"
+      ]
+    },
+    {
+      "name": "wfh_sessions",
+      "schema": "public",
+      "columns": [
+        "checked_in_at",
+        "checked_out_at",
+        "created_at",
+        "created_by",
+        "employee_id",
+        "forced_by",
+        "id",
+        "work_date"
       ]
     },
     {

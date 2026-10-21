@@ -2,16 +2,19 @@
 # SANA HR production schema upgrade: migrations 0052 (Timesheet), 0053 (Payroll rebuild), 0054 (deleted-employee email).
 # Adds the 27 tables / 22 columns the deploy gate reports missing. See RUNBOOK.md before running anything.
 #
-#   preflight                     read-only checks + impact report (production unchanged)
+#   preflight                     read-only checks, impact report, HR Manager access report and a copy of the VPS
+#                                 deployer for compatibility review (production unchanged)
 #   rehearse  [opts]              fresh verified backup -> isolated throwaway PostgreSQL -> full migration, validation,
 #                                 from-scratch catalog comparison, rollback test (production unchanged)
-#   apply     --rehearsal DIR --confirm APPLY-0052-0054-ON-sanaa_hr [opts]
-#                                 stops HR, final verified backup, ONE transaction on production, validation, restarts HR
+#   apply     --rehearsal DIR --deployer-sha256 HASH --confirm APPLY-0052-0054-ON-sanaa_hr [opts]
+#                                 APPROVAL REQUIRED. Stops HR, final verified backup, ONE transaction on production,
+#                                 validation, restarts HR. HASH = sha256 of the deployer version reviewers approved.
 #   rollback  --run-dir DIR --confirm ROLLBACK-0052-0054-ON-sanaa_hr
 #                                 logical rollback of an apply run while the new objects hold no data
-# opts: --hr-managers "USER_ID[:Egypt|:KSA],..."  (listed order = admin_order per region; first = payroll head)
-#       --keep-ledger                              (NOT recommended: leaves drizzle history at 33 rows, see RUNBOOK)
+# opts: --hr-managers "USER_ID[:Egypt|:KSA],..."  ONLY with written approval of these ids/regions; default: nobody
+#                                                 (listed order = admin_order per region; first = payroll head)
 #       --accept-catalog-drift                     (rehearse: accept objects missing vs a from-scratch build, after review)
+# The migration history is always reconciled to 0054 (see RUNBOOK section 5); there is no option to skip it.
 # Run as root on the VPS from a checkout/release of the reviewed commit (files are hash-pinned in files.sha256).
 set -Eeuo pipefail
 umask 077
@@ -32,7 +35,6 @@ CONFIRM_ROLLBACK="ROLLBACK-0052-0054-ON-$DB"
 MIGRATIONS=(0052_timesheet_management 0053_payroll_rebuild 0054_deleted_employee_email)
 REHEARSAL_MAX_AGE_SECONDS=$((24 * 3600))
 
-LEDGER_MODE="reconcile"
 HR_MANAGERS=""
 ACCEPT_DRIFT=0
 CLONE=""
@@ -142,7 +144,6 @@ SQL
 
 migration_stream() {
   # $1 = COMMIT | ROLLBACK
-  echo "\\set ledger_mode $LEDGER_MODE"
   echo "BEGIN;"
   echo "SET LOCAL search_path TO public;"
   echo "SET LOCAL lock_timeout = '10s';"
@@ -150,15 +151,22 @@ migration_stream() {
   cat "$HERE/expected-ledger.sql" "$HERE/guards.sql" "$HERE/fingerprint-begin.sql"
   for m in "${MIGRATIONS[@]}"; do echo "\\echo HR_APPLYING $m"; cat "$REPO/drizzle-postgres/$m.sql"; echo; done
   hr_managers_sql "$HR_MANAGERS"
-  [[ "$LEDGER_MODE" == reconcile ]] && cat "$HERE/ledger-record.sql"
-  cat "$HERE/validate.sql" "$HERE/fingerprint-end.sql"
+  cat "$HERE/ledger-record.sql" "$HERE/validate.sql" "$HERE/fingerprint-end.sql"
   echo "$1;"
 }
 
-run_preflight_sql() { { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/expected-ledger.sql" "$HERE/guards.sql" "$HERE/report.sql"; echo "ROLLBACK;"; } | psql_to "$1"; }
+run_preflight_sql() {
+  { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/expected-ledger.sql" "$HERE/guards.sql" "$HERE/report.sql"
+    echo "\\echo ===== HR MANAGER ACCESS (report only - nothing is assigned; full table in hr-manager-access.csv) ====="
+    echo "\\x on"; cat "$HERE/hr-manager-access.sql"; echo "\\x off"; echo "ROLLBACK;"; } | psql_to "$1"
+}
+
+hr_manager_access_csv() {
+  { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/hr-manager-access.sql"; echo "ROLLBACK;"; } | psql_to "$1" --csv
+}
 
 run_validate_sql() {
-  { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/expected-ledger.sql"; echo "\\set ledger_mode $LEDGER_MODE";
+  { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/expected-ledger.sql"
     hr_managers_sql "$HR_MANAGERS" | grep '^\\set hr_manager_count'; cat "$HERE/validate.sql"; echo "ROLLBACK;"; } | psql_to "$1"
 }
 
@@ -180,8 +188,7 @@ SELECT '\set wf_was_not_null ' || CASE WHEN is_nullable = 'NO' THEN 'true' ELSE 
  WHERE table_schema='public' AND table_name='approval_workflow_runs' AND column_name='workflow_id';
 SQL
   grep -q '\\' <(grep orig_ "$out" | cut -d' ' -f3-) && die "index definition contains a backslash; rollback capture unsafe"
-  echo "\\set ledger_was_reconciled $([[ "$LEDGER_MODE" == reconcile ]] && echo true || echo false)" >> "$out"
-  grep -c '^\\set ' "$out" | grep -qx 6 || die "rollback capture incomplete: $out"
+  grep -c '^\\set ' "$out" | grep -qx 5 || die "rollback capture incomplete: $out"
 }
 
 run_rollback_sql() {
@@ -194,7 +201,7 @@ run_rollback_sql() {
 # ---------- host checks, backup, throwaway clone ----------
 verify_files() {
   ( cd "$REPO" && sha256sum --quiet -c "$HERE/files.sha256" ) || die "release files differ from the reviewed hashes in files.sha256"
-  for f in expected-ledger.sql guards.sql report.sql fingerprint-begin.sql fingerprint-end.sql ledger-record.sql validate.sql rollback-template.sql expected-missing.txt; do
+  for f in expected-ledger.sql guards.sql report.sql hr-manager-access.sql fingerprint-begin.sql fingerprint-end.sql ledger-record.sql validate.sql rollback-template.sql expected-missing.txt; do
     [[ -s "$HERE/$f" ]] || die "missing $HERE/$f"
   done
 }
@@ -213,16 +220,28 @@ host_checks() {
     local url_user; url_user="$(sed -n 's#^DATABASE_URL=["'\'']\{0,1\}postgres[a-z]*://\([^:@/]*\).*#\1#p' /etc/sanaa-hr/hr.env | head -n1)"
     [[ -z "$url_user" || "$url_user" == "$DBU" ]] || log "WARNING: the app connects as '$url_user', not '$DBU'; new tables will be owned by $DBU - grant access before deploying"
   fi
-  if [[ -x "$DEPLOYER" ]] && grep -qE '__drizzle_migrations|hr-production-prepare' "$DEPLOYER"; then
-    log "WARNING: $DEPLOYER references the migration ledger or hr-production-prepare.sh (which asserts 33 rows)."
-    log "         Review it before choosing LEDGER_MODE=$LEDGER_MODE: grep -n '__drizzle_migrations\\|33\\|prepare' $DEPLOYER"
-  fi
   if [[ -d "$APP_DIR" ]]; then
     if grep -rqs --include='*.js' portal_session_activity "$APP_DIR/dist" 2>/dev/null; then
       log "NOTE: the currently deployed app already knows portal_session_activity: users are logged out as soon as 0053 commits."
     else
       log "NOTE: the currently deployed app does not use portal_session_activity: users are logged out when the new release starts."
     fi
+  fi
+}
+
+# The VPS deployer is not in the repository. Its exact version must be reviewed for compatibility with the
+# reconciled migration history (55 rows) before apply; apply then requires that version's sha256.
+deployer_review() {
+  if [[ ! -f "$DEPLOYER" ]]; then
+    log "WARNING: $DEPLOYER not found; apply cannot be approved until the deployer is located and reviewed"
+    return 0
+  fi
+  sha256sum "$DEPLOYER" | cut -d' ' -f1 > "$RUN_DIR/deployer.sha256"
+  install -m 0600 "$DEPLOYER" "$RUN_DIR/deployer.copy"
+  grep -nE -C3 'drizzle|migrat|ledger|__drizzle|schema|audit|prepare|psql|pg_|33' "$DEPLOYER" > "$RUN_DIR/deployer-excerpt.txt" || true
+  log "deployer $DEPLOYER sha256=$(cat "$RUN_DIR/deployer.sha256") (copy + excerpt saved for review; check the copy for secrets before sharing)"
+  if grep -qE '__drizzle_migrations|hr-production-prepare' "$DEPLOYER"; then
+    log "ATTENTION: the deployer references the migration ledger or hr-production-prepare.sh; reviewers must confirm it accepts 55 rows"
   fi
 }
 
@@ -277,7 +296,10 @@ cmd_preflight() {
   log "guards + impact report (READ ONLY transaction)"
   run_preflight_sql prod | tee "$RUN_DIR/preflight.txt"
   grep -q '^HR_GUARDS=PASS' "$RUN_DIR/preflight.txt" || die "guards failed"
-  log "PREFLIGHT=PASS  report: $RUN_DIR/preflight.txt  (production unchanged)"
+  hr_manager_access_csv prod > "$RUN_DIR/hr-manager-access.csv"
+  deployer_review
+  log "PREFLIGHT=PASS  results: $RUN_DIR  (production unchanged)"
+  log "Send for review: preflight.txt, contract-before.txt, hr-manager-access.csv, deployer.sha256, deployer-excerpt.txt (and deployer.copy if it holds no secrets)"
 }
 
 cmd_rehearse() {
@@ -286,6 +308,8 @@ cmd_rehearse() {
   contract_check prod "$RUN_DIR/contract-prod.txt" || true
   expect_reviewed_gap "$RUN_DIR/contract-prod.txt"
   run_preflight_sql prod > "$RUN_DIR/preflight.txt"; grep -q '^HR_GUARDS=PASS' "$RUN_DIR/preflight.txt" || die "guards failed on production"
+  hr_manager_access_csv prod > "$RUN_DIR/hr-manager-access.csv"
+  deployer_review
 
   log "1/7 fresh backup of production (pg_dump, online snapshot)"
   local backup; backup="$(take_backup rehearsal)"; log "backup: $backup ($(du -h "$backup" | cut -f1))"
@@ -316,10 +340,10 @@ cmd_rehearse() {
   log "objects only in production lineage (informational): $(wc -l < "$RUN_DIR/catalog-extra-on-production.txt")"
   if [[ -s "$RUN_DIR/catalog-missing-on-production.txt" ]]; then
     cat "$RUN_DIR/catalog-missing-on-production.txt" >&2
-    if [[ "$LEDGER_MODE" == reconcile && "$ACCEPT_DRIFT" != 1 ]]; then
-      die "objects defined by 0000-0054 are missing on production (above): recording 0033-0054 as applied would be wrong. Review, then fix or re-run with --accept-catalog-drift"
+    if [[ "$ACCEPT_DRIFT" != 1 ]]; then
+      die "objects defined by 0000-0054 are missing on production (above): recording 0033-0054 as applied would be wrong. Send this run to the developers; re-run with --accept-catalog-drift only after their review"
     fi
-    log "WARNING: catalog drift accepted/ignored (ledger mode $LEDGER_MODE)"
+    log "WARNING: catalog drift accepted with --accept-catalog-drift (reviewed)"
   fi
 
   log "5/7 rerun must be refused"
@@ -341,11 +365,12 @@ cmd_rehearse() {
 RESULT=PASS
 TIMESTAMP=$(date -u +%s)
 PACKAGE_FINGERPRINT=$(package_fingerprint)
-LEDGER_MODE=$LEDGER_MODE
 HR_MANAGERS=$HR_MANAGERS
+DEPLOYER_SHA256=$(cat "$RUN_DIR/deployer.sha256" 2>/dev/null || echo missing)
 BACKUP=$backup
 EOF
   log "REHEARSAL=PASS  results: $RUN_DIR  (production unchanged)"
+  log "Send the whole run directory for approval (it holds no database dump; the backup stays in $BACKUP_DIR)"
 }
 
 restore_service() {
@@ -357,15 +382,18 @@ restore_service() {
 }
 
 cmd_apply() {
-  local rehearsal="$1" confirm="$2"
+  local rehearsal="$1" confirm="$2" deployer_sha="$3"
   [[ "$confirm" == "$CONFIRM_APPLY" ]] || die "confirmation must be exactly --confirm $CONFIRM_APPLY"
   new_run_dir apply; verify_files; host_checks
+  [[ -f "$DEPLOYER" ]] || die "$DEPLOYER not found; the deployer must be reviewed before apply"
+  [[ "$deployer_sha" =~ ^[0-9a-f]{64}$ ]] || die "--deployer-sha256 <hash of the reviewed deployer> is required"
+  [[ "$(sha256sum "$DEPLOYER" | cut -d' ' -f1)" == "$deployer_sha" ]] || die "$DEPLOYER differs from the reviewed version; review the current one first"
   local r="$rehearsal/REHEARSAL_RESULT"
   [[ -s "$r" ]] || die "no rehearsal result at $r"
   grep -qx 'RESULT=PASS' "$r" || die "rehearsal did not pass"
   grep -qx "PACKAGE_FINGERPRINT=$(package_fingerprint)" "$r" || die "package changed since the rehearsal; rehearse again"
-  grep -qx "LEDGER_MODE=$LEDGER_MODE" "$r" || die "ledger mode differs from the rehearsal"
   grep -qx "HR_MANAGERS=$HR_MANAGERS" "$r" || die "--hr-managers differs from the rehearsal"
+  grep -qx "DEPLOYER_SHA256=$deployer_sha" "$r" || die "the deployer changed since the rehearsal; rehearse again"
   local age=$(( $(date -u +%s) - $(sed -n 's/^TIMESTAMP=//p' "$r") ))
   (( age < REHEARSAL_MAX_AGE_SECONDS )) || die "rehearsal is older than 24h; rehearse again"
 
@@ -403,7 +431,7 @@ cmd_apply() {
   fi
   COMMITTED=1
   grep -q '^HR_DATA_PRESERVATION=PASS' "$RUN_DIR/migration.log" || die "COMMIT happened without the data check marker - investigate $RUN_DIR/migration.log"
-  echo "$LEDGER_MODE" > "$RUN_DIR/LEDGER_MODE"; echo "$HR_MANAGERS" > "$RUN_DIR/HR_MANAGERS"
+  echo "$HR_MANAGERS" > "$RUN_DIR/HR_MANAGERS"
 
   log "5/6 post-commit validation"
   run_validate_sql prod > "$RUN_DIR/validate.txt" || true
@@ -417,14 +445,13 @@ cmd_apply() {
   curl -fsS --max-time 10 -o /dev/null -w 'HR HTTP %{http_code}\n' "$APP_URL" || log "WARNING: HR did not answer on $APP_URL"
   bash "$REPO/ops/hr-schema-audit.sh" "$REPO/ops/hr-schema-contract.json" | tee "$RUN_DIR/official-audit.txt" | grep '^HR_SCHEMA_STATUS' >&2 || true
   log "APPLY=COMPLETE  run dir: $RUN_DIR  backup: $backup"
-  log "Next: re-run the production deployment. Users must sign in again. Assign HR managers (RUNBOOK step 6)."
+  log "Next: re-run the production deployment. Users must sign in again. HR manager assignment is a separate, approved step."
 }
 
 cmd_rollback() {
   local dir="$1" confirm="$2"
   [[ "$confirm" == "$CONFIRM_ROLLBACK" ]] || die "confirmation must be exactly --confirm $CONFIRM_ROLLBACK"
   [[ -s "$dir/rollback-vars.sql" && -s "$dir/BACKUP" ]] || die "$dir is not a completed apply run"
-  LEDGER_MODE="$(cat "$dir/LEDGER_MODE")"
   new_run_dir rollback; verify_files; host_checks
   trap 'restore_service' EXIT
   log "1/3 stopping $SVC"; systemctl stop "$SVC"; SERVICE_STOPPED=1
@@ -438,11 +465,11 @@ cmd_rollback() {
 
 main() {
   local cmd="${1:-}"; shift || true
-  local rehearsal="" confirm="" rundir=""
+  local rehearsal="" confirm="" rundir="" deployer_sha=""
   while (( $# )); do
     case "$1" in
       --hr-managers) HR_MANAGERS="${2:-}"; shift 2 ;;
-      --keep-ledger) LEDGER_MODE="keep"; shift ;;
+      --deployer-sha256) deployer_sha="${2:-}"; shift 2 ;;
       --accept-catalog-drift) ACCEPT_DRIFT=1; shift ;;
       --rehearsal) rehearsal="${2:-}"; shift 2 ;;
       --confirm) confirm="${2:-}"; shift 2 ;;
@@ -454,9 +481,9 @@ main() {
   case "$cmd" in
     preflight) cmd_preflight ;;
     rehearse)  cmd_rehearse ;;
-    apply)     cmd_apply "$rehearsal" "$confirm" ;;
+    apply)     cmd_apply "$rehearsal" "$confirm" "$deployer_sha" ;;
     rollback)  cmd_rollback "$rundir" "$confirm" ;;
-    *) sed -n '2,19p' "${BASH_SOURCE[0]}"; exit 2 ;;
+    *) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 2 ;;
   esac
 }
 

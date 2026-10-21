@@ -1,4 +1,4 @@
--- Records 0033-0054 in drizzle.__drizzle_migrations, inside the migration transaction (LEDGER_MODE=reconcile).
+-- Records 0033-0054 in drizzle.__drizzle_migrations, inside the migration transaction.
 -- Requires expected-ledger.sql. Drizzle applies every journal entry with `when` > MAX(created_at); leaving the
 -- ledger at 0032 would make the next `drizzle-kit migrate` replay 0033-0054 (non-idempotent DDL and data rewrites).
 -- Rehearsal proves 0033-0054 are fully present (catalog vs a from-scratch build) before this may run on production.

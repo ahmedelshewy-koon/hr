@@ -1,5 +1,5 @@
 -- Post-migration validation. Runs inside the transaction before COMMIT and again read-only after COMMIT.
--- Expects psql variables: ledger_mode (reconcile|keep), hr_manager_count, base_when/head_when (expected-ledger.sql).
+-- Expects psql variables: hr_manager_count, head_when (expected-ledger.sql).
 SELECT coalesce(string_agg(t, ', '), '') AS hr_v_missing_tables
 FROM unnest(ARRAY['timesheets','timesheet_edit_permissions','timesheet_month_locks','payroll_variable_entries',
  'payroll_month_locks','shift_plans','shift_plan_details','shift_assignments','company_wfh_days','business_units',
@@ -41,8 +41,7 @@ SELECT
 SELECT (:'hr_v_missing_tables' <> '' OR :'hr_v_missing_columns' <> '' OR :'hr_v_missing_indexes' <> ''
         OR :hr_v_trigger <> 1 OR :hr_v_email_idx <> 1 OR :hr_v_runs_idx <> 1 OR :'hr_v_wf_nullable' <> 'YES'
         OR :hr_v_sar <> 1 OR :hr_v_managers <> :hr_manager_count OR :hr_v_ts_perm < 1
-        OR CASE :'ledger_mode' WHEN 'reconcile' THEN :hr_v_ledger_rows <> 55 OR :hr_v_ledger_head <> :head_when
-                               ELSE :hr_v_ledger_rows <> 33 OR :hr_v_ledger_head <> :base_when END) AS hr_bad \gset
+        OR :hr_v_ledger_rows <> 55 OR :hr_v_ledger_head <> :head_when) AS hr_bad \gset
 \if :hr_bad
   DO $$ BEGIN RAISE EXCEPTION 'POST-MIGRATION VALIDATION FAILED'; END $$;
 \endif

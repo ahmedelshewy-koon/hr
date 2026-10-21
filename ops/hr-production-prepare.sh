@@ -76,8 +76,13 @@ BEGIN
 END $$;
 SQL
 echo "===== VERIFY HR AND EXISTING LEDGER ====="
-ledger="$(docker exec sanaa-hr-postgres psql -X -U sanaa_hr -d sanaa_hr -At -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*) FROM drizzle.__drizzle_migrations;')"
-[[ "$ledger" == "33" ]] || { echo "HR migration history changed unexpectedly ($ledger)" >&2; exit 1; }
+# 33 rows = the pre-0052 lineage. After ops/prod-migration-0052-0054 the history is reconciled to one row per
+# journal entry, so that state is accepted too when it matches this release's journal exactly.
+ledger="$(docker exec sanaa-hr-postgres psql -X -U sanaa_hr -d sanaa_hr -At -F ' ' -v ON_ERROR_STOP=1 -c 'SELECT COUNT(*), COALESCE(MAX(created_at),0) FROM drizzle.__drizzle_migrations;')"
+journal="$HERE/../drizzle-postgres/meta/_journal.json"
+expected=""
+[[ -s "$journal" ]] && expected="$(python3 -I -c 'import json,sys; e=json.load(open(sys.argv[1]))["entries"]; print(len(e), e[-1]["when"])' "$journal")"
+[[ "${ledger%% *}" == "33" || ( -n "$expected" && "$ledger" == "$expected" ) ]] || { echo "HR migration history changed unexpectedly ($ledger)" >&2; exit 1; }
 systemctl is-active --quiet sanaa-hr.service
 curl -fsS --max-time 15 -o /dev/null -w 'HR HTTP: %{http_code}\n' http://127.0.0.1:4050/
 echo "HR_PRODUCTION_SCHEMA_PREPARED=PASS"

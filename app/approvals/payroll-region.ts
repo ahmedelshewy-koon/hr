@@ -16,6 +16,9 @@ export function selectRegionalManagers(managers:Row[],region:string,unitId:numbe
 export async function payrollRegionChain(db:TransactionDatabase,employeeId:number):Promise<ResolvedStep[]|null>{
   const ready=await db.prepare("SELECT to_regclass('public.hr_managers') IS NOT NULL AS ready").first<{ready:boolean}>();
   if(!ready?.ready)return null;
+  // Until an administrator assigns HR managers, requests keep the approval routing they had before migration 0053.
+  const configured=await db.prepare("SELECT EXISTS(SELECT 1 FROM hr_managers WHERE is_active=1) AS configured").first<{configured:boolean}>();
+  if(!configured?.configured)return null;
   const employee=await db.prepare("SELECT id,country,salary_country,working_business_unit_id FROM employees WHERE id=?").bind(employeeId).first<Row>();
   if(!employee)throw new Response("Employee not found",{status:404});
   const region=employeePayrollCountry(employee);

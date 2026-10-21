@@ -14,21 +14,19 @@ FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_p
 SELECT count(*) AS active_users, count(*) FILTER (WHERE last_login_at > now() - interval '3 hours') AS signed_in_last_3h
 FROM users WHERE status = 'active';
 
-\echo ===== HR MANAGER ACCESS CHANGE =====
-\echo Once hr_managers exists, HR Manager role users NOT listed in it: cannot open Timesheet or Payroll (403), see no
-\echo employees in timesheet scope, and are not payroll-region approvers. Only admin_order=0 managers may set salaries
-\echo or make privileged profile edits. Assign them with --hr-managers (see RUNBOOK) or in Payroll > HR Manager Setup.
-SELECT u.id AS user_id, u.email, u.status, u.employee_id, e.employee_code, e.employment_status,
-       coalesce(e.salary_country, e.country) AS payroll_country_hint
-FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN employees e ON e.id = u.employee_id
-WHERE r.name = 'HR Manager' ORDER BY u.status, u.id;
-
-\echo ===== APPROVAL ROUTING CHANGE =====
-\echo With hr_managers present, a request type with no active workflow for the employee gets a default
-\echo manager -> HR chain (previously the legacy path). Active employees whose company has no active workflow at all:
-SELECT count(*) AS employees_without_any_company_workflow FROM employees e
-WHERE e.employment_status IN ('active','probation','notice_period')
-  AND NOT EXISTS (SELECT 1 FROM approval_workflows w WHERE w.company_id = e.company_id AND w.active);
+\echo ===== APPROVAL ROUTING =====
+\echo Unchanged by this migration: with no HR manager assigned, the new release keeps the current routing (legacy path
+\echo when no workflow applies; configured workflows as today). Requests already in progress keep their stored route.
+SELECT (SELECT count(*) FROM requests WHERE status LIKE 'pending%') AS requests_in_progress,
+       (SELECT count(*) FROM approval_workflow_runs WHERE state = 'pending') AS workflow_runs_in_progress;
+\echo Changes only AFTER HR managers are assigned (separate approval): for employees with a payroll country, the HR
+\echo step goes to the regional HR managers; where no workflow applies, new requests get a manager -> HR chain.
+SELECT count(*) FILTER (WHERE has_region AND NOT has_workflow) AS would_get_default_chain,
+       count(*) FILTER (WHERE has_region AND has_workflow) AS hr_step_would_go_to_regional_managers,
+       count(*) FILTER (WHERE NOT has_region) AS unchanged_no_payroll_country
+FROM (SELECT lower(btrim(coalesce(e.salary_country,''))) IN ('egypt','eg','egy','مصر','جمهورية مصر العربية','ksa','saudi arabia','saudi','sa','kingdom of saudi arabia','السعودية','المملكة العربية السعودية') AS has_region,
+             EXISTS (SELECT 1 FROM approval_workflows w WHERE w.company_id = e.company_id AND w.active) AS has_workflow
+      FROM employees e WHERE e.employment_status IN ('active','probation','notice_period')) s;
 
 \echo ===== DATA SEEDED BY 0052/0053 =====
 SELECT count(*) AS active_absence_rules,

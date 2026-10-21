@@ -40,6 +40,6 @@ test("no payroll-country fallback to work country remains in the app", () => {
 });
 
 test("an approval for an employee without payroll country gets no regional chain", async () => {
-  const db = { prepare: sql => ({ bind: () => ({ first: async () => /to_regclass/.test(sql) ? { ready: true } : { id: 7, country: "Saudi Arabia", salary_country: null, working_business_unit_id: null }, all: async () => { throw new Error("managers must not be queried"); } }), first: async () => ({ ready: true }) }) };
+  const db = { prepare: sql => ({ bind: () => ({ first: async () => /to_regclass/.test(sql) ? { ready: true } : { id: 7, country: "Saudi Arabia", salary_country: null, working_business_unit_id: null }, all: async () => { throw new Error("managers must not be queried"); } }), first: async () => ({ ready: true, configured: true }) }) };
   assert.deepEqual(await payrollRegionChain(db, 7), []);
 });

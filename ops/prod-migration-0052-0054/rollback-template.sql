@@ -2,7 +2,7 @@
 -- Needs the rollback-vars.sql captured at apply time (pre-migration max ids and original index definitions).
 -- Only for use while the 0052-0054 objects hold no real data (e.g. the new release could not be deployed).
 -- Once timesheets/payroll data exist, restore the verified backup instead (RUNBOOK "Full restore").
--- Variables: perm_max_id, dr_max_id, orig_runs_idx, orig_email_idx, wf_was_not_null, base_when, ledger_was_reconciled.
+-- Variables: perm_max_id, dr_max_id, orig_runs_idx, orig_email_idx, wf_was_not_null, base_when.
 
 -- Guard: refuse if the new tables or new columns already hold data that the rollback would destroy.
 SELECT (SELECT count(*) FROM timesheets) + (SELECT count(*) FROM timesheet_edit_permissions) + (SELECT count(*) FROM timesheet_month_locks)
@@ -63,9 +63,7 @@ DELETE FROM permissions WHERE id > :perm_max_id AND role_id IN (SELECT id FROM r
   'zkAttendanceLogs','sajelErpSetup');
 DELETE FROM deduction_rules WHERE id > :dr_max_id AND rule_type = 'absence'
   AND name_en IN ('Absence with notice','Absence without notice');
-\if :ledger_was_reconciled
-  DELETE FROM drizzle.__drizzle_migrations WHERE created_at > :base_when;
-\endif
+DELETE FROM drizzle.__drizzle_migrations WHERE created_at > :base_when;
 
 SELECT (SELECT count(*) FROM drizzle.__drizzle_migrations) AS hr_rb_ledger,
        (SELECT count(*) FROM unnest(ARRAY['timesheets','hr_managers','portal_session_activity','payroll_run_lines']) t WHERE to_regclass('public.'||t) IS NOT NULL) AS hr_rb_left \gset

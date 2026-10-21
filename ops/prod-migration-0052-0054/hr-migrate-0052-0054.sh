@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # SANA HR production schema upgrade: migrations 0052 (Timesheet), 0053 (Payroll rebuild), 0054 (deleted-employee email).
-# Adds the 27 tables / 22 columns the deploy gate reports missing. See RUNBOOK.md before running anything.
+# Adds the 27 tables / 22 columns the deploy gate reports missing. Administrators: follow ADMIN_HANDOFF.md.
 #
+#   evidence    --recovered DIR --candidate DIR   STAGE 1, read-only: everything preflight does, plus the recovered VPS
+#               migrations (byte-exact, with SOURCE.txt), the candidate release check and the service-startup paths;
+#               writes STAGE1_SUMMARY.md and one bundle <run>.tar.gz (+ .sha256) to send. Exit 4 = expected before review
 #   preflight   read-only: schema gap, guards, impact + HR Manager reports, deployer review, and MIGRATION LINEAGE
 #               verification. Exit 4 + ADMIN_ACTION_REPORT.md when the lineage cannot be verified (production unchanged)
 #   rehearse    preflight gates, then fresh verified backup -> isolated throwaway PostgreSQL -> full migration,
 #               validation, from-scratch catalog comparison, rerun refusal, rollback tests (production unchanged)
 #   apply       --rehearsal DIR --deployer-sha256 HASH --confirm APPLY-0052-0054-ON-sanaa_hr [--hr-managers ...]
 #               SEPARATE WRITTEN APPROVAL REQUIRED. Verified lineage + attested ledger + approved deployer review only.
+#   postdeploy  --run-dir DIR   read-only, after the new release started: contract, validation, and access (permissions,
+#               roles, users, seed_version) unchanged since apply. Exit 5 when anything differs
 #   rollback    --run-dir DIR --confirm ROLLBACK-0052-0054-ON-sanaa_hr
 #               logical rollback of an apply run; refused once any object 0052-0054 introduced holds data
 # opts: --hr-managers "USER_ID[:Egypt|:KSA],..."  ONLY with written approval of these ids/regions; default: nobody
@@ -33,6 +38,8 @@ CONFIRM_ROLLBACK="ROLLBACK-0052-0054-ON-$DB"
 MIGRATIONS=(0052_timesheet_management 0053_payroll_rebuild 0054_deleted_employee_email)
 REHEARSAL_MAX_AGE_SECONDS=$((24 * 3600))
 LINEAGE_EXIT=4
+POSTDEPLOY_EXIT=5
+RECOVERED_FILES=(0031_vps_current_schema.sql 0032_vps_attendance_device_country.sql meta/_journal.json)
 
 HR_MANAGERS=""
 ACCEPT_DRIFT=0
@@ -42,7 +49,11 @@ SERVICE_STOPPED=0
 LINEAGE_JSON=""
 DEPLOYER_SHA=""
 
-log() { printf '[%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" | tee -a "${RUN_DIR:-/dev/null}/run.log" >&2; }
+log() {
+  local line; line="$(printf '[%s] %s' "$(date -u +%H:%M:%SZ)" "$*")"
+  printf '%s\n' "$line" >&2
+  if [[ -n "$RUN_DIR" && -d "$RUN_DIR" ]]; then printf '%s\n' "$line" >> "$RUN_DIR/run.log"; fi
+}
 die() { log "ERROR: $*"; exit 1; }
 
 # ---------- database access (prod container, or a database inside the throwaway clone container) ----------
@@ -119,10 +130,12 @@ recon_proposal() {
 
 # system_settings.seed_version vs the release's SEED_VERSION: a mismatch means the first API request after a deploy
 # runs the application's runtime reseed (role remapping and permission upserts).
+release_seed_version() { sed -n 's/^const SEED_VERSION = "\([^"]*\)";.*/\1/p' "${1:-$REPO}/app/api/hr/route.ts" 2>/dev/null | head -n1; }
+
 runtime_seed_check() {
   local db release
   db="$(psql_to "$1" -At -c "SELECT CASE WHEN to_regclass('public.system_settings') IS NULL THEN NULL ELSE (SELECT value_json FROM system_settings WHERE setting_key='seed_version') END")"
-  release="$(sed -n 's/^const SEED_VERSION = "\([^"]*\)";.*/\1/p' "$REPO/app/api/hr/route.ts" | head -n1)"
+  release="$(release_seed_version)"
   [[ -n "$release" ]] || die "could not read SEED_VERSION from the release (app/api/hr/route.ts)"
   node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({dbSeedVersion: process.argv[2] || null, releaseSeedVersion: process.argv[3]}))' "$2" "$db" "$release"
 }
@@ -172,6 +185,83 @@ deployer_review() {
 
 deployer_approved_for() {
   node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(r.status==="approved"&&r.sha256===process.argv[2]?0:1)' "$HERE/deployer-review.json" "$1"
+}
+
+# ---------- Stage 1 evidence and post-deploy checks (read-only) ----------
+# Every permission, role, user role/status and the seed marker, in a stable order (access-snapshot.sql).
+access_snapshot() {
+  { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/access-snapshot.sql"; echo "ROLLBACK;"; } | psql_to "$1" -At -F $'\t'
+}
+
+# Copies the recovered VPS migrations byte for byte from $1 into $2 and writes SOURCE.txt (sha256 + stat of each).
+collect_recovered() {
+  local src="$1" dst="$2" f
+  [[ -d "$src" ]] || die "--recovered $src is not a directory"
+  mkdir -p -- "$dst/meta"   # 0700 under umask 077
+  {
+    echo "# Recovered VPS migrations, collected $(date -u +%Y-%m-%dT%H:%M:%SZ) by $(id -un)@$(hostname) from $(cd "$src" && pwd -P)"
+    echo "# <sha256 of the exact bytes>  <file>  <mtime>  <owner>  <bytes>"
+    for f in "${RECOVERED_FILES[@]}"; do
+      [[ -f "$src/$f" ]] || die "recovered file missing: $src/$f (expected: ${RECOVERED_FILES[*]})"
+      cp -p -- "$src/$f" "$dst/$f"
+      cmp -s -- "$src/$f" "$dst/$f" || die "copy of $f is not byte-identical"
+      printf '%s  %s  mtime=%s  owner=%s  bytes=%s\n' "$(sha256sum < "$src/$f" | cut -d' ' -f1)" "$f" \
+        "$(stat -c %y -- "$src/$f" | tr ' ' T)" "$(stat -c %U:%G -- "$src/$f")" "$(stat -c %s -- "$src/$f")"
+    done
+    if [[ -s "$src/ORIGIN.txt" ]]; then echo "# ORIGIN.txt (where the files were found):"; sed 's/^/#   /' "$src/ORIGIN.txt"; fi
+  } > "$dst/SOURCE.txt"
+  log "recovered VPS migrations collected byte-exact: $dst"
+}
+
+# The release the deployer will run: its git SHA, and whether its schema-audit files and SEED_VERSION equal the reviewed ones.
+candidate_check() {
+  local c="$1" out="$2" f got want ok=1 seed
+  [[ -d "$c" ]] || die "--candidate $c is not a directory"
+  {
+    echo "candidate: $(cd "$c" && pwd -P)"
+    echo "git_sha: $(git -C "$c" rev-parse HEAD 2>/dev/null || echo unknown)"
+    for f in ops/hr-schema-audit.sh ops/hr-schema-contract.json; do
+      want="$(awk -v f="$f" '$2 == f { print $1 }' "$HERE/files.sha256")"
+      if [[ -f "$c/$f" ]]; then got="$(sha256sum < "$c/$f" | cut -d' ' -f1)"; else got=missing; fi
+      if [[ "$got" == "$want" ]]; then echo "$f $got MATCH"; else echo "$f $got DIFFERS (reviewed $want)"; ok=0; fi
+    done
+    seed="$(release_seed_version "$c")"
+    echo "seed_version: ${seed:-unknown} (this package: $(release_seed_version))"
+    [[ "$seed" == "$(release_seed_version)" ]] || ok=0
+    echo "CANDIDATE=$( (( ok )) && echo PASS || echo FAIL)"
+  } > "$out"
+  grep '^CANDIDATE=' "$out" >&2
+}
+
+# Service unit, the scripts it starts, HR timers and crontabs: shown to reviewers and scanned for migration commands.
+startup_paths() {
+  local out="$1" exe unit f
+  {
+    echo "## systemctl cat $SVC"; systemctl cat "$SVC" 2>&1 || true
+    for exe in $(systemctl cat "$SVC" 2>/dev/null | sed -n 's/^Exec[A-Za-z]*=[-@:+!]*\([^ ]*\).*/\1/p' | sort -u); do
+      if [[ -f "$exe" ]] && grep -Iq . "$exe"; then echo "## $exe (started by $SVC)"; cat "$exe"; fi
+    done
+    echo "## systemctl list-timers --all"; systemctl list-timers --all --no-pager 2>&1 || true
+    for unit in $(systemctl list-timers --all --no-legend --no-pager 2>/dev/null | awk '{print $NF}' | grep -iE 'san|hr' || true); do
+      echo "## systemctl cat $unit"; systemctl cat "$unit" 2>&1 || true
+    done
+    for f in root sana-deploy; do echo "## crontab -l -u $f"; crontab -l -u "$f" 2>&1 || true; done
+    echo "## /etc/crontab and /etc/cron.d"; cat /etc/crontab /etc/cron.d/* 2>/dev/null || true
+  } > "$out"
+  node "$HERE/lineage.mjs" scan-startup --file "$out" >&2
+}
+
+# One archive of the run directory (no database dump in it) to send to the reviewers.
+# Relative names inside the archive and in the .sha256, so `sha256sum -c` works wherever both files are copied.
+make_bundle() {
+  [[ -n "$RUN_DIR" && -d "$RUN_DIR" ]] || return 0
+  local name; name="$(basename "$RUN_DIR")"
+  if ( cd "$(dirname "$RUN_DIR")" && tar -czf "$name.tar.gz" "$name" && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256" ); then
+    chmod 0600 "$RUN_DIR.tar.gz" "$RUN_DIR.tar.gz.sha256" 2>/dev/null || true
+    printf '[%s] bundle to send: %s (+ .sha256)\n' "$(date -u +%H:%M:%SZ)" "$RUN_DIR.tar.gz" >&2
+  else
+    printf '[%s] WARNING: could not create the bundle; send the run directory %s instead\n' "$(date -u +%H:%M:%SZ)" "$RUN_DIR" >&2
+  fi
 }
 
 # ---------- SQL streams ----------
@@ -287,7 +377,7 @@ verify_files() {
   ( cd "$REPO" && sha256sum --quiet -c "$HERE/files.sha256" ) || die "release files differ from the reviewed hashes in files.sha256"
   for f in expected-ledger.sql guards.sql report.sql hr-manager-access.sql data-checks.sql fingerprint-begin.sql fingerprint-end.sql \
            ledger-record.sql audit.sql validate.sql rollback-baseline.sql rollback-template.sql expected-missing.txt lineage.mjs \
-           recon-proposal.sql recon-report.sql recon-apply.sql reconciliation-approval.json \
+           recon-proposal.sql recon-report.sql recon-apply.sql reconciliation-approval.json access-snapshot.sql \
            known-migration-versions.json ledger-attestations.json deployer-review.json; do
     [[ -s "$HERE/$f" ]] || die "missing $HERE/$f"
   done
@@ -384,6 +474,31 @@ lineage_stop() {
 }
 
 # ---------- phases ----------
+# STAGE 1: one read-only run that collects everything reviewers need, bundled into one archive.
+cmd_evidence() {
+  local recovered="$1" candidate="$2"
+  new_run_dir evidence; verify_files; host_checks
+  trap 'make_bundle' EXIT
+  if [[ -n "$recovered" ]]; then collect_recovered "$recovered" "$RUN_DIR/evidence-bundle/vps-lineage"
+  else log "WARNING: --recovered DIR not given: the recovered VPS migrations are not in this bundle"; fi
+  if [[ -n "$candidate" ]]; then candidate_check "$candidate" "$RUN_DIR/candidate.txt"
+  else log "WARNING: --candidate DIR not given: the candidate release is not checked"; fi
+  log "service-startup paths (read-only)"
+  startup_paths "$RUN_DIR/startup-paths.txt"
+  production_gates
+  if [[ -n "$recovered" ]]; then
+    log "provisional lineage with the recovered files (they count only once committed through a reviewed PR)"
+    mkdir -p "$RUN_DIR/provisional"
+    node "$HERE/lineage.mjs" classify --repo "$REPO" --ledger "$RUN_DIR/ledger.tsv" --data-checks "$RUN_DIR/data-checks.tsv" \
+      --recon "$RUN_DIR/recon.tsv" --runtime "$RUN_DIR/runtime.json" --evidence-dir "$RUN_DIR/evidence-bundle/vps-lineage" \
+      --out "$RUN_DIR/provisional" >&2 || true
+  fi
+  node "$HERE/lineage.mjs" stage1-summary --run "$RUN_DIR" >&2
+  if (( LINEAGE_OK )); then log "EVIDENCE=COMPLETE, lineage already verified. results: $RUN_DIR (production unchanged)"; return 0; fi
+  log "EVIDENCE=COMPLETE (exit 4 is expected before review). Send the bundle below and STAGE1_SUMMARY.md. Production unchanged."
+  exit "$LINEAGE_EXIT"
+}
+
 cmd_preflight() {
   new_run_dir preflight; verify_files; host_checks
   production_gates
@@ -553,6 +668,8 @@ cmd_apply() {
   contract_check prod "$RUN_DIR/contract-after.txt" || true
   grep -q '^HR_VALIDATION=PASS' "$RUN_DIR/validate.txt" && grep -q 'ALL_EXPECTED_COLUMNS_PRESENT' "$RUN_DIR/contract-after.txt" \
     || die "post-commit validation failed (validate.txt / contract-after.txt). See RUNBOOK 'Recovery'."
+  access_snapshot prod > "$RUN_DIR/access-after-apply.tsv"
+  log "access snapshot for postdeploy: $(grep -c '^PERM' "$RUN_DIR/access-after-apply.tsv") permissions, $(grep -c '^USER' "$RUN_DIR/access-after-apply.tsv") users"
 
   log "7/7 restarting $SVC (current release) and running the official gate"
   restore_service
@@ -560,7 +677,36 @@ cmd_apply() {
   curl -fsS --max-time 10 -o /dev/null -w 'HR HTTP %{http_code}\n' "$APP_URL" || log "WARNING: HR did not answer on $APP_URL"
   bash "$REPO/ops/hr-schema-audit.sh" "$REPO/ops/hr-schema-contract.json" | tee "$RUN_DIR/official-audit.txt" | grep '^HR_SCHEMA_STATUS' >&2 || true
   log "APPLY=COMPLETE  run dir: $RUN_DIR  backup: $backup"
-  log "Next: re-run the production deployment only if approved. Users must sign in again. HR manager assignment is a separate, approved step."
+  log "Next: deploy the approved release, then run: postdeploy --run-dir $RUN_DIR (before any permission edit or HR manager assignment)."
+}
+
+# After the new release has started: read-only proof that the schema is complete and that nothing (an administrator, the
+# deployer or the application's startup reseed) changed access since apply.
+cmd_postdeploy() {
+  local dir="$1" fail=0 i
+  [[ -s "$dir/access-after-apply.tsv" && -s "$dir/BACKUP" ]] || die "$dir is not a completed apply run with an access snapshot"
+  new_run_dir postdeploy; verify_files; host_checks
+  HR_MANAGERS="$(cat "$dir/HR_MANAGERS" 2>/dev/null || true)"
+  log "1/4 schema contract and post-migration validation"
+  contract_check prod "$RUN_DIR/contract.txt" || { fail=1; log "FAIL: schema contract incomplete (contract.txt)"; }
+  run_validate_sql prod > "$RUN_DIR/validate.txt" 2>&1 || true
+  grep -q '^HR_VALIDATION=PASS' "$RUN_DIR/validate.txt" || { fail=1; log "FAIL: validation (validate.txt)"; }
+  log "2/4 access unchanged since apply (permissions, roles, users, seed_version)"
+  access_snapshot prod > "$RUN_DIR/access-now.tsv"
+  if ! diff "$dir/access-after-apply.tsv" "$RUN_DIR/access-now.tsv" > "$RUN_DIR/access.diff"; then
+    fail=1; log "FAIL: access changed since apply (access.diff, '<' = at apply, '>' = now):"; head -n 40 "$RUN_DIR/access.diff" >&2
+  fi
+  log "3/4 runtime seed marker equals this release"
+  runtime_seed_check prod "$RUN_DIR/runtime.json"
+  node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(r.dbSeedVersion===r.releaseSeedVersion?0:1)' "$RUN_DIR/runtime.json" \
+    || { fail=1; log "FAIL: seed_version differs from the release ($(cat "$RUN_DIR/runtime.json"))"; }
+  log "4/4 application answers and the official audit passes"
+  for i in $(seq 1 15); do curl -fsS --max-time 5 -o /dev/null "$APP_URL" && break; sleep 2; done
+  curl -fsS --max-time 10 -o /dev/null "$APP_URL" || { fail=1; log "FAIL: HR does not answer on $APP_URL"; }
+  bash "$REPO/ops/hr-schema-audit.sh" "$REPO/ops/hr-schema-contract.json" > "$RUN_DIR/official-audit.txt" 2>&1 || { fail=1; log "FAIL: official audit (official-audit.txt)"; }
+  if (( fail )); then echo "RESULT=FAIL" > "$RUN_DIR/POSTDEPLOY_RESULT"; log "POSTDEPLOY=FAIL  results: $RUN_DIR (see ADMIN_HANDOFF.md, recovery)"; exit "$POSTDEPLOY_EXIT"; fi
+  echo "RESULT=PASS" > "$RUN_DIR/POSTDEPLOY_RESULT"
+  log "POSTDEPLOY=PASS  results: $RUN_DIR"
 }
 
 cmd_rollback() {
@@ -582,9 +728,11 @@ cmd_rollback() {
 
 main() {
   local cmd="${1:-}"; shift || true
-  local rehearsal="" confirm="" rundir="" deployer_sha=""
+  local rehearsal="" confirm="" rundir="" deployer_sha="" recovered="" candidate=""
   while (( $# )); do
     case "$1" in
+      --recovered) recovered="${2:-}"; shift 2 ;;
+      --candidate) candidate="${2:-}"; shift 2 ;;
       --hr-managers) HR_MANAGERS="${2:-}"; shift 2 ;;
       --deployer-sha256) deployer_sha="${2:-}"; shift 2 ;;
       --accept-catalog-drift) ACCEPT_DRIFT=1; shift ;;
@@ -596,11 +744,13 @@ main() {
   done
   hr_managers_sql "$HR_MANAGERS" > /dev/null   # validate the spec early
   case "$cmd" in
-    preflight) cmd_preflight ;;
-    rehearse)  cmd_rehearse ;;
-    apply)     cmd_apply "$rehearsal" "$confirm" "$deployer_sha" ;;
-    rollback)  cmd_rollback "$rundir" "$confirm" ;;
-    *) sed -n '2,19p' "${BASH_SOURCE[0]}"; exit 2 ;;
+    evidence)   cmd_evidence "$recovered" "$candidate" ;;
+    preflight)  cmd_preflight ;;
+    rehearse)   cmd_rehearse ;;
+    apply)      cmd_apply "$rehearsal" "$confirm" "$deployer_sha" ;;
+    postdeploy) cmd_postdeploy "$rundir" ;;
+    rollback)   cmd_rollback "$rundir" "$confirm" ;;
+    *) sed -n '2,22p' "${BASH_SOURCE[0]}"; exit 2 ;;
   esac
 }
 

@@ -9,6 +9,8 @@
 > 3. explicit approvals of the job-history backfill and of the RBAC rows (`reconciliation-approval.json`).
 >
 > Until then, `preflight` ends with exit 4 and an `ADMIN_ACTION_REPORT.md`, and `rehearse`/`apply` refuse to run.
+>
+> **The administrator follows only `ADMIN_HANDOFF.md`.** It has one read-only Stage 1 (`evidence`, which collects everything listed in section 7 into a single bundle), one reviewed PR (Checkpoint A), and one maintenance window with written checkpoints B–D. This RUNBOOK is the reviewers' background.
 
 ## 1. What is missing
 
@@ -38,7 +40,7 @@
 | R3 | Repo migrations 0031–0046 create exactly **17** tables that still exist after 0042 drops the workforce tables. This is consistent with C2 |
 | R4 | A missing permission row means **deny**: only `allowed=1` rows grant access. So `allowed=0` rows from 0042 change no access |
 | R5 | No GitHub workflow, npm lifecycle script, build step or application module runs Drizzle migrations. `db:migrate` is manual only. The one script that calls `migrate()` (`scripts/rehearse-organization-migration.mjs`) is a manual clone-rehearsal tool |
-| R6 | **The application changes the database at runtime:** <ul><li>idempotent DDL (`ADD COLUMN IF NOT EXISTS` on users/roles/holidays, `CREATE TABLE IF NOT EXISTS system_settings`);</li><li>when `system_settings.seed_version` differs from the release's `SEED_VERSION`, a reseed that remaps roles, deletes legacy-role permissions and **upserts `ROLE_DEFAULTS` permissions, overwriting custom values** for those modules.</li></ul>The reseed covers HR Manager `staffing_blueprint` (7 actions) and `timesheetManagement`. `SEED_VERSION` has been unchanged since 2026-08-24 |
+| R6 | **The application changes the database at runtime:** <ul><li>idempotent DDL (`ADD COLUMN IF NOT EXISTS` on users/roles/holidays, `CREATE TABLE IF NOT EXISTS system_settings`);</li><li>when `system_settings.seed_version` differs from the release's `SEED_VERSION`, a reseed that remaps roles, deletes legacy-role permissions and **upserts `ROLE_DEFAULTS` permissions, overwriting custom values** for those modules.</li></ul>The reseed covers HR Manager `staffing_blueprint` (7 actions) and `timesheetManagement`. `SEED_VERSION` has been unchanged since 2026-08-24. **Fixed in this PR:** the reseed's permission writes are now insert-only (`app/api/hr/role-permission-seed.ts`, `ON CONFLICT DO NOTHING`), so a SEED_VERSION bump can no longer overwrite a customized permission; it only fills missing keys. The preflight gate stays, because the reseed still remaps legacy roles and would add missing keys |
 | R7 | `ops/hr-schema-audit.sh` is read-only (only a `SELECT` on `information_schema.columns`) and exits 3 when anything is missing. Its sha256 is now pinned in `files.sha256` |
 
 ### 2.3 Assumptions (not verified; the evidence in section 7 settles them)
@@ -107,18 +109,24 @@ Each part has its own **fingerprint** (md5 of exactly the rows that would be ins
   - **Packaged schema-audit script:** repo side done (R7). The VPS must show the candidate release's file hashes (section 7, item 6).
   - **CI/CD:** repo side done (R5), and a regression test fails if a workflow, npm hook or application module starts running migrations.
   - **Service startup:** the systemd unit, timers and crontabs must be shown (section 7, item 5).
-  - **Application startup:** the runtime DDL is limited to the reviewed idempotent statements, and a test fails on any new runtime DDL. The runtime reseed (R6) would overwrite role permissions; preflight compares `seed_version` and **blocks** if a deploy would trigger it.
+  - **Application startup:** the runtime DDL is limited to the reviewed idempotent statements, and a test fails on any new runtime DDL. The runtime reseed (R6) is now insert-only for permissions. Preflight still compares `seed_version` and **blocks** if a deploy would trigger it. `apply` saves an access snapshot (every permission, role, user role/status and the seed marker); `postdeploy` proves that the deployed release changed none of it.
 
 ## 7. Evidence still required before rehearsal can be authorized
 
-Run a **read-only** Stage 1 `preflight` of the new commit:
+The administrator runs the **read-only** Stage 1 `evidence` command (ADMIN_HANDOFF.md, Stage 1). It collects items 1–7 below automatically into a single bundle:
+- recovered files byte-exact, with `SOURCE.txt`;
+- `startup-paths.txt`, scanned for migration commands;
+- `candidate.txt`;
+- the preflight outputs;
+- `APPROVAL_JOB_HISTORY.md` / `APPROVAL_RBAC.md`;
+- `STAGE1_SUMMARY.md`, with the values to copy and the remaining blockers.
+
+Developers then run `node ops/prod-migration-0052-0054/lineage.mjs ingest --bundle <dir> [--write]`. It refuses files that differ from `SOURCE.txt` or from the ledger hashes, copies them byte for byte, and prints (never writes) the attestation and approval entries.
 ```bash
-cd /root/hr-migration && git fetch && git checkout <commit from the review request>
-sha256sum --quiet -c ops/prod-migration-0052-0054/files.sha256 && echo FILES-OK
-bash ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh preflight; echo "exit=$?"   # expected now: 4
+bash ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh evidence --recovered DIR --candidate DIR; echo "exit=$?"   # expected now: 4
 ```
 
-Then send:
+What the bundle contains (for reference):
 1. **Recovered VPS migrations, byte for byte:**
    - `0031_vps_current_schema.sql`;
    - `0032_vps_attendance_device_country.sql`;
@@ -195,7 +203,7 @@ systemctl start sanaa-hr.service   # with the pre-0052 release deployed
 | **R9** | **Job-history backfill misrepresents history** (the current assignment shown as held since `start_date`) | Medium for employees using `start_date` | Medium | `date_source` shown per employee for approval; `assignment_effective_date` preferred; no invented dates; MISSING_SOURCE excluded |
 | **R10** | **RBAC grants approved without intent** | Low | Medium | Grants listed separately from parity denials; explicit, fingerprint-bound approval; existing grants and denials preserved |
 | **R11** | **Production data changes between approval and apply** | Medium (live system) | Low | Fingerprint mismatch aborts with nothing applied; re-run preflight and re-approve |
-| **R12** | **Runtime reseed on deploy overwrites role permissions** (R6) | Low (`SEED_VERSION` unchanged since Aug) | High | Preflight compares `seed_version`; apply blocks on mismatch |
+| **R12** | **Runtime reseed on deploy overwrites role permissions** (R6) | Very low | High | Reseed permission writes are insert-only (tested on PostgreSQL); preflight blocks a `seed_version` mismatch; `postdeploy` diffs the access snapshot taken at apply |
 | R13 | Deployer or startup path runs migrations | Low (conditional PASS) | High | Conditions in section 6; apply needs `approved` |
 | R14 | Rollback destroys data written after apply | Very low | High | Baseline guard covers all new tables, columns, seeds, reconciliation rows and ledger rows; otherwise backup restore |
 | R15 | New `hr_ops` audit schema on production | Certain at apply | Low | Outside the public contract and Drizzle; append-only |
@@ -222,13 +230,29 @@ systemctl start sanaa-hr.service   # with the pre-0052 release deployed
   - rollback refused after a reconciled row changes;
   - refused with nothing applied when history or a permission changes after approval;
   - unverified without approval.
+- `tests/prod-migration-handoff.test.mjs` (always, CI): **14 tests**:
+  - the runtime reseed is insert-only (the only remaining upsert is the seed marker);
+  - separate job-history and RBAC approval requests, and their entries approve exactly the current proposal;
+  - the startup-path scanner;
+  - `ingest` (dry run, byte-exact write with CRLF kept, refusal on altered files or on overwrite);
+  - full verification needs the files, the fingerprint and both approvals;
+  - Stage 1 summary blockers;
+  - `collect_recovered` and `candidate_check`;
+  - ADMIN_HANDOFF.md names only real commands, options and files;
+  - Stage 1 and `postdeploy` are read-only.
+- `tests/prod-migration-postgres.test.mjs` additionally (**21 tests** in total):
+  - the reseed on a real schema keeps custom denials and grants and fills only missing keys (the replaced upsert is shown to revert them);
+  - the access snapshot is stable and detects permission, role and seed changes;
+  - Stage 1 `evidence` end to end produces one verifiable bundle (byte-exact files, approvals, summary that flags mismatched recovered files) and leaves the data, the ledger and the schema untouched.
 - Not executed: Docker and systemd on the VPS.
 
 ## 12. Files
 
 | File | Purpose |
 |---|---|
-| `hr-migrate-0052-0054.sh` | Orchestrator |
+| `ADMIN_HANDOFF.md` | The administrator's single procedure: commands, checkpoints, expected results, recovery, outstanding approvals |
+| `hr-migrate-0052-0054.sh` | Orchestrator (`evidence`, `preflight`, `rehearse`, `apply`, `postdeploy`, `rollback`) |
+| `access-snapshot.sql` | Access state saved at apply and compared by `postdeploy` |
 | `lineage.mjs` | Lineage classification, evidence hashing, reconciliation coverage and reports, discovery, audit SQL |
 | `ledger-attestations.json` | Reviewed lineage decisions (rows #32/#33 reference the recovered files; fingerprint pending) |
 | `reconciliation-approval.json` | Explicit approvals of the job-history and RBAC reconciliation (pending) |

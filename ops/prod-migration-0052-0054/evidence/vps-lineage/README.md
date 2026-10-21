@@ -16,6 +16,10 @@ line endings; `.gitattributes` keeps git from changing them):
 - `meta/_journal.json` (the original VPS journal containing both entries)
 - `SOURCE.txt`: where each file was found on the VPS (path, mtime, owner) and its `sha256sum` as computed there.
 
+Do not copy them by hand: the Stage 1 `evidence` command bundles them with SOURCE.txt, and
+`node ops/prod-migration-0052-0054/lineage.mjs ingest --bundle <extracted run dir> --write` verifies them against SOURCE.txt
+and the ledger before copying them here byte for byte.
+
 `lineage.mjs` hashes these files itself (sha256 of the exact bytes, as Drizzle does) and accepts ledger rows #32/#33
 only when the journal timestamp and the computed hash both equal the production row AND the reviewed attestation in
 `../../ledger-attestations.json` references the file. Until the files are here, preflight reports

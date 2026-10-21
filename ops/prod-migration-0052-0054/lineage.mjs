@@ -10,11 +10,17 @@
 //       -> discovery.json / DISCOVERY.md: Drizzle journals found on this host whose entries match ledger rows
 //   node lineage.mjs recon-render --recon recon.tsv [--after recon-after.tsv] --out DIR
 //       -> RECONCILIATION_PROPOSAL.md + job-history-proposal.csv + rbac-proposal.csv (or RECONCILIATION_BEFORE_AFTER.md)
+//       (also APPROVAL_JOB_HISTORY.md and APPROVAL_RBAC.md: one independent approval request per part)
+//   node lineage.mjs scan-startup --file startup-paths.txt   -> STARTUP_PATHS=CLEAN | MIGRATION_COMMANDS_FOUND
+//   node lineage.mjs stage1-summary --run DIR  -> STAGE1_SUMMARY.md: values reviewers copy and the remaining blockers
+//   node lineage.mjs ingest --bundle DIR [--write]   (developer machine) verifies a Stage 1 bundle's recovered files
+//       against SOURCE.txt and the ledger; --write copies them byte for byte into evidence/vps-lineage. Prints, never
+//       writes, the attestation and approval entries for reviewers. Exit 5 when refused.
 //   node lineage.mjs psql-vars --repo DIR      -> psql \set lines for the in-transaction guards and the approved reconciliation
 //   node lineage.mjs audit-sql --lineage lineage.json --run-id ID --package FP --deployer SHA
 //       -> INSERT statements for hr_ops.migration_audit (run inside the migration transaction)
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -194,21 +200,23 @@ export function reconciliationStatus(recon, approval = {}) {
   };
 }
 
-/** Recovered VPS migrations (evidence/vps-lineage): journal entries with the sha256 of the exact file bytes. */
-export function loadEvidence(pkgDir) {
-  const dir = join(pkgDir, "evidence", "vps-lineage");
+/**
+ * Recovered VPS migrations (evidence/vps-lineage): journal entries with the sha256 of the exact file bytes. `dir`
+ * overrides the committed location (Stage 1 provisional check of files that are not committed yet).
+ */
+export function loadEvidence(pkgDir, dir = join(pkgDir, "evidence", "vps-lineage")) {
   const journalPath = join(dir, "meta", "_journal.json");
   if (!existsSync(journalPath)) return [];
   return (JSON.parse(readFileSync(journalPath, "utf8")).entries || []).map(e => {
     const file = join(dir, `${e.tag}.sql`);
     const present = existsSync(file);
-    return { tag: e.tag, when: e.when, file: `evidence/vps-lineage/${e.tag}.sql`, present, hash: present ? sha256(readFileSync(file)) : null };
+    return { tag: e.tag, when: e.when, file: `evidence/vps-lineage/${e.tag}.sql`, path: file, present, hash: present ? sha256(readFileSync(file)) : null };
   });
 }
 
 /** Schema the recovered VPS migrations introduce vs. what repo migrations 0031-0047 introduce (net of the 0042 drops). */
 export function evidenceEquivalence(repo, pkgDir, evidence) {
-  const vps = introducedObjects(evidence.filter(e => e.present).map(e => readFileSync(join(pkgDir, e.file), "utf8")));
+  const vps = introducedObjects(evidence.filter(e => e.present).map(e => readFileSync(e.path ?? join(pkgDir, e.file), "utf8")));
   const repoTags = loadJournal(repo).filter(e => e.idx >= 31 && e.idx <= 47).map(e => e.tag);
   const own = introducedObjects(repoTags.map(t => readFileSync(join(repo, `drizzle-postgres/${t}.sql`), "utf8")));
   const dropped = ["workforce_plans", "workforce_plan_lines", "workforce_plan_events"];
@@ -259,6 +267,68 @@ export function renderReconciliation(before, after, approval = {}) {
   return { md: md.join("\n"), jhCsv: csv(before.jh, jhCols), rbacCsv: csv(before.rbac, rbacCols) };
 }
 
+/**
+ * One approval request per reconciliation part (APPROVAL_JOB_HISTORY.md, APPROVAL_RBAC.md), each with the exact rows, the
+ * fingerprint and the entry to commit in reconciliation-approval.json. Nothing here approves anything: the entry is only
+ * a template with the approver fields left empty.
+ */
+export function approvalEntries(before) {
+  const s = before.summary;
+  const proposedIds = before.jh.filter(r => r.status === "PROPOSED").map(r => r.employee_id);
+  const rbacRows = before.rbac.filter(r => r.status === "PROPOSED_INSERT").map(r => `${r.role_name}:${r.module}:${r.action}=${r.seed_allowed}`);
+  return {
+    job_history: { decision: "approved", proposal_fingerprint: s.jh.fp, employee_ids: proposedIds, approved_by: "<name, role>", approved_at: "<YYYY-MM-DD>" },
+    rbac: { decision: "approved", proposal_fingerprint: s.rbac.fp, rows: rbacRows, approved_by: "<name, role>", approved_at: "<YYYY-MM-DD>" },
+  };
+}
+
+export function renderApprovalRequests(before) {
+  const s = before.summary, entries = approvalEntries(before);
+  const jhProposed = before.jh.filter(r => r.status === "PROPOSED"), jhMissing = before.jh.filter(r => r.status === "MISSING_SOURCE");
+  const grants = before.rbac.filter(r => r.status === "PROPOSED_INSERT" && r.seed_allowed === 1);
+  const denials = before.rbac.filter(r => r.status === "PROPOSED_INSERT" && r.seed_allowed !== 1);
+  const kept = before.rbac.filter(r => r.status === "PRESERVED_CUSTOM"), missingRoles = before.rbac.filter(r => r.status === "ROLE_MISSING");
+  const signOff = ["## Sign-off", "", "| Decision | Approver (name, role) | Date |", "|---|---|---|", "| APPROVE / REJECT | | |", ""];
+  const jh = [`# Approval request 1 of 2: job-history reconciliation (0041 backfill)`, ``,
+    `Approver: someone allowed to approve changes to HR employee records. This is independent of the RBAC request.`, ``,
+    `- Fingerprint: \`${s.jh.fp}\` (md5 of exactly the rows below; any change in production invalidates this approval)`,
+    `- Rows to insert: **${s.jh.proposed}** \`current_assignment\` entries, one per employee who has no job history at all`,
+    `- Values come only from the employee record; nothing existing is updated or deleted`,
+    `- MISSING_SOURCE (never inserted): **${s.jh.missing_source}**`, ``,
+    `| employee_id | code | company | branch | department | section | job title | position | start_date | date source |`, `|---|---|---|---|---|---|---|---|---|---|`,
+    ...jhProposed.map(r => `| ${r.employee_id} | ${r.employee_code} | ${r.company_id} | ${r.branch_id} | ${r.department_id} | ${r.section_id} | ${r.job_title_id} | ${r.position_id} | ${r.start_date} | ${r.date_source} |`),
+    ...(jhProposed.length ? [] : ["| (none) |||||||||"]), ``,
+    `\`date source = start_date\` means the history will show the current assignment as held since the hire date.`, ``,
+    ...(jhMissing.length ? [`## MISSING_SOURCE employees: decision needed`, ``,
+      `Employees without a stored assignment date: ${jhMissing.map(r => `${r.employee_id} (${r.employee_code})`).join(", ")}. With missing-source employees,`,
+      `approving this request alone does not unblock the release. Choose one:`,
+      `- **A (no new production run):** leave them without history for now. Commit a \`data_checks\` attestation in ledger-attestations.json:`,
+      "  `{\"id\": \"0041_job_history_backfill\", \"decision\": \"accept\", \"reason\": \"employees <ids> have no stored assignment date; HR records it through the application after the release\", \"reviewed_by\": \"...\", \"reviewed_at\": \"...\"}`",
+      `- **B:** HR enters the dates through the application first. The proposal and its fingerprint then change, so Stage 1 has to be repeated.`, ``] : []),
+    `## If approved, commit this as \`job_history\` in reconciliation-approval.json`, ``, "```json", JSON.stringify(entries.job_history, null, 2), "```", ``,
+    `If rejected: the 0041 backfill stays missing and the release stays blocked unless a \`data_checks\` attestation for \`0041_job_history_backfill\` records that decision.`, ``, ...signOff];
+  const table = rows => [`| role | permission key | allowed | source |`, `|---|---|---|---|`, ...rows.map(r => `| ${r.role_name} (id ${r.role_id}) | ${r.module}:${r.action} | ${r.seed_allowed} | ${r.source} |`), ...(rows.length ? [] : ["| (none) ||||"])];
+  const rbac = [`# Approval request 2 of 2: RBAC reconciliation (0041 administrative_decisions, 0042 staffing_blueprint)`, ``,
+    `Approver: someone allowed to approve access changes. This is independent of the job-history request.`, ``,
+    `- Fingerprint: \`${s.rbac.fp}\` (md5 of exactly the rows below; any permission edit in production invalidates this approval)`,
+    `- Rows to insert: **${s.rbac.insert}**, of which **${s.rbac.grants}** grant access. Existing permission rows are never changed.`,
+    `- Existing custom values kept as they are (PRESERVED_CUSTOM): **${s.rbac.preserved}**; missing roles: **${s.rbac.role_missing}**`, ``,
+    `## Access grants (allowed=1): users with these roles GAIN access`, ``, ...table(grants), ``,
+    `## Explicit denials (allowed=0): parity with 0042, no access change`, ``, ...table(denials), ``,
+    `## Existing rows kept unchanged (PRESERVED_CUSTOM)`, ``, ...table(kept.map(r => ({ ...r, seed_allowed: `${r.existing_allowed} (seed would be ${r.seed_allowed})` }))), ``,
+    ...(missingRoles.length ? [`## Missing roles (blocking)`, ``, ...table(missingRoles), ``] : []),
+    `## If approved, commit this as \`rbac\` in reconciliation-approval.json`, ``, "```json", JSON.stringify(entries.rbac, null, 2), "```", ``,
+    `If rejected: the release stays blocked unless \`data_checks\` attestations for \`0041_admin_decisions_permissions\` and \`0042_staffing_blueprint_permissions\` record that decision (missing rows mean deny).`, ``, ...signOff];
+  return { jobHistoryMd: jh.join("\n"), rbacMd: rbac.join("\n") };
+}
+
+/** Lines of service units, timers, crontabs or start scripts that would run Drizzle migrations. */
+export const MIGRATION_COMMAND = /drizzle-kit\s+(migrate|push)|db:migrate|drizzle-orm\/[\w-]+\/migrator|\bmigrate\s*\(|npm\s+run\s+[\w:-]*migrat/i;
+export function scanStartupPaths(text) {
+  const flagged = text.split(/\r?\n/).map((line, i) => ({ line: i + 1, text: line.trim() })).filter(l => MIGRATION_COMMAND.test(l.text));
+  return { clean: flagged.length === 0, flagged };
+}
+
 export function renderLineageReport(result) {
   const lines = [`# Migration lineage report`, ``, `LINEAGE=${result.verified ? "VERIFIED" : "UNVERIFIED"}`, ``,
     `- Ledger rows: ${result.rows.length}; fingerprint \`${result.fingerprint}\` (attested: ${result.attestedFingerprint ?? "none"})`,
@@ -298,6 +368,97 @@ export function renderAdminActionReport(result) {
     `7. Confirmation that nobody will run drizzle-kit migrate / npm run db:migrate against production until the package is applied (see LINEAGE_REPORT.md, ordering hazards).`,
     ``, `Note: drizzle stores the journal's generation time ("when") as created_at, not the time a migration ran.`,
     `The unknown rows were therefore generated at the times shown, in a journal that is not in this repository.`, ``].join("\n");
+}
+
+export const RECOVERED_FILES = ["0031_vps_current_schema.sql", "0032_vps_attendance_device_country.sql", "meta/_journal.json"];
+
+/** SOURCE.txt lines are "<sha256>  <relative path>  <stat details>"; every recovered file must be listed and match. */
+export function verifySourceManifest(dir) {
+  const problems = [];
+  const manifest = join(dir, "SOURCE.txt");
+  if (!existsSync(manifest)) return { ok: false, problems: [`${manifest} is missing`], listed: {} };
+  const listed = {};
+  for (const line of readFileSync(manifest, "utf8").split(/\r?\n/)) {
+    const m = /^([0-9a-f]{64})\s+(\S+)/.exec(line);
+    if (m) listed[m[2]] = m[1];
+  }
+  for (const f of RECOVERED_FILES) {
+    const path = join(dir, f);
+    if (!existsSync(path)) problems.push(`${f} is missing`);
+    else if (!listed[f]) problems.push(`${f} is not listed in SOURCE.txt`);
+    else if (sha256(readFileSync(path)) !== listed[f]) problems.push(`${f}: sha256 ${sha256(readFileSync(path))} differs from SOURCE.txt ${listed[f]} (file altered in transit?)`);
+  }
+  return { ok: problems.length === 0, problems, listed };
+}
+
+/**
+ * STAGE1_SUMMARY.md for the evidence run: every value reviewers need, and what still blocks. `run` holds the parsed
+ * outputs of one run directory (lineage = committed state, provisional = with the recovered files of this run).
+ */
+export function renderStage1Summary({ lineage, provisional, recon, runtime, startup, candidate, deployer, manifest }) {
+  const rowLine = r => `- id ${r.id} (${r.created_at}, ${r.iso}): ${r.class}${r.attested ? ` - attested as ${r.attested}` : ""}${r.ok ? "" : " - NOT explained"}`;
+  const foreign = rows => rows.filter(r => !["CURRENT_EXACT", "HISTORICAL_VERSION"].includes(r.class));
+  const s = recon?.summary;
+  const blockers = [];
+  const ev = provisional ?? lineage;
+  if (!manifest) blockers.push("Recovered VPS migrations were not collected (re-run `evidence` with --recovered DIR).");
+  else if (!manifest.ok) blockers.push(`Recovered files fail their SOURCE.txt check: ${manifest.problems.join("; ")}`);
+  for (const r of foreign(ev.rows).filter(r => !r.ok)) blockers.push(`Ledger row ${r.id} is still ${r.class}: ${r.detail}`);
+  if (s?.jh.missing_source) blockers.push(`${s.jh.missing_source} employee(s) are MISSING_SOURCE: HR/business decision A or B in APPROVAL_JOB_HISTORY.md.`);
+  if (s?.rbac.role_missing) blockers.push(`${s.rbac.role_missing} seeded RBAC row(s) reference a missing role: developers must review.`);
+  if (runtime && runtime.dbSeedVersion !== runtime.releaseSeedVersion) blockers.push(`seed_version mismatch (production ${runtime.dbSeedVersion ?? "absent"}, release ${runtime.releaseSeedVersion}): the release would run the runtime reseed on first request. Needs a developer review before anything else.`);
+  if (startup && !startup.clean) blockers.push(`Service-startup paths contain migration commands (startup-paths.txt lines ${startup.flagged.map(f => f.line).join(", ")}).`);
+  if (candidate && !/^CANDIDATE=PASS/m.test(candidate)) blockers.push("The candidate release's schema-audit files differ from the reviewed hashes (candidate.txt).");
+  if (!candidate) blockers.push("The candidate release was not checked (re-run `evidence` with --candidate DIR).");
+  if (deployer && deployer.sha !== deployer.pinned) blockers.push(`The deployer changed (sha256 ${deployer.sha ?? "missing"}, reviewed ${deployer.pinned}): it needs a new review.`);
+  const out = [`# Stage 1 evidence summary`, ``,
+    `Read-only run; production was not changed. Send the whole bundle (\`*.tar.gz\` + \`.sha256\`).`, ``,
+    `## Values reviewers copy (through a reviewed PR)`, ``,
+    `| Item | Value | Where it goes |`, `|---|---|---|`,
+    `| Ledger fingerprint | \`${lineage.fingerprint}\` (${lineage.rows.length} rows, head ${lineage.headIso}) | ledger-attestations.json \`production_ledger.fingerprint\` |`,
+    `| Job-history proposal | \`${s?.jh.fp ?? "-"}\`: ${s?.jh.proposed ?? "?"} rows, ${s?.jh.missing_source ?? "?"} MISSING_SOURCE | APPROVAL_JOB_HISTORY.md -> reconciliation-approval.json \`job_history\` |`,
+    `| RBAC proposal | \`${s?.rbac.fp ?? "-"}\`: ${s?.rbac.insert ?? "?"} rows (${s?.rbac.grants ?? "?"} grants), ${s?.rbac.preserved ?? "?"} preserved custom | APPROVAL_RBAC.md -> reconciliation-approval.json \`rbac\` |`,
+    `| Deployer sha256 | \`${deployer?.sha ?? "not found"}\` (${deployer && deployer.sha === deployer.pinned ? "matches the reviewed version" : "DIFFERS from the reviewed version"}) | deployer-review.json |`,
+    `| seed_version | production ${runtime?.dbSeedVersion ?? "absent"}; release ${runtime?.releaseSeedVersion ?? "?"} | (must be equal) |`,
+    `| Startup paths | ${startup ? (startup.clean ? "no migration command found" : `**${startup.flagged.length} migration command(s)**`) : "not collected"} | deployer-review.json conditions |`,
+    `| Candidate release | ${candidate ? (candidate.match(/^git_sha: (.*)$/m)?.[1] ?? "?") + "; " + (candidate.match(/^CANDIDATE=(.*)$/m)?.[1] ?? "?") : "not checked"} | deployer-review.json conditions |`, ``,
+    `## Ledger rows outside the repository journal`, ``,
+    `With the committed files: `, ...foreign(lineage.rows).map(rowLine), ``,
+    ...(provisional ? [`With the recovered files of this run (provisional: they become effective only once committed): `, ...foreign(provisional.rows).map(rowLine), ``,
+      ...(provisional.equivalence ? [`Schema introduced by the recovered files vs repo 0031-0047: VPS ${provisional.equivalence.vpsTables} tables, repo ${provisional.equivalence.repoTables}; tables only in repo: ${provisional.equivalence.tablesOnlyInRepo.join(", ") || "none"}; only in VPS: ${provisional.equivalence.tablesOnlyInVps.join(", ") || "none"}; columns only in repo: ${provisional.equivalence.columnsOnlyInRepo.join(", ") || "none"}; only in VPS: ${provisional.equivalence.columnsOnlyInVps.join(", ") || "none"}`, ``] : [])] : []),
+    `## Blockers that need evidence or a decision`, ``, ...(blockers.length ? blockers.map(b => `- ${b}`) : ["- none: reviewers can commit the evidence, the fingerprint and the approvals"]), ``,
+    `## Expected and resolved through the reviewed PR`, ``,
+    ...(lineage.verified ? ["- (lineage already verified)"] : lineage.reasons.map(r => `- ${r}`)), ``];
+  return { md: out.join("\n"), blockers };
+}
+
+/**
+ * Developer side: checks a Stage 1 bundle (an extracted run directory) and, with write=true, copies the recovered files
+ * byte for byte into evidence/vps-lineage. It never edits attestations or approvals: it prints the values for reviewers.
+ */
+export function ingestBundle({ bundle, pkgDir, write = false }) {
+  const src = join(bundle, "evidence-bundle", "vps-lineage");
+  const manifest = verifySourceManifest(src);
+  if (!manifest.ok) return { ok: false, problems: manifest.problems };
+  const repo = join(pkgDir, "..", "..");
+  const evidence = loadEvidence(pkgDir, src);
+  const result = classifyLedger({
+    ledger: parseLedgerTsv(readFileSync(join(bundle, "ledger.tsv"), "utf8")),
+    journal: loadJournal(repo),
+    known: JSON.parse(readFileSync(join(pkgDir, "known-migration-versions.json"), "utf8")).versions,
+    attestations: JSON.parse(readFileSync(join(pkgDir, "ledger-attestations.json"), "utf8")),
+    dataChecks: parseDataChecksTsv(readFileSync(join(bundle, "data-checks.tsv"), "utf8")),
+    evidence,
+    recon: parseReconTsv(readFileSync(join(bundle, "recon.tsv"), "utf8")).summary,
+    approval: JSON.parse(readFileSync(join(pkgDir, "reconciliation-approval.json"), "utf8")),
+    runtime: existsSync(join(bundle, "runtime.json")) ? JSON.parse(readFileSync(join(bundle, "runtime.json"), "utf8")) : null,
+  });
+  const recovered = result.rows.filter(r => r.class === "RECOVERED_SOURCE");
+  const problems = result.rows.filter(r => r.class === "RECOVERED_SOURCE_HASH_MISMATCH").map(r => `ledger row ${r.id}: ${r.detail}`);
+  const copies = [...RECOVERED_FILES, "SOURCE.txt"].map(f => ({ from: join(src, f), to: join(pkgDir, "evidence", "vps-lineage", f) }));
+  for (const c of copies) if (existsSync(c.to) && !readFileSync(c.to).equals(readFileSync(c.from))) problems.push(`${c.to} already exists with different content`);
+  if (write && problems.length === 0) for (const c of copies) { mkdirSync(dirname(c.to), { recursive: true }); writeFileSync(c.to, readFileSync(c.from)); }
+  return { ok: problems.length === 0, problems, written: write && problems.length === 0, recovered: recovered.map(r => r.id), fingerprint: result.fingerprint, result };
 }
 
 /** Read-only search for Drizzle journals on this host that explain ledger rows. */
@@ -367,7 +528,9 @@ function args(argv) {
   const out = { root: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, "");
-    if (k === "root") out.root.push(argv[++i]); else out[k] = argv[++i];
+    if (k === "root") out.root.push(argv[++i]);
+    else if (argv[i + 1] === undefined || argv[i + 1].startsWith("--")) out[k] = true;   // boolean flag (--write)
+    else out[k] = argv[++i];
   }
   return out;
 }
@@ -383,7 +546,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       known: JSON.parse(readFileSync(join(pkg, "known-migration-versions.json"), "utf8")).versions,
       attestations: JSON.parse(readFileSync(join(pkg, "ledger-attestations.json"), "utf8")),
       dataChecks: a["data-checks"] ? parseDataChecksTsv(readFileSync(a["data-checks"], "utf8")) : [],
-      evidence: loadEvidence(pkg),
+      evidence: a["evidence-dir"] ? loadEvidence(pkg, a["evidence-dir"]) : loadEvidence(pkg),
       recon: a.recon ? parseReconTsv(readFileSync(a.recon, "utf8")).summary : null,
       approval: JSON.parse(readFileSync(join(pkg, "reconciliation-approval.json"), "utf8")),
       runtime: a.runtime ? JSON.parse(readFileSync(a.runtime, "utf8")) : null,
@@ -400,7 +563,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const after = a.after ? parseReconTsv(readFileSync(a.after, "utf8")) : null;
     const r = renderReconciliation(before, after, JSON.parse(readFileSync(join(pkg, "reconciliation-approval.json"), "utf8")));
     writeFileSync(join(a.out, after ? "RECONCILIATION_BEFORE_AFTER.md" : "RECONCILIATION_PROPOSAL.md"), r.md);
-    if (!after) { writeFileSync(join(a.out, "job-history-proposal.csv"), r.jhCsv); writeFileSync(join(a.out, "rbac-proposal.csv"), r.rbacCsv); }
+    if (!after) {
+      writeFileSync(join(a.out, "job-history-proposal.csv"), r.jhCsv); writeFileSync(join(a.out, "rbac-proposal.csv"), r.rbacCsv);
+      const requests = renderApprovalRequests(before);
+      writeFileSync(join(a.out, "APPROVAL_JOB_HISTORY.md"), requests.jobHistoryMd); writeFileSync(join(a.out, "APPROVAL_RBAC.md"), requests.rbacMd);
+    }
     console.log(`RECON job_history_proposed=${before.summary.jh.proposed} missing_source=${before.summary.jh.missing_source} fp=${before.summary.jh.fp} rbac_insert=${before.summary.rbac.insert} grants=${before.summary.rbac.grants} preserved=${before.summary.rbac.preserved} fp=${before.summary.rbac.fp}`);
   } else if (cmd === "discover") {
     const roots = a.root.length ? a.root : ["/opt/sanaa-hr", "/home/sana-deploy", "/root", "/srv", "/var/www"];
@@ -408,11 +575,44 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     writeFileSync(join(a.out, "discovery.json"), JSON.stringify(found, null, 2));
     writeFileSync(join(a.out, "DISCOVERY.md"), renderDiscovery(found, roots));
     console.log(`DISCOVERY journals=${found.length} matching=${found.filter(f => f.matches.length).length}`);
+  } else if (cmd === "scan-startup") {
+    const r = scanStartupPaths(readFileSync(a.file, "utf8"));
+    writeFileSync(`${a.file}.json`, JSON.stringify(r, null, 2));
+    console.log(`STARTUP_PATHS=${r.clean ? "CLEAN" : "MIGRATION_COMMANDS_FOUND"}${r.flagged.map(f => `\n  line ${f.line}: ${f.text}`).join("")}`);
+  } else if (cmd === "stage1-summary") {
+    const pkg = fileURLToPath(new URL(".", import.meta.url));
+    const run = a.run, opt = (f, parse = JSON.parse) => existsSync(join(run, f)) ? parse(readFileSync(join(run, f), "utf8")) : null;
+    const review = JSON.parse(readFileSync(join(pkg, "deployer-review.json"), "utf8"));
+    const { md, blockers } = renderStage1Summary({
+      lineage: opt("lineage.json"), provisional: opt("provisional/lineage.json"), recon: opt("recon.tsv", parseReconTsv), runtime: opt("runtime.json"),
+      startup: opt("startup-paths.txt.json"), candidate: opt("candidate.txt", t => t),
+      deployer: { sha: opt("deployer.sha256", t => t.trim()), pinned: review.sha256 },
+      manifest: existsSync(join(run, "evidence-bundle", "vps-lineage")) ? verifySourceManifest(join(run, "evidence-bundle", "vps-lineage")) : null,
+    });
+    writeFileSync(join(run, "STAGE1_SUMMARY.md"), md);
+    console.log(`STAGE1 blockers=${blockers.length}${blockers.map(b => `\n  - ${b}`).join("")}`);
+  } else if (cmd === "ingest") {
+    const pkg = fileURLToPath(new URL(".", import.meta.url));
+    const r = ingestBundle({ bundle: a.bundle, pkgDir: pkg, write: a.write === true });
+    if (!r.ok && !r.result) { console.error(`INGEST=REFUSED\n${r.problems.map(p => `  - ${p}`).join("\n")}`); process.exit(5); }
+    const run = a.bundle, opt = f => existsSync(join(run, f)) ? readFileSync(join(run, f), "utf8") : null;
+    const recon = parseReconTsv(opt("recon.tsv"));
+    const entries = approvalEntries(recon);
+    console.log([`INGEST=${r.ok ? (r.written ? "WRITTEN" : "CHECKED (dry run; add --write to copy the files)") : "REFUSED"}`,
+      ...r.problems.map(p => `  - ${p}`),
+      `Ledger rows explained by the recovered files: ${r.recovered.join(", ") || "none"}`,
+      ``, `Reviewers decide and commit (nothing below has been written):`,
+      `1. ledger-attestations.json -> "production_ledger": ${JSON.stringify({ fingerprint: r.fingerprint, rows: r.result.rows.length, head: r.result.head, source: "STAGE1 run " + basename(run) })}`,
+      `2. reconciliation-approval.json -> "job_history": ${JSON.stringify(entries.job_history)}`,
+      `3. reconciliation-approval.json -> "rbac": ${JSON.stringify(entries.rbac)}`,
+      `4. deployer-review.json -> status "approved" only once STAGE1_SUMMARY.md shows clean startup paths and a PASS candidate.`,
+      ``, `Remaining reasons the lineage is not verified yet:`, ...r.result.reasons.map(x => `  - ${x}`)].join("\n"));
+    process.exit(r.ok ? 0 : 5);
   } else if (cmd === "psql-vars") {
     process.stdout.write(psqlVars(a.repo));
   } else if (cmd === "audit-sql") {
     process.stdout.write(auditSql({ lineage: JSON.parse(readFileSync(a.lineage, "utf8")), runId: a["run-id"], packageFingerprint: a.package, deployerSha: a.deployer }));
   } else {
-    console.error("usage: lineage.mjs classify|discover|recon-render|psql-vars|audit-sql ..."); process.exit(2);
+    console.error("usage: lineage.mjs classify|discover|recon-render|scan-startup|stage1-summary|ingest|psql-vars|audit-sql ..."); process.exit(2);
   }
 }

@@ -35,6 +35,7 @@ import { scheduledDailyMinutes } from "../../employees/schedule-policy";
 import { PAGE_MODULES, filterAvailablePages, validatePageToggle } from "../../page-availability";
 import { readPageAvailability, readPageOrder } from "../../page-availability-store";
 import { orderPages, validatePageOrder } from '../../page-order';
+import { SEED_PERMISSION_SQL, seedPermissionRows } from "./role-permission-seed";
 // The shared employee engine preserves sequence allocation via pg_get_serial_sequence('employees','id').
 
 type Json = Record<string, unknown>;
@@ -126,10 +127,11 @@ async function ensureSeed(d1: PostgresDatabase) {
   for (const [roleName,moduleDefaults] of Object.entries(ROLE_DEFAULTS)) {
     const role=await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{id:number}>();
     if(!role)continue;
-    for(const [moduleName,allowedActions] of Object.entries(moduleDefaults)) for(const action of ACTIONS) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,?,?,?) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=excluded.allowed").bind(role.id,moduleName,action,allowedActions.includes(action)?1:0).run();
+    // Insert-only (role-permission-seed.ts): existing rows, including customized ones, are never overwritten.
+    for(const row of seedPermissionRows(role.id,moduleDefaults,ACTIONS)) await d1.prepare(SEED_PERMISSION_SQL).bind(...row).run();
   }
   const hrRole = await d1.prepare("SELECT id FROM roles WHERE name='HR Manager'").first<{ id: number }>();
-  if (hrRole) for (const action of ["view","manage_settings"]) await d1.prepare("INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,'system_settings',?,1) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=1").bind(hrRole.id,action).run();
+  if (hrRole) for (const action of ["view","manage_settings"]) await d1.prepare(SEED_PERMISSION_SQL).bind(hrRole.id,"system_settings",action,1).run();
   for (const [roleName, allowedActions] of Object.entries(PAYROLL_ROLE_DEFAULTS)) {
     const payrollRole = await d1.prepare("SELECT id FROM roles WHERE name=?").bind(roleName).first<{ id: number }>();
     if (!payrollRole) continue;

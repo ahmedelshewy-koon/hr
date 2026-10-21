@@ -284,3 +284,96 @@ test("clean logical rollback restores the attested ledger exactly and appends an
   assert.equal(psql("hrmig_rb_clean", "SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id").stdout.trim(), originalLedger);
   assert.equal(psql("hrmig_rb_clean", "SELECT to_regclass('public.timesheets') IS NULL AND (SELECT count(*) FROM hr_ops.migration_audit WHERE event = 'rollback') = 1").stdout.trim(), "t");
 });
+
+test("runtime reseed on the real schema: customized permissions survive a SEED_VERSION bump, only missing keys are filled", { skip }, async () => {
+  const { SEED_PERMISSION_SQL, seedPermissionRows } = await import("../app/api/hr/role-permission-seed.ts");
+  const defaults = { "HR Manager": { employees: ["view", "create", "edit", "delete", "export"], learning: ["view", "export"] }, Employee: { dashboard: ["view"] } };
+  const actions = ["view", "create", "edit", "delete", "approve", "export", "manage_settings"];
+  const customize = `
+    INSERT INTO permissions (role_id, module, action, allowed) SELECT id, 'employees', 'delete', 0 FROM roles WHERE name = 'HR Manager' ON CONFLICT (role_id, module, action) DO UPDATE SET allowed = 0;
+    INSERT INTO permissions (role_id, module, action, allowed) SELECT id, 'employees', 'approve', 1 FROM roles WHERE name = 'HR Manager' ON CONFLICT (role_id, module, action) DO UPDATE SET allowed = 1;
+    INSERT INTO roles (name) SELECT 'Employee' WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name = 'Employee');
+    INSERT INTO permissions (role_id, module, action, allowed) SELECT id, 'dashboard', 'view', 0 FROM roles WHERE name = 'Employee' ON CONFLICT (role_id, module, action) DO UPDATE SET allowed = 0;
+    DELETE FROM permissions WHERE role_id = (SELECT id FROM roles WHERE name = 'HR Manager') AND module = 'learning' AND action = 'export';`;
+  // As db/postgres.ts runs it: "?" placeholders become $1..$n.
+  const reseed = async (db, statement) => {
+    const sql = postgres({ host: "127.0.0.1", port: +PORT, user: "postgres", database: db, max: 1, onnotice: () => {} });
+    try {
+      const roles = Object.fromEntries((await sql`SELECT id, name FROM roles`).map(r => [r.name, r.id]));
+      let i = 0; const text = statement.replace(/\?/g, () => `$${++i}`);
+      for (const [role, modules] of Object.entries(defaults)) for (const row of seedPermissionRows(roles[role], modules, actions)) { i = 0; await sql.unsafe(statement.replace(/\?/g, () => `$${++i}`), row); }
+      return text;
+    } finally { await sql.end(); }
+  };
+  const key = (db, role, module, action) => psql(db, `SELECT coalesce((SELECT allowed::text FROM permissions p JOIN roles r ON r.id = p.role_id WHERE r.name = '${role}' AND p.module = '${module}' AND p.action = '${action}'), 'absent')`).stdout.trim();
+
+  copyDb("hrmig_apply", "hrmig_reseed"); psql("hrmig_reseed", customize);
+  const permRows = db => psql(db, "SELECT role_id || '|' || module || '|' || action || '|' || allowed FROM permissions ORDER BY 1").stdout.trim().split("\n");
+  const before = permRows("hrmig_reseed");
+  await reseed("hrmig_reseed", SEED_PERMISSION_SQL);
+  assert.equal(key("hrmig_reseed", "HR Manager", "employees", "delete"), "0", "custom denial kept");
+  assert.equal(key("hrmig_reseed", "HR Manager", "employees", "approve"), "1", "custom grant kept");
+  assert.equal(key("hrmig_reseed", "Employee", "dashboard", "view"), "0", "custom denial of another role kept");
+  assert.equal(key("hrmig_reseed", "HR Manager", "learning", "export"), "1", "a missing key is filled with its default");
+  const after = permRows("hrmig_reseed");
+  for (const line of before) assert.ok(after.includes(line), `existing row changed: ${line}`);
+  for (const line of after.filter(l => !before.includes(l))) assert.match(line, /^\d+\|(employees|learning|dashboard)\|/, `only keys of the seeded modules are added: ${line}`);
+
+  // The statement this release replaces would have reverted every customization above.
+  copyDb("hrmig_apply", "hrmig_reseed_old"); psql("hrmig_reseed_old", customize);
+  await reseed("hrmig_reseed_old", "INSERT INTO permissions (role_id,module,action,allowed) VALUES (?,?,?,?) ON CONFLICT(role_id,module,action) DO UPDATE SET allowed=excluded.allowed");
+  assert.deepEqual([key("hrmig_reseed_old", "HR Manager", "employees", "delete"), key("hrmig_reseed_old", "HR Manager", "employees", "approve"), key("hrmig_reseed_old", "Employee", "dashboard", "view")], ["1", "0", "1"]);
+});
+
+test("postdeploy's access snapshot is stable and detects any change of permissions, roles, users or seed_version", { skip }, () => {
+  copyDb("hrmig_apply", "hrmig_access");
+  const same = sh(`access_snapshot clone:hrmig_access > "$RUN_DIR/a.tsv"; access_snapshot clone:hrmig_access > "$RUN_DIR/b.tsv"; diff "$RUN_DIR/a.tsv" "$RUN_DIR/b.tsv"`, `${repo}/run-access`);
+  assert.equal(same.status, 0, same.stdout + same.stderr);
+  const snap = readFileSync(`${repo}/run-access/a.tsv`, "utf8");
+  assert.match(snap, /^PERM\tSuper Admin\t\w+\t\w+\t1$/m);
+  assert.match(snap, /^SEED\t\S+$/m);
+  for (const [name, mutation, expect] of [
+    ["permission", "UPDATE permissions SET allowed = 1 - allowed WHERE id = (SELECT min(id) FROM permissions);", /^[<>] PERM\t/m],
+    ["role", "INSERT INTO roles (name) VALUES ('Probe Role');", /^> ROLE\t\d+\tProbe Role$/m],
+    ["seed_version", "UPDATE system_settings SET value_json = 'bumped' WHERE setting_key = 'seed_version';", /^> SEED\tbumped$/m],
+  ]) {
+    copyDb("hrmig_apply", "hrmig_access2"); psql("hrmig_access2", mutation);
+    const r = sh(`access_snapshot clone:hrmig_access2 > "$RUN_DIR/c.tsv"; diff "${repo}/run-access/a.tsv" "$RUN_DIR/c.tsv" || echo "DIFFERS"`, `${repo}/run-access2`);
+    assert.match(r.stdout, /DIFFERS/, name);
+    assert.match(r.stdout, expect, name);
+  }
+});
+
+test("Stage 1 'evidence' end to end: one bundle with byte-exact recovered files, approvals and summary; the database is untouched", { skip }, () => {
+  copyDb("hrmig_base", "prod");   // psql_to prod -> this database
+  const rec = `${repo}/recovered`, cand = `${repo}/candidate`;
+  mkdirSync(`${rec}/meta`, { recursive: true }); mkdirSync(`${cand}/ops`, { recursive: true }); mkdirSync(`${cand}/app/api/hr`, { recursive: true });
+  // Files whose hashes do NOT match the fixture's ledger rows (they are placeholders): the summary must say so.
+  writeFileSync(`${rec}/0031_vps_current_schema.sql`, 'CREATE TABLE "x" ("id" serial);\r\n');
+  writeFileSync(`${rec}/0032_vps_attendance_device_country.sql`, 'ALTER TABLE "attendance_devices" ADD COLUMN "country" text;\n');
+  writeFileSync(`${rec}/meta/_journal.json`, JSON.stringify({ entries: [{ idx: 31, when: UNKNOWN[0].created_at, tag: "0031_vps_current_schema" }, { idx: 32, when: UNKNOWN[1].created_at, tag: "0032_vps_attendance_device_country" }] }));
+  for (const f of ["ops/hr-schema-audit.sh", "ops/hr-schema-contract.json"]) writeFileSync(`${cand}/${f}`, readFileSync(f, "utf8").replace(/\r\n/g, "\n"));
+  writeFileSync(`${cand}/app/api/hr/route.ts`, readFileSync("app/api/hr/route.ts", "utf8"));
+  const before = ["employees", "employee_job_history", "permissions", "users"].map(t => tableText("prod", t));
+  const r = sh(`RUN_ROOT="${repo}/runs"; mkdir -p "$RUN_ROOT"
+    new_run_dir() { RUN_DIR="$RUN_ROOT/$1-test"; mkdir -p "$RUN_DIR"; }   # install -m cannot chmod on Windows temp dirs
+    host_checks() { :; }; verify_files() { :; }                          # root/docker/df checks, and the release hashes of a partial copy
+    ${process.platform === "win32" ? 'if command -v py >/dev/null; then python3() { py -3 "$@"; }; fi   # Windows: python3 is a Store alias' : ""}
+    cmd_evidence "${rec}" "${cand}"`, `${repo}/runs/unused`);
+  assert.equal(r.status, 0, r.stdout + r.stderr);   // the fixture's attestation already verifies its own ledger
+  const run = `${repo}/runs/evidence-test`;
+  for (const f of ["STAGE1_SUMMARY.md", "APPROVAL_JOB_HISTORY.md", "APPROVAL_RBAC.md", "RECONCILIATION_PROPOSAL.md", "LINEAGE_REPORT.md", "candidate.txt", "startup-paths.txt", "provisional/LINEAGE_REPORT.md", "ledger.tsv", "recon.tsv"]) assert.ok(readdirSync(run, { recursive: true }).map(slash).includes(f), f);
+  for (const f of ["0031_vps_current_schema.sql", "0032_vps_attendance_device_country.sql", "meta/_journal.json"]) assert.ok(readFileSync(`${run}/evidence-bundle/vps-lineage/${f}`).equals(readFileSync(`${rec}/${f}`)), f);
+  assert.match(readFileSync(`${run}/candidate.txt`, "utf8"), /^CANDIDATE=PASS$/m);
+  const summary = readFileSync(`${run}/STAGE1_SUMMARY.md`, "utf8");
+  assert.match(summary, /With the recovered files of this run[\s\S]*id 32 [^\n]*RECOVERED_SOURCE_HASH_MISMATCH/);
+  assert.match(summary, /## Blockers[\s\S]*Ledger row 32 is still RECOVERED_SOURCE_HASH_MISMATCH/);
+  assert.match(readFileSync(`${run}.tar.gz.sha256`, "utf8"), /^[0-9a-f]{64} [ *]evidence-test\.tar\.gz\n$/, "relative name, verifiable anywhere");
+  assert.equal(spawnSync("sha256sum", ["-c", "evidence-test.tar.gz.sha256"], { cwd: `${repo}/runs`, encoding: "utf8" }).status, 0);
+  const list = spawnSync("tar", ["-tzf", "evidence-test.tar.gz"], { encoding: "utf8", cwd: `${repo}/runs` });
+  assert.match(list.stdout, /evidence-test\/STAGE1_SUMMARY\.md/);
+  assert.match(list.stdout, /evidence-test\/evidence-bundle\/vps-lineage\/meta\/_journal\.json/);
+  assert.deepEqual(["employees", "employee_job_history", "permissions", "users"].map(t => tableText("prod", t)), before, "Stage 1 changed data");
+  assert.equal(psql("prod", "SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id").stdout.trim(), originalLedger);
+  assert.equal(psql("prod", "SELECT to_regnamespace('hr_ops') IS NULL AND to_regclass('public.timesheets') IS NULL").stdout.trim(), "t");
+});

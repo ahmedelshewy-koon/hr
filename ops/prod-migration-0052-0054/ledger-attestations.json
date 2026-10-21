@@ -1,0 +1,12 @@
+{
+  "schema": "hr-ledger-attestation-v1",
+  "note": "Reviewed decisions only, committed through a reviewed pull request. Until production_ledger.fingerprint is set and every unexplained ledger row has an accepted entry, preflight reports LINEAGE=UNVERIFIED and rehearse/apply refuse to run. Never edit this to make a run pass without evidence.",
+  "production_ledger": null,
+  "rows": [],
+  "data_checks": [],
+  "example_entries_do_not_copy": {
+    "production_ledger": { "fingerprint": "<md5 from LINEAGE_REPORT.md>", "row_count": 33, "head": 1791372110232, "reviewed_by": "<name>", "reviewed_at": "<date>", "evidence": "<run directory / PR comment>" },
+    "row": { "created_at": 1791298824926, "hash": "<64 hex>", "decision": "accept", "identified_as": "<source journal + tag, e.g. /opt/sanaa-hr/releases/X/drizzle-postgres 0031_foo>", "evidence": "<DISCOVERY.md match, file diff vs current migrations>", "reviewed_by": "<name>", "reviewed_at": "<date>" },
+    "data_check": { "id": "0041_job_history_backfill", "decision": "accept", "reason": "<why the failed check is acceptable>", "reviewed_by": "<name>", "reviewed_at": "<date>" }
+  }
+}

@@ -82,15 +82,33 @@ SELECT :hr_dupes > 0 AS hr_bad \gset
   DO $$ BEGIN RAISE EXCEPTION 'GUARD: duplicate work_email blocks idx_employees_work_email (0054)'; END $$;
 \endif
 
--- 4. Migration history must be exactly the 0000-0032 lineage (33 rows) that this package was reviewed against.
+-- 4. Migration history must be exactly the ledger that was reviewed and attested (ledger-attestations.json), row
+--    for row (id, hash, created_at). Requires :attested_ledger_fp (lineage.mjs psql-vars) and expected-ledger.sql.
+--    Production's lineage diverges from this repository, so nothing weaker than the exact reviewed state is accepted.
+--    Preflight sets hr_check_ledger=false (lineage.mjs classifies and reports instead); the transaction sets true.
+\if :hr_check_ledger
 WITH e(idx,tag,hash,created_at) AS :expected_ledger
 SELECT (SELECT count(*) FROM drizzle.__drizzle_migrations) AS hr_ledger_rows,
-       (SELECT count(*) FROM drizzle.__drizzle_migrations m WHERE NOT EXISTS (SELECT 1 FROM e WHERE e.idx <= 32 AND e.created_at = m.created_at)) AS hr_ledger_unknown,
-       (SELECT count(*) FROM e WHERE e.idx <= 32 AND NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations m WHERE m.created_at = e.created_at)) AS hr_ledger_missing,
-       (SELECT count(*) FROM drizzle.__drizzle_migrations m JOIN e ON e.created_at = m.created_at WHERE m.hash <> e.hash) AS hr_ledger_hash_diff \gset
-\echo HR_LEDGER_ROWS=:hr_ledger_rows UNKNOWN=:hr_ledger_unknown MISSING_0000_0032=:hr_ledger_missing HASH_DIFFERENCES=:hr_ledger_hash_diff (hash differences are informational; Drizzle orders by created_at only)
-SELECT (:hr_ledger_rows <> 33 OR :hr_ledger_unknown > 0 OR :hr_ledger_missing > 0) AS hr_bad \gset
+       (SELECT coalesce(max(created_at), 0) FROM drizzle.__drizzle_migrations) AS hr_ledger_head,
+       (SELECT coalesce(max(id), 0) FROM drizzle.__drizzle_migrations) AS hr_ledger_max_id,
+       (SELECT md5(coalesce(string_agg(id || ':' || hash || ':' || created_at, ',' ORDER BY id), '')) FROM drizzle.__drizzle_migrations) AS hr_ledger_fp,
+       (SELECT count(*) FROM drizzle.__drizzle_migrations m JOIN e ON e.idx >= 52 AND (m.created_at = e.created_at OR m.hash = e.hash)) AS hr_ledger_package_rows \gset
+\echo HR_LEDGER_ROWS=:hr_ledger_rows HEAD=:hr_ledger_head FINGERPRINT=:hr_ledger_fp ATTESTED=:attested_ledger_fp
+SELECT (:'hr_ledger_fp' <> :'attested_ledger_fp') AS hr_bad \gset
 \if :hr_bad
-  DO $$ BEGIN RAISE EXCEPTION 'GUARD: drizzle.__drizzle_migrations is not the expected 0000-0032 lineage'; END $$;
+  DO $$ BEGIN RAISE EXCEPTION 'GUARD: drizzle.__drizzle_migrations differs from the attested ledger (or none is attested); run preflight and see ADMIN_ACTION_REPORT.md'; END $$;
+\endif
+SELECT (:hr_ledger_package_rows > 0) AS hr_bad \gset
+\if :hr_bad
+  DO $$ BEGIN RAISE EXCEPTION 'GUARD: a ledger row for 0052-0054 already exists (drizzle-kit migrate may have run); stop and investigate'; END $$;
+\endif
+SELECT (:hr_ledger_head >= :head_when) AS hr_bad \gset
+\if :hr_bad
+  DO $$ BEGIN RAISE EXCEPTION 'GUARD: ledger head is not older than 0054; recording 0052-0054 would not make it the head'; END $$;
+\endif
+\endif
+SELECT NOT has_database_privilege(current_database(), 'CREATE') AND to_regnamespace('hr_ops') IS NULL AS hr_bad \gset
+\if :hr_bad
+  DO $$ BEGIN RAISE EXCEPTION 'GUARD: the migrating user cannot create the hr_ops audit schema'; END $$;
 \endif
 \echo HR_GUARDS=PASS

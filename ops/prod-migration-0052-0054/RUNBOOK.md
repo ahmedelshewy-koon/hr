@@ -1,182 +1,192 @@
 # SANA HR production schema upgrade: migrations 0052–0054
 
-**Audience:** the administrator of the HR VPS (`209.42.23.12`).
-**Status:** prepared and rehearsed against a copy of real HR data. **Not run on production.**
+**Audience:** the administrator of the HR VPS (`209.42.23.12`) and the reviewers of PR #7.
+**Status:** **Not run on production.** The first Stage 1 preflight showed that production's Drizzle migration history diverges from this repository. The package now verifies that history and stops when it cannot.
 
-> **Stage 1 (now):** validate the environment, take a verified backup and run the isolated rehearsal. Then send the results back.
-> **Stage 2 (later, only after written approval):** `apply`.
-> Until then: no production database changes, no permission changes, no deployment.
+> **Next authorized activity:** a read-only Stage 1 run of the updated package (section 4). It will very likely end with `LINEAGE=UNVERIFIED` (exit code 4) and an `ADMIN_ACTION_REPORT.md`. That is the expected, fail-closed result: collect the evidence it lists and send it.
+> **The isolated rehearsal can only run after** developers have reviewed that evidence and committed a lineage attestation through a reviewed PR.
+> **`apply` stays prohibited** until separate written approval.
+> No production database changes, no permission changes, no deployment.
 
-## 1. Why this is needed
+## 1. What is missing, and why
 
-The deploy of the Payroll & Timesheet release was blocked by the schema gate (`ops/hr-schema-audit.sh`) with **27 missing tables** and **22 missing columns**. All 49 come from three migrations that were never applied to production:
+The Payroll & Timesheet deploy was blocked by the schema gate with **27 missing tables** and **22 missing columns**. All 49 come from 0052, 0053 and 0054; the list is in `expected-missing.txt`.
+- **0052:** 9 tables, plus 5 columns. These include `attendance_types.early_exit_allowance_minutes` and `.weekend_days`.
+- **0053:** 18 tables, plus 17 columns, including 14 payroll tracking fields on `payroll_runs`.
+- **0054:** rebuilds one index.
 
-| Migration | Adds |
+## 2. Findings: production's migration history
+
+### 2.1 What the administrator reported
+
+- Production's `drizzle.__drizzle_migrations` has **33 rows**.
+- Rows 1–31 line up with migrations 0000–0030.
+- **Row 32:** `created_at = 1791298824926` (2026-10-06 15:00:24 UTC). **Row 33:** `1791372110232` (2026-10-07 11:21:50 UTC). Their hashes also differ from this repository's files.
+- The current journal has 0031 at `1790773448045` and 0032 at `1790776914266`. Production's newest row is newer than 0052 and 0053.
+
+### 2.2 What the repository history shows
+
+- Drizzle stores the journal's **generation time** (`when`) as `created_at`, not the time a migration ran.
+- **Neither timestamp appears in any committed journal or file.** That covers all 41 commits that touch `drizzle-postgres/`, on every branch, and every file in the working directory. Every committed journal always had 0031/0032 at the current timestamps.
+- At commit `516d980` (2026-09-30) the journal ended at 0030 with exactly **31 entries**, the 31 production rows that match.
+- Rows 32/33 were generated a few hours after commits `52cd837` (2026-10-06 11:46 UTC) and `79d6f72` (2026-10-07 11:07 UTC).
+- Earlier local reports (`FINAL_VALIDATION_REPORT.md`) already found that 0017 and 0020 were **edited after being applied**, so hash mismatches on old rows are expected.
+
+**Working hypothesis (unconfirmed):**
+1. Production was migrated from a 0000–0030 checkout.
+2. Two migrations were then generated outside git, probably by `drizzle-kit generate` from the schema at those times, and applied.
+3. Generated migrations contain schema changes only, so the **hand-written data steps of 0031–0047** may never have run on production: permission seeds and the job-history backfill.
+
+The package therefore treats rows 32/33 as **unknown lineage**. It never assumes they are equivalent to 0031/0032 just because the schema objects exist.
+
+### 2.3 Ordering hazard today
+
+Drizzle applies every journal entry newer than the **latest** `created_at`. Production's latest is 2026-10-07, which is newer than 0052 and 0053.
+
+So **`drizzle-kit migrate` / `npm run db:migrate` run against production today would apply only 0054, record it, and skip 0052/0053 permanently.** This was reproduced with Drizzle's own migrator on a fixture. **Nobody may run Drizzle migrations against production** until this package has been applied.
+
+## 3. The reconciliation design
+
+| Principle | How it is enforced |
 |---|---|
-| `0052_timesheet_management` | 9 tables: `timesheets`, `timesheet_edit_permissions`, `timesheet_month_locks`, `payroll_variable_entries`, `payroll_month_locks`, `shift_plans`, `shift_plan_details`, `shift_assignments`, `company_wfh_days`. 5 columns: `employees.attendance_type_id`, `employees.shift_plan_id`, `holidays.religion`, `attendance_types.early_exit_allowance_minutes`, `attendance_types.weekend_days` |
-| `0053_payroll_rebuild` | 18 tables: `business_units`, `business_unit_cost_center_mapping`, `payroll_currencies`, `hr_managers`, `hr_manager_business_units`, `payroll_elements`, `payroll_element_eligibility`, `payroll_employee_elements`, `request_escalations`, `payroll_run_lines`, `payroll_erp_settings`, `payroll_erp_invoice_attempts`, `payroll_erp_reconciliations`, `employee_wfh_days`, `wfh_sessions`, `saved_attendance`, `user_permissions`, `portal_session_activity`. 17 columns: `employees.working_business_unit_id`, `.termination_date`, `.dopay_employee_number`, and 14 on `payroll_runs` (currency, totals, confirmation, accounting and ERP tracking) |
-| `0054_deleted_employee_email` | No new objects. Rebuilds `idx_employees_work_email` so that deleted employees no longer reserve their e-mail address |
+| **Existing ledger rows are never changed, deleted or re-dated** | No `UPDATE`/`DELETE` of `drizzle.__drizzle_migrations` anywhere except rollback. Rollback deletes only the three rows this package inserted (id above the pre-apply maximum **and** exact 0052–0054 hash and timestamp). Unit tests enforce this |
+| **No fabricated history** | 0033–0051 are **not** recorded: Drizzle did not run them on production. Only 0052, 0053 and 0054 are recorded, inside the transaction, after they actually ran |
+| **Safe ordering for future migrations** | Recording 0054 makes the latest `created_at` = 0054's, so nothing in this release is pending and the next migration (newer than 0054) is the first one Drizzle applies. Verified in the transaction (`drizzle_pending=0`) and with Drizzle's real migrator in tests (a probe 0055 applies alone) |
+| **Lineage must be explained before anything runs** | `lineage.mjs` classifies every ledger row against three sources: the current journal; every committed historical version of every migration on every ref (LF and CRLF hashes, `known-migration-versions.json`); and reviewed attestations (`ledger-attestations.json`). Rows it cannot explain stop the run. Rows newer than the release, rows already recording 0052–0054, and duplicate timestamps are blocking even with an attestation |
+| **The exact reviewed ledger is pinned** | The attestation records the ledger fingerprint `md5(id:hash:created_at …)`. The migration transaction refuses unless the live ledger has exactly that fingerprint, so a ledger that changed after review aborts with nothing applied |
+| **Auditable** | A new `hr_ops.migration_audit` table (outside the public schema contract) gets, inside the same transaction: every existing ledger row with its classification and attestation; every unrecorded migration (`journal_entry_out_of_band`); every data check; and the package and deployer fingerprints. Rollback appends an event; nothing is deleted |
+| **Data steps are not skipped silently or replayed** | For migrations the ledger does not record, the data steps are checked read-only (section 3.1). A failing check stops the run unless reviewers attest it. The package never replays 0033–0051 |
 
-The **two columns that were not obvious** are `attendance_types.early_exit_allowance_minutes` and `attendance_types.weekend_days`: 0052 adds them to a table that already exists. The exact expected gap is pinned in `expected-missing.txt`. The script refuses to run if production's gap differs from it by even one item.
+### 3.1 Audit of 0031–0051 (data and non-schema operations)
 
-## 2. What the script does
+All other statements in 0031–0051 are additive schema changes, which the rehearsal verifies by comparing the result against a from-scratch build of all 55 migrations.
 
-`hr-migrate-0052-0054.sh` has four modes. Each one writes its logs and evidence to `/root/sanaa-hr-migration-runs/<mode>-<timestamp>/`.
+| Check (`data-checks.sql`) | Migration step it verifies |
+|---|---|
+| `0032_ip_port_index_dropped` | 0032 drops `idx_attendance_devices_ip_port` |
+| `0037_min_minutes_nullable` | 0037 `deduction_rules.min_minutes DROP NOT NULL` |
+| `0038_company_request_type_key_dropped` | 0038 drops `approval_workflows_company_id_request_type_key` |
+| `0039_0042_workforce_tables_absent` | 0039 creates `workforce_*`, 0042 drops them (and refuses if they hold rows) |
+| `0039_0042_workforce_permissions_removed` | 0039 seeds `workforce_planning` permissions, 0042 deletes them |
+| `0041_job_history_backfill` | 0041 inserts a `current_assignment` job-history row for every non-deleted employee |
+| `0041_admin_decisions_permissions` | 0041 seeds `administrative_decisions` view/create for HR Manager and Department Manager |
+| `0042_staffing_blueprint_permissions` | 0042 seeds `staffing_blueprint` permissions for HR Manager and Department Manager |
+| `0046_debit_account_nullable` | 0046 `cost_centers.debit_account DROP NOT NULL` |
 
-| Mode | Touches production? | What it does |
-|---|---|---|
-| `preflight` | Read-only | Checks file hashes, the schema gap, the guards and the migration history. Prints the **impact report** and the **HR Manager access report** (also saved as CSV). Saves a copy, the sha256 and relevant excerpts of the VPS deployer for review |
-| `rehearse` | Read-only (`pg_dump`) | Everything `preflight` does. Then takes a fresh backup and restores it into a **throwaway PostgreSQL container with no network**, using the same image and the same non-superuser owner as production. There it applies the full migration and validates it, compares the result with a from-scratch build of all 55 migrations, checks that a second run is refused, and checks that rollback works |
-| `apply` | **Yes. Stage 2 only** | Requires all of: a passing rehearsal less than 24 hours old with identical package files; `--deployer-sha256` matching the deployer version the reviewers approved; and a typed confirmation. Stops HR, takes a final backup and verifies it by restoring it, applies everything in **one transaction**, validates, restarts HR and runs the official gate |
-| `rollback` | **Yes** | Logical rollback of one `apply` run. Refuses if the new tables or columns already hold data |
+A failing check is **not fixed by this package**. Production data and permissions stay untouched. Reviewers either attest it with a reason, or plan a separately approved corrective change.
 
-### Safeguards inside the single transaction
+### 3.2 Rollback guards
 
-1. **Guards** (`guards.sql`):
-   - none of the 49 objects may exist yet;
-   - the prerequisite tables and indexes exist;
-   - no duplicate `payroll_runs` periods and no duplicate active work e-mails (either would break the new unique indexes);
-   - the migrating user owns the altered tables;
-   - the migration history is exactly 0000–0032.
-2. **Data-preservation fingerprint.** Before any DDL runs, every existing table is hashed: row count plus an md5 over every row, using only the columns that existed before. After the migrations it is hashed again. If any existing row was changed or deleted, or rows appeared anywhere except the seeds the migrations are expected to add (`permissions`, `deduction_rules`), the whole transaction is rolled back.
-3. **The three migration files, byte for byte** as committed. Their sha256 values are pinned in `files.sha256`.
-4. **Migration history** reconciled to 0054 (section 5). No HR manager is assigned unless `--hr-managers` is given; that option needs separate written approval.
-5. **Validation** (`validate.sql`): the 27 tables, 22 columns, 26 indexes, trigger and seed rows, and the history. Only then `COMMIT`.
+Right after COMMIT, while HR is still stopped, `apply` records a baseline of:
+- the full content of each of the **27 new tables**;
+- the seeded `permissions` and `deduction_rules` rows;
+- the three recorded ledger rows.
 
-Rehearsed on a copy of real HR data (107 tables, 5,695 rows), the transaction took about 2 seconds.
+A logical rollback recomputes that baseline and is **refused** if anything differs. That covers:
+- any row in a new table: `hr_managers`, `portal_session_activity`, `user_permissions`, timesheets, payroll tables, and so on;
+- any changed seed;
+- any of the **22 new columns** holding a non-default value (checked generically from the catalog), including all `payroll_runs` tracking fields;
+- any `approval_workflow_runs` row without a workflow.
 
-## 3. Stage 1: validate, back up, rehearse, report
+A refused rollback means: **restore the verified backup** (section 7). It was tested against a hr_managers row, a session row, a user_permissions grant, a filled employee column, a changed seeded permission and a changed SAR rate; all six were refused.
 
-Run everything as root on the VPS. **None of these steps changes production.**
+### 3.3 VPS deployer
 
-**Step 0: get the reviewed files.** Use a Linux checkout of the commit named in the approval request (PR branch `ops/prod-migration-0052-0054`). Don't copy the files from a Windows machine: line-ending changes break the pinned hashes, and the script will refuse to run.
+`deployer-review.json` pins the hash the administrator reported, `2df500bd…5fc7`, with status **pending**. Only the hash was provided; **the content has not been reviewed.** `apply` refuses unless:
+- `status` is `approved`;
+- that sha256 equals the deployer on the VPS;
+- it equals `--deployer-sha256`.
+
+The open review questions are listed in that file. The most important: does the deployer run Drizzle migrations? With the hazard in section 2.3, that would apply 0054 and skip 0052/0053.
+
+## 4. Stage 1 (read-only): validate, collect lineage evidence, report
+
+Run everything as root on the VPS, from a Linux checkout of the commit named in the review request. Don't copy files from Windows: the hashes are pinned. **Node 18+ is required** (the app's runtime).
 
 ```bash
 cd /root && git clone https://github.com/ahmedelshewy-koon/hr.git hr-migration && cd hr-migration
-git checkout <commit from the approval request>
+git checkout <commit from the review request>
 sha256sum --quiet -c ops/prod-migration-0052-0054/files.sha256 && echo FILES-OK
 S=ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh
+bash "$S" preflight; echo "exit=$?"
 ```
 
-**Step 1: validate the environment** (read-only):
+- **Exit 4 / `LINEAGE=UNVERIFIED` (expected now):** nothing was changed. Read `ADMIN_ACTION_REPORT.md` in the run directory (`/root/sanaa-hr-migration-runs/preflight-<ts>/`) and collect what it lists:
+  1. `DISCOVERY.md` / `discovery.json`. The preflight searched `/opt/sanaa-hr`, `/home/sana-deploy`, `/root`, `/srv` and `/var/www`, read-only, for Drizzle journals whose entries match the ledger rows. If one matches, also send that journal and its SQL files.
+  2. The release history: `ls -la --time-style=full-iso /opt/sanaa-hr/releases/`, plus the GitHub SHA of each release.
+  3. Shell-history lines mentioning `drizzle-kit`, `db:migrate`, `db:generate` or `migrate(`, for root and sana-deploy, with dates. Redact secrets.
+  4. The **full content** of `/usr/local/sbin/sana-hr-deploy` (`deployer.copy`). Redact secrets.
+  5. Deployment logs from 2026-10-05 to 2026-10-09.
+  6. Confirmation that nobody will run Drizzle migrations against production in the meantime.
 
-```bash
-bash "$S" preflight
-```
+  Send the whole run directory: `LINEAGE_REPORT.md`, `ledger.tsv`, `data-checks.tsv`, `lineage.json`, `preflight.txt`, `hr-manager-access.csv`, the `deployer.*` files, `DISCOVERY.md`, `ADMIN_ACTION_REPORT.md`, `run.log`.
+- **Exit 1:** a gate failed (wrong schema gap, guards, missing tool). Send the run directory.
+- **Exit 0 / `PREFLIGHT=PASS`:** only possible once an attestation exists. Continue with `bash "$S" rehearse`.
 
-The run must end with `PREFLIGHT=PASS`.
+**Reviewers, after Stage 1:**
+1. Identify where rows 32/33 came from, using the discovery output, releases and history.
+2. Decide whether each unexplained row and each failed data check is acceptable.
+3. Commit `ledger-attestations.json` (row decisions plus the exact ledger fingerprint from `LINEAGE_REPORT.md`) and the deployer verdict in `deployer-review.json`, through a reviewed PR.
 
-**Step 2: verified backup and isolated rehearsal** (read-only; about 2–5 minutes). Run it **without** `--hr-managers`:
+Then a new Stage 1 run (preflight, then `rehearse`) is authorized. Rehearse refuses to start while the lineage is unverified.
 
-```bash
-bash "$S" rehearse
-```
+## 5. Rehearsal (after attestation)
 
-The run must end with `REHEARSAL=PASS`. If it stops at step 4/7 with objects "missing on production", production differs from what the migration files define. Send the run directory as it is. Do not use `--accept-catalog-drift`.
+`bash "$S" rehearse` works as follows. Production is unchanged throughout.
+1. Re-runs every preflight gate.
+2. Takes a fresh backup and restores it into a throwaway container with no network.
+3. Checks the clone's ledger has the same fingerprint as production's.
+4. Applies 0052–0054 in one transaction.
+5. Validates the result and compares it with a from-scratch build of all 55 migrations.
+6. Checks that a rerun is refused.
+7. Tests a clean logical rollback.
+8. Checks that a rollback is refused after a session row is written.
 
-**Step 3: send the results for approval.** Send the rehearsal run directory, `/root/sanaa-hr-migration-runs/rehearse-<ts>/`. It contains no database dump. The important files are:
+Send the run directory for approval.
 
-| File | Reviewers check |
-|---|---|
-| `run.log`, `REHEARSAL_RESULT` | Every step passed; the backup path; the package fingerprint |
-| `preflight.txt` | Guards, impact report, approval-routing counts, deduction-rule seeding, other connections |
-| `hr-manager-access.csv` | Every HR Manager account and its expected access (section 6.1) |
-| `deployer.sha256`, `deployer-excerpt.txt` (and `deployer.copy` if it holds no secrets) | Whether the VPS deployer is compatible with the 55-row history (section 5) |
-| `migration-clone.log`, `validate-clone.txt`, `contract-clone-after.txt` | The migration, data-preservation and validation results on the clone |
-| `catalog-missing-on-production.txt` (must be empty), `catalog-extra-on-production.txt` | Comparison with the from-scratch build |
-| `rollback-test.log` | The rollback test |
-| `counts.diff` | Live traffic during the backup (informational) |
-
-Keep the backup it made (`/root/sanaa-hr-cicd-backups/hr-before-0052-0054-rehearsal-<ts>.dump` and its `.sha256`), and copy it off the server.
-
-## 4. Stage 2: apply (only after written approval)
+## 6. Apply (only after separate written approval)
 
 The approval must name:
 - the commit;
 - the approved deployer sha256;
 - the maintenance window;
-- whether any HR managers are to be assigned, and which ones. The default is none.
+- any HR managers to assign (default none).
 
-Then:
-1. Announce the window: about 15 minutes of HR downtime, and everyone must sign in again.
-2. If the rehearsal is more than 24 hours old, run `bash "$S" rehearse` again.
-3. Apply:
+```bash
+bash "$S" apply --rehearsal /root/sanaa-hr-migration-runs/rehearse-<ts> \
+  --deployer-sha256 <approved hash> --confirm APPLY-0052-0054-ON-sanaa_hr
+```
 
-   ```bash
-   bash "$S" apply --rehearsal /root/sanaa-hr-migration-runs/rehearse-<ts> \
-     --deployer-sha256 <approved hash> --confirm APPLY-0052-0054-ON-sanaa_hr
-   ```
+Before touching production, `apply` re-checks:
+- the lineage and the attested fingerprint;
+- that the rehearsal saw the same ledger;
+- the package fingerprint;
+- that the rehearsal is less than 24 hours old;
+- the deployer approval.
 
-   It must end with `APPLY=COMPLETE`, and the official gate must print `HR_SCHEMA_STATUS=ALL_EXPECTED_COLUMNS_PRESENT`.
-4. Re-run the deployment only if the approval covers it. In GitHub Actions that is *Deploy HR to production (gated)*.
-5. Smoke test: sign in as Super Admin, open Timesheet, Payroll and Employees, and submit one leave request.
+Then it:
+1. stops HR and confirms nothing else is connected;
+2. takes a final backup and verifies it by restoring it;
+3. runs **one transaction**: guards, data fingerprint, 0052–0054, recording of the 0052–0054 history rows, the audit trail, validation, data-preservation check;
+4. captures the rollback baseline;
+5. restarts HR and runs the official gate.
 
-## 5. Migration history (`drizzle.__drizzle_migrations`)
-
-Production's history has 33 rows (0000–0032). However, the schema of 0033–0051 is already present: it was applied outside Drizzle, partly through the additive bridge. The package **always** records 0033–0054, so the history matches the schema. There is no option to skip this.
-
-- **Why:** Drizzle applies every migration whose journal timestamp is newer than the **latest** recorded `created_at`. The row count doesn't matter; the latest timestamp does. Tested with Drizzle's real migrator on the rehearsal copy:
-  - **History left at 33:** the next `drizzle-kit migrate` replays 0033 and fails with `column "nationality_country" … already exists`. Every future migration is blocked.
-  - **History reconciled to 55:** a test migration 0055 applied on its own, as intended.
-- Each row gets the file's sha256 and its journal timestamp, exactly as Drizzle writes them. The rows are recorded inside the migration transaction, and only after the rehearsal confirms the restored production copy matches a from-scratch build of all 55 migrations. On the local copy the only difference was an extra unique key on `system_settings`, which is harmless.
-- **VPS deployer compatibility** (`/usr/local/sbin/sana-hr-deploy`, not in the repository). `preflight` and `rehearse` save its sha256, a copy and the relevant excerpts. Reviewers must confirm that it doesn't require exactly 33 history rows and doesn't call anything that does. `apply` runs only against that exact reviewed version. If the deployer needs a change, that change is reviewed and approved first, and then the rehearsal is run again.
-- **`ops/hr-production-prepare.sh`** (the old bridge script) used to require exactly 33 rows. This PR changes it to also accept the reconciled history when it exactly matches the release's journal (row count and latest timestamp). So a deployer that still calls it keeps working after `apply`.
-- Five of the existing 0000–0032 rows have hashes that differ from the current files. Drizzle doesn't use hashes, so this is informational only.
-
-## 6. Effects on people and requests
-
-### 6.1 HR Manager accounts (report only; nothing is assigned)
-
-`preflight` writes `hr-manager-access.csv` with one row per account that has the HR Manager role:
-- account status, last login, data scope and linked employee;
-- payroll country, read from the stored `salary_country` only, as the app does;
-- the number of role grants today;
-- the **expected access after the migration while unassigned**;
-- **eligibility if assigned**. An account without a linked active employee can get access but cannot be an approver.
-
-Expected access for an HR Manager **not listed** in `hr_managers`:
-- **blocked (403):** Timesheet, the Payroll pages, Saved Attendance and Vacation Setup;
-- **Super Admin only:** salary and payroll-setup edits;
-- **unchanged:** every other HR page (role permissions as today).
-
-Putting accounts into `hr_managers` is a **separate decision requiring written approval** that names user ids and regions. It is done either under Payroll → HR Manager Setup after the deploy, or with `--hr-managers` on an approved apply.
-
-### 6.2 Approval routing
-
-This PR also changes the application. Until at least one HR manager is assigned, the new release **keeps the current approval routing**:
-- requests with no applicable workflow keep the legacy manager/HR path;
-- configured workflows behave as today.
-
-Without this change, the moment the `hr_managers` table existed, requests from employees with no workflow would have been forced into a manager → HR chain. They would have failed with "approver unavailable" whenever the employee has no manager account. Unit tests cover the three states: table missing, table empty, and managers assigned.
-
-- **Requests already in progress:** unaffected. Their route is stored with each request (`preflight` counts them).
-- **Unavoidable once HR managers are assigned** (separate approval):
-  - for employees with a payroll country, the HR step of new requests goes to the regional HR managers;
-  - where no workflow applies, new requests get a manager → HR chain.
-
-  `preflight` gives counts of employees in each group. On the local copy: 22 would get the default chain, 20 would have their HR step routed regionally, and 4 have no payroll country and stay as they are.
-- Configuring company workflows, or linking HR managers to employees, before that approval minimizes the change.
-
-### 6.3 Other effects
-
-| Effect | Who | When |
-|---|---|---|
-| Signed out once ("Session idle timeout") | Everyone | When an app version that knows `portal_session_activity` runs against the new schema. `preflight` says whether the current release already does |
-| New role page grants (90 rows) | Super Admin and HR Manager **roles** get `timesheetManagement` plus view/edit on 19 payroll/attendance pages. These rows come **from migrations 0052/0053 themselves**; they are part of what is approved for `apply` | At COMMIT |
-| Two absence deduction rules created (1 and 2 days of wage) | Only if production has no active absence rule (`preflight` reports this) | At COMMIT |
-| Employees with payroll or timesheet history cannot be deleted (trigger) | HR admins | At COMMIT |
+**Effects users notice:**
+- Everyone is signed out once.
+- HR Managers are blocked from Timesheet, Payroll, Saved Attendance and Vacation Setup until someone assigns them. `hr-manager-access.csv` lists who is affected, and assigning them needs separate approval.
+- 0052/0053 add 90 role permission rows for the Super Admin and HR Manager roles.
+- Approval routing stays as it is today until HR managers are assigned. The application change in this PR keeps the legacy routing while none are assigned.
 
 ## 7. Rollback and recovery
 
 | Situation | What to do |
 |---|---|
-| `apply` fails before COMMIT | Nothing to do. The transaction rolled back, the schema is unchanged and HR was restarted automatically. Read `migration.log` |
-| COMMIT done, but the new release fails to deploy | **Leave the schema in place.** The changes are additive (new tables, nullable or defaulted columns, a relaxed index), so the previous release keeps working; `apply` already restarted it on the new schema. Section 6.3 still applies. Fix the deploy and retry |
-| The schema must be removed and no real data is in the new objects yet | `bash "$S" rollback --run-dir /root/sanaa-hr-migration-runs/apply-<ts> --confirm ROLLBACK-0052-0054-ON-sanaa_hr`. This takes a safety backup, then reverses everything in one transaction: tables, columns, the original indexes, seeded rows and history rows. It refuses if any new table or column holds data. The deployed release must then be the pre-0052 one |
-| Data was written to the new objects, or anything else went wrong | **Full restore** from the verified final backup (path in `<apply run>/BACKUP`). Anything written after the backup is lost |
+| `apply` fails before COMMIT | Nothing to do. The transaction rolled back and HR was restarted |
+| Committed, but the new release fails to deploy | Leave the schema in place: the changes are additive and the previous release runs on them |
+| Schema must go, and the new objects are exactly as `apply` left them | `bash "$S" rollback --run-dir <apply run> --confirm ROLLBACK-0052-0054-ON-sanaa_hr`. Takes a safety backup, then reverses in one transaction. Existing ledger rows are untouched and the rollback is logged in the audit table |
+| Rollback refused (any new data), or anything else | **Full restore** from the verified final backup (`<apply run>/BACKUP`). Data written after the backup is lost |
 
-**Full restore procedure.** Restore into a new database, then swap names. Never use `pg_restore --clean`. Check which role is the superuser inside the container first; with the official image it is `POSTGRES_USER`.
-
+**Full restore procedure:**
 ```bash
 B=/root/sanaa-hr-cicd-backups/hr-before-0052-0054-final-<ts>.dump
 sha256sum -c "$B.sha256"
@@ -189,47 +199,66 @@ docker exec sanaa-hr-postgres psql -U sanaa_hr -d postgres \
   -c "ALTER DATABASE sanaa_hr_restore RENAME TO sanaa_hr"
 systemctl start sanaa-hr.service   # with the pre-0052 release deployed
 ```
-
-Keep `sanaa_hr_failed_0052` until the incident is closed. **Copy every backup off the server**: the backups and the database share one disk.
+Never use `pg_restore --clean`. Copy every backup off the server.
 
 ## 8. Risk assessment
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | Existing HR, employee, attendance or payroll data is altered | Very low | High | The migrations only add objects. The in-transaction fingerprint of every existing row aborts on any change; tested with an injected update, delete and insert, all caught and rolled back. Final backup verified by a full restore with identical row counts |
-| R2 | Migration fails halfway and leaves a partial schema | Very low | Medium | Single transaction with `ON_ERROR_STOP`; guards refuse any partial state |
-| R3 | Production differs from the reviewed state | Low | Medium | Exact 49-item gap check, 33-row history lineage check, and a catalog comparison against a from-scratch build. All stop the run before production is touched |
-| R4 | HR managers lose Timesheet/Payroll/Saved Attendance/Vacation Setup access | **Certain** until assigned | Medium | Access report for approval; assignment is a separate approved step; plan it into the deploy window |
-| R5 | Approval routing changes | None until HR managers are assigned; then expected | Medium | The application keeps current routing while no HR manager is assigned (unit-tested); `preflight` gives counts of who changes once assigned; configure workflows first |
-| R6 | All users signed out | **Certain** | Low | Announce the window. One-time only |
-| R7 | Future `drizzle-kit migrate` blocked | None (history always reconciled) | High if it happened | Tested with Drizzle's own migrator |
-| R8 | VPS deployer incompatible with the 55-row history | Unknown until reviewed | Medium (deploy blocked) | Deployer copy and hash collected in stage 1; `apply` is locked to the reviewed hash; `hr-production-prepare.sh` updated to accept the reconciled history |
-| R9 | Lock waits on `employees` / `payroll_runs` | Very low | Low | HR stopped, other connections checked, `lock_timeout=10s`, about 2 s runtime |
-| R10 | The deletion trigger blocks a legitimate deletion | Low | Low | Intended; archive the employee instead |
-| R11 | Backups lost together with the server | Low | High | Copy `.dump` and `.sha256` files off the server |
-| R12 | Rehearsal container behaves differently from production | Low | Low | Same image and non-superuser owner, no network; the final backup is re-verified at apply time |
+| R1 | Existing HR, employee, attendance or payroll data altered | Very low | High | Additive migrations; in-transaction fingerprint of every existing row; verified backups |
+| R2 | Partial schema | Very low | Medium | One transaction; guards refuse any partial state |
+| R3 | Production schema differs from the reviewed state | Low | Medium | Exact 49-item gap check, catalog comparison against a from-scratch build, attested ledger fingerprint |
+| R4 | HR managers lose access to four pages | **Certain** until assigned | Medium | Access report; assignment is a separate approved step |
+| R5 | Approval routing changes | None until HR managers are assigned | Medium | Application guard (unit-tested); preflight counts who would change |
+| R6 | All users signed out | **Certain** | Low | Announce the window |
+| **R7** | **Production lineage unexplained** (rows 32/33 from a journal outside git) | **Confirmed** | High | Fail-closed lineage gate; discovery of journals on the VPS; reviewed attestation pinned by fingerprint |
+| **R8** | **`drizzle-kit migrate` run against production before this package**: applies 0054 and skips 0052/0053 forever | Real until applied | High | Never run it on production (action report item 6); deployer review question 1; the guard refuses if a 0052–0054 row already exists |
+| **R9** | **Hand-written data steps of 0031–0047 never ran on production** (permission seeds, job-history backfill) | Plausible (hypothesis 2.2) | Medium | Read-only data checks; failures must be attested or fixed by a separately approved change; this package changes no data or permissions |
+| R10 | Deployer incompatible (runs migrations, asserts row counts) | Unknown: content not reviewed | Medium–High | Pinned hash; apply locked to an approved review; `hr-production-prepare.sh` accepts a ledger whose head is 0054 |
+| R11 | Rollback destroys data written after apply | Very low | High | Baseline guard over all 27 tables, 22 columns, seeds and ledger rows; otherwise backup restore |
+| R12 | Backups lost with the server | Low | High | Copy `.dump` and `.sha256` files off the server |
+| R13 | A new audit schema `hr_ops` on production | Certain at apply | Low | Outside the public schema contract and Drizzle; append-only; documented |
 
-## 9. What was tested before handover
+## 9. Tests
 
-Everything below ran locally on PostgreSQL 18, against a copy of the HR database taken before 0052. That copy has the same 0000–0032 history as production and reproduces production's exact 27/22 gap. The real script ran its `preflight`, `rehearse`, `apply` and `rollback` phases with only Docker and systemd stubbed out and a stand-in deployer file. The production VPS was **not** accessed.
-
-- Gap reproduced exactly; after `apply`, the official audit logic reports `ALL_EXPECTED_COLUMNS_PRESENT` (134 tables / 1,532 columns).
-- Data preservation: 107 tables / 5,695 rows unchanged; the only new rows were 90 `permissions` grants. Injected changes were caught and rolled back.
-- `apply` was refused without a deployer hash, with a wrong hash, with a changed package, with changed `--hr-managers`, and for `--keep-ledger` (option removed). A second `apply` was refused because the schema is already complete.
-- Rollback restored the identical schema and was refused once a real `shift_plans` row existed. The full restore-and-swap procedure was tested.
-- Drizzle's real migrator: reconciled history → a future 0055 applies alone; 33 rows → fails at 0033.
-- Approval routing: unit tests for table missing, empty, and assigned. The payroll tests pass.
-- **Not executed:** the Docker and systemd commands and the production image. Stage 1 on the VPS is their first real run, and it is read-only.
+- `tests/prod-migration-lineage.test.mjs` (always runs, also in CI), 16 tests:
+  - divergent history with unknown timestamps;
+  - a wrong-hash attestation;
+  - a ledger that changed after attestation;
+  - committed LF/CRLF historical hashes versus unknown hashes;
+  - blocking ordering conflicts (newer than the release, already recorded, duplicates);
+  - data-check gating;
+  - the fingerprint formula;
+  - journal ordering and pinned files;
+  - rollback and validation coverage of all 27 tables and 22 columns, derived by parsing the migrations;
+  - no ledger `UPDATE`/`DELETE`;
+  - the guard fails without an attestation;
+  - the deployer pin;
+  - journal discovery;
+  - audit rows.
+- `tests/prod-migration-postgres.test.mjs` (runs when `HR_MIGRATION_TEST_PG_BIN` and `HR_MIGRATION_TEST_PG_PORT` point at a disposable PostgreSQL; skipped otherwise), 12 tests on a production-like fixture:
+  - a missing data step is detected;
+  - Drizzle's own migrator reproduces the skip hazard;
+  - a changed ledger is refused with nothing applied;
+  - the happy path keeps all 33 rows byte-for-byte and records only 0052–0054;
+  - Drizzle's migrator applies nothing afterwards, and a future 0055 alone;
+  - six unsafe rollbacks are refused;
+  - a clean rollback restores the attested ledger exactly.
+- Not executed: Docker and systemd on the VPS. Stage 1 is their first real run and it is read-only.
 
 ## 10. Files
 
 | File | Purpose |
 |---|---|
-| `hr-migrate-0052-0054.sh` | Orchestrator (modes above) |
+| `hr-migrate-0052-0054.sh` | Orchestrator (preflight, rehearse, apply, rollback) |
+| `lineage.mjs` | Lineage classification, VPS journal discovery, admin action report, audit SQL |
+| `ledger-attestations.json` | Reviewed lineage decisions and the pinned ledger fingerprint (empty until review) |
+| `known-migration-versions.json` | Every committed version of every migration (generated) |
+| `deployer-review.json` | Pinned deployer hash and review verdict (pending) |
+| `data-checks.sql` | Read-only checks of the 0031–0051 data steps |
 | `guards.sql`, `report.sql`, `hr-manager-access.sql` | Blocking checks, impact report, HR Manager access report |
 | `fingerprint-begin.sql`, `fingerprint-end.sql` | In-transaction data-preservation proof |
-| `ledger-record.sql`, `expected-ledger.sql` | Migration-history reconciliation; the expected history is generated |
+| `ledger-record.sql`, `audit.sql`, `expected-ledger.sql` | Recording 0052–0054 only; the audit trail; the expected journal (generated) |
 | `validate.sql` | Post-migration validation |
-| `rollback-template.sql` | Logical rollback (with the values captured at apply time) |
-| `expected-missing.txt` | The exact 49-item gap this package was reviewed for |
-| `files.sha256`, `gen-ledger-sql.mjs` | Pinned hashes of the migrations, journal and contract; the generator for them |
+| `rollback-baseline.sql`, `rollback-template.sql` | Rollback baseline and guarded logical rollback |
+| `expected-missing.txt`, `files.sha256`, `gen-ledger-sql.mjs` | The reviewed 49-item gap, pinned hashes, generator |

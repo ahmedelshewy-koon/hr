@@ -1,0 +1,17 @@
+{
+  "schema": "hr-deployer-review-v1",
+  "deployer": "/usr/local/sbin/sana-hr-deploy",
+  "sha256": "2df500bdc1c75b927b8aeff733d1e204c49932aed8d9fcbf4b3686b58b3a5fc7",
+  "source": "SHA256 reported by the VPS administrator after the first Stage 1 preflight (2026-10-21). The file content has not been provided.",
+  "status": "pending",
+  "status_values": "pending | approved | rejected. apply runs only when status is approved and sha256 equals the deployer on the VPS.",
+  "questions_for_review": [
+    "Does it run drizzle-kit migrate, npm run db:migrate, migrate(), or any SQL against the HR database? If yes, in which order relative to ops/hr-schema-audit.sh? With production's ledger head (1791372110232, 2026-10-07) Drizzle would apply 0054 and skip 0052/0053.",
+    "Does it assert a drizzle.__drizzle_migrations row count (for example 33) or call ops/hr-production-prepare.sh? After apply the ledger has 36 rows and its head is 0054.",
+    "Does it read anything from the hr_ops schema or depend on the public schema containing only Drizzle-managed tables?",
+    "What does it do when the schema audit fails (the 2026-10-21 run restored the previous release)?"
+  ],
+  "findings": [],
+  "reviewed_by": null,
+  "reviewed_at": null
+}

@@ -1,5 +1,5 @@
 -- Post-migration validation. Runs inside the transaction before COMMIT and again read-only after COMMIT.
--- Expects psql variables: hr_manager_count, head_when (expected-ledger.sql).
+-- Expects psql variables: hr_manager_count, expected_ledger and head_when (expected-ledger.sql).
 SELECT coalesce(string_agg(t, ', '), '') AS hr_v_missing_tables
 FROM unnest(ARRAY['timesheets','timesheet_edit_permissions','timesheet_month_locks','payroll_variable_entries',
  'payroll_month_locks','shift_plans','shift_plan_details','shift_assignments','company_wfh_days','business_units',
@@ -35,13 +35,19 @@ SELECT
   (SELECT count(*) FROM hr_managers) AS hr_v_managers,
   (SELECT count(*) FROM permissions p JOIN roles r ON r.id=p.role_id WHERE r.name='Super Admin' AND p.module='timesheetManagement' AND p.allowed=1) AS hr_v_ts_perm,
   (SELECT count(*) FROM drizzle.__drizzle_migrations) AS hr_v_ledger_rows,
-  (SELECT max(created_at) FROM drizzle.__drizzle_migrations) AS hr_v_ledger_head \gset
+  (SELECT max(created_at) FROM drizzle.__drizzle_migrations) AS hr_v_ledger_head,
+  (WITH e(idx,tag,hash,created_at) AS :expected_ledger
+   SELECT count(*) FROM e WHERE e.idx IN (52,53,54)
+     AND (SELECT count(*) FROM drizzle.__drizzle_migrations m WHERE m.hash = e.hash AND m.created_at = e.created_at) = 1) AS hr_v_package_rows,
+  (WITH e(idx,tag,hash,created_at) AS :expected_ledger
+   SELECT count(*) FROM e WHERE e.created_at > (SELECT max(created_at) FROM drizzle.__drizzle_migrations)) AS hr_v_pending,
+  (SELECT count(*) FROM hr_ops.migration_audit WHERE event = 'apply_started') AS hr_v_audit \gset
 \echo HR_VALIDATE missing_tables=[:hr_v_missing_tables] missing_columns=[:hr_v_missing_columns] missing_indexes=[:hr_v_missing_indexes]
-\echo HR_VALIDATE trigger=:hr_v_trigger email_idx=:hr_v_email_idx runs_idx=:hr_v_runs_idx workflow_id_nullable=:hr_v_wf_nullable sar=:hr_v_sar hr_managers=:hr_v_managers/:hr_manager_count ledger=:hr_v_ledger_rows@:hr_v_ledger_head
+\echo HR_VALIDATE trigger=:hr_v_trigger email_idx=:hr_v_email_idx runs_idx=:hr_v_runs_idx workflow_id_nullable=:hr_v_wf_nullable sar=:hr_v_sar hr_managers=:hr_v_managers/:hr_manager_count ledger=:hr_v_ledger_rows@:hr_v_ledger_head package_rows=:hr_v_package_rows/3 drizzle_pending=:hr_v_pending audit=:hr_v_audit
 SELECT (:'hr_v_missing_tables' <> '' OR :'hr_v_missing_columns' <> '' OR :'hr_v_missing_indexes' <> ''
         OR :hr_v_trigger <> 1 OR :hr_v_email_idx <> 1 OR :hr_v_runs_idx <> 1 OR :'hr_v_wf_nullable' <> 'YES'
         OR :hr_v_sar <> 1 OR :hr_v_managers <> :hr_manager_count OR :hr_v_ts_perm < 1
-        OR :hr_v_ledger_rows <> 55 OR :hr_v_ledger_head <> :head_when) AS hr_bad \gset
+        OR :hr_v_package_rows <> 3 OR :hr_v_ledger_head <> :head_when OR :hr_v_pending > 0 OR :hr_v_audit < 1) AS hr_bad \gset
 \if :hr_bad
   DO $$ BEGIN RAISE EXCEPTION 'POST-MIGRATION VALIDATION FAILED'; END $$;
 \endif

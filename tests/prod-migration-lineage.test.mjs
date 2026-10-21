@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   classifyLedger, ledgerFingerprint, loadJournal, journalProblems, introducedObjects, psqlVars, auditSql, discoverJournals,
-  parseLedgerTsv, PACKAGE_TAGS, DATA_CHECKS, sha256,
+  parseLedgerTsv, parseReconTsv, renderReconciliation, reconciliationStatus, PACKAGE_TAGS, DATA_CHECKS, sha256,
 } from "../ops/prod-migration-0052-0054/lineage.mjs";
 
 const PKG = "ops/prod-migration-0052-0054";
@@ -170,7 +170,7 @@ test("existing ledger rows are never updated or deleted, and only package rows c
 });
 
 test("the in-transaction guard can never pass without a committed fingerprint attestation", () => {
-  assert.equal(psqlVars("."), "\\set attested_ledger_fp 'not-attested'\n");
+  assert.ok(psqlVars(".").startsWith("\\set attested_ledger_fp 'not-attested'\n"));
   assert.match(read(`${PKG}/guards.sql`), /:'hr_ledger_fp' <> :'attested_ledger_fp'/);
 });
 
@@ -192,6 +192,168 @@ test("journal discovery finds the source of a foreign ledger row and checks its 
   const found = discoverJournals({ ledger: [{ id: 32, hash: sha256(text), created_at: UNKNOWN_32.created_at }, { id: 33, ...UNKNOWN_33 }], roots: [root] });
   assert.equal(found.length, 1);
   assert.deepEqual(found[0].matches.map(m => [m.ledger_id, m.tag, m.hash_matches]), [[32, "0031_generated", true], [33, "0032_other", false]]);
+});
+
+// ---------- recovered evidence, reconciliation coverage, application-startup paths ----------
+const evidenceFor = (hash32, hash33, present = true) => [
+  { tag: "0031_vps_current_schema", when: UNKNOWN_32.created_at, file: "evidence/vps-lineage/0031_vps_current_schema.sql", present, hash: present ? hash32 : null },
+  { tag: "0032_vps_attendance_device_country", when: UNKNOWN_33.created_at, file: "evidence/vps-lineage/0032_vps_attendance_device_country.sql", present, hash: present ? hash33 : null },
+];
+const evidenceAttestation = ledger => ({
+  production_ledger: { fingerprint: ledgerFingerprint(ledger) },
+  rows: [{ created_at: UNKNOWN_32.created_at, evidence_tag: "0031_vps_current_schema", decision: "accept" },
+         { created_at: UNKNOWN_33.created_at, evidence_tag: "0032_vps_attendance_device_country", decision: "accept" }],
+});
+
+test("recovered VPS migrations explain rows 32/33 only when the committed files hash to the ledger values", () => {
+  const ledger = productionLedger();
+  const ok = classifyLedger({ ledger, journal, known, attestations: evidenceAttestation(ledger), dataChecks: allPass, evidence: evidenceFor(UNKNOWN_32.hash, UNKNOWN_33.hash) });
+  assert.deepEqual(ok.rows.filter(r => r.id >= 32).map(r => [r.class, r.ok]), [["RECOVERED_SOURCE", true], ["RECOVERED_SOURCE", true]]);
+  assert.equal(ok.verified, true, ok.reasons.join("; "));
+  const mismatch = classifyLedger({ ledger, journal, known, attestations: evidenceAttestation(ledger), dataChecks: allPass, evidence: evidenceFor("9".repeat(64), UNKNOWN_33.hash) });
+  assert.equal(mismatch.rows.find(r => r.id === 32).class, "RECOVERED_SOURCE_HASH_MISMATCH");
+  assert.equal(mismatch.verified, false);
+  const absent = classifyLedger({ ledger, journal, known, attestations: evidenceAttestation(ledger), dataChecks: allPass, evidence: evidenceFor(null, null, false) });
+  assert.equal(absent.verified, false);
+  assert.match(absent.rows.find(r => r.id === 32).detail, /not committed/);
+});
+
+test("the committed attestation references the recovered files and stays unverified until they and the fingerprint are committed", () => {
+  const att = JSON.parse(read(`${PKG}/ledger-attestations.json`));
+  assert.deepEqual(att.rows.map(r => [r.created_at, r.evidence_tag, r.decision]),
+    [[UNKNOWN_32.created_at, "0031_vps_current_schema", "accept"], [UNKNOWN_33.created_at, "0032_vps_attendance_device_country", "accept"]]);
+  assert.ok(att.rows.every(r => !r.hash), "hashes must come from the committed evidence files, never typed by hand");
+  assert.equal(att.production_ledger, null);
+  const r = classifyLedger({ ledger: productionLedger(), journal, known, attestations: att, dataChecks: allPass, evidence: [] });
+  assert.equal(r.verified, false);
+});
+
+const reconSummary = (o = {}) => ({ jh: { proposed: 1, missing_source: 0, fp: "a".repeat(32), ...o.jh }, rbac: { insert: 4, grants: 4, preserved: 0, role_missing: 0, fp: "b".repeat(32), ...o.rbac } });
+const failing3 = allPass.map(c => ["0041_job_history_backfill", "0041_admin_decisions_permissions", "0042_staffing_blueprint_permissions"].includes(c.id) ? { ...c, status: "FAIL" } : c);
+
+test("failed data checks are covered only by an approved reconciliation whose fingerprint equals the current proposal", () => {
+  const ledger = productionLedger();
+  const approved = { job_history: { decision: "approved", proposal_fingerprint: "a".repeat(32) }, rbac: { decision: "approved", proposal_fingerprint: "b".repeat(32) } };
+  const base = { ledger, journal, known, attestations: attest(ledger), dataChecks: failing3 };
+  assert.equal(classifyLedger({ ...base, recon: reconSummary(), approval: approved }).verified, true);
+  assert.equal(classifyLedger({ ...base, recon: reconSummary(), approval: {} }).verified, false, "no approval");
+  const drift = classifyLedger({ ...base, recon: reconSummary({ rbac: { fp: "c".repeat(32) } }), approval: approved });
+  assert.equal(drift.verified, false);
+  assert.match(drift.reasons.join("\n"), /differs from the current proposal/);
+  const missing = classifyLedger({ ...base, recon: reconSummary({ jh: { missing_source: 1 } }), approval: approved });
+  assert.equal(missing.verified, false);
+  assert.match(missing.reasons.join("\n"), /MISSING_SOURCE/);
+  const attested = attest(ledger, { data_checks: [{ id: "0041_job_history_backfill", decision: "accept", reason: "reviewed exception" }] });
+  assert.equal(classifyLedger({ ...base, attestations: attested, recon: reconSummary({ jh: { missing_source: 1 } }), approval: approved }).verified, true);
+  assert.equal(reconciliationStatus(reconSummary({ rbac: { role_missing: 2 } }), approved).rbac.covers, null);
+});
+
+test("a deploy that would run the application's runtime reseed blocks verification", () => {
+  const ledger = productionLedger();
+  const base = { ledger, journal, known, attestations: attest(ledger), dataChecks: allPass };
+  const r = classifyLedger({ ...base, runtime: { dbSeedVersion: "old", releaseSeedVersion: "new" } });
+  assert.equal(r.verified, false);
+  assert.match(r.reasons.join("\n"), /runtime reseed would run on deploy/);
+  assert.equal(classifyLedger({ ...base, runtime: { dbSeedVersion: "same", releaseSeedVersion: "same" } }).verified, true);
+});
+
+test("with the committed approval file nothing is enabled: the transaction cannot reconcile anything unapproved", () => {
+  const vars = psqlVars(".");
+  for (const line of ["\\set recon_jh_enabled false", "\\set approved_jh_fp 'not-approved'", "\\set recon_rbac_enabled false", "\\set approved_rbac_fp 'not-approved'"]) assert.ok(vars.includes(line), line);
+  const appr = JSON.parse(read(`${PKG}/reconciliation-approval.json`));
+  assert.equal(appr.job_history.decision, "pending");
+  assert.equal(appr.rbac.decision, "pending");
+});
+
+test("the RBAC seeds in recon-proposal.sql are exactly what 0041 and 0042 insert", () => {
+  const m41 = read("drizzle-postgres/0041_employee_profile_and_decisions.sql"), m42 = read("drizzle-postgres/0042_staffing_blueprint.sql");
+  assert.match(m41, /'administrative_decisions',a\.action,1 FROM roles r CROSS JOIN \(VALUES \('view'\),\('create'\)\) AS a\(action\)\nWHERE r\.name IN \('HR Manager','Department Manager'\)/);
+  assert.match(m42, /CASE WHEN r\."name" = 'HR Manager' AND a\."action" IN \('view','create','edit','approve','delete'\) THEN 1 ELSE 0 END/);
+  assert.match(m42, /\(VALUES \('view'\),\('create'\),\('edit'\),\('approve'\),\('delete'\),\('manage_settings'\)\)/);
+  assert.match(m42, /WHERE r\."name" IN \('HR Manager','Department Manager','Employee'\)/);
+  const proposal = read(`${PKG}/recon-proposal.sql`);
+  assert.match(proposal, /unnest\(ARRAY\['HR Manager','Department Manager'\]\) AS r\(name\) CROSS JOIN unnest\(ARRAY\['view','create'\]\)/);
+  assert.match(proposal, /unnest\(ARRAY\['HR Manager','Department Manager','Employee'\]\) AS r\(name\)\s+CROSS JOIN unnest\(ARRAY\['view','create','edit','approve','delete','manage_settings'\]\)/);
+  assert.match(proposal, /CASE WHEN r\.name = 'HR Manager' AND a\.action IN \('view','create','edit','approve','delete'\) THEN 1 ELSE 0 END/);
+  const checks = read(`${PKG}/data-checks.sql`);
+  assert.match(checks, /staffing_roles AS \(SELECT id, name FROM roles WHERE name IN \('HR Manager','Department Manager','Employee'\)\)/);
+});
+
+test("reconciliation SQL only inserts (guarded), never updates or deletes existing employee or permission rows, and never invents dates", () => {
+  const proposal = read(`${PKG}/recon-proposal.sql`), apply = read(`${PKG}/recon-apply.sql`);
+  for (const m of proposal.matchAll(/\b(INSERT INTO|UPDATE|DELETE FROM|ALTER TABLE)\s+(\w+)/g)) assert.match(m[2], /^hr_recon_/, `proposal writes ${m[2]}`);
+  assert.doesNotMatch(apply, /\b(UPDATE|DELETE FROM)\s+(employee_job_history|permissions|employees)\b/);
+  assert.match(apply, /INSERT INTO employee_job_history[\s\S]*?NOT EXISTS \(SELECT 1 FROM employee_job_history h WHERE h\.employee_id = j\.employee_id\)/);
+  assert.match(apply, /INSERT INTO permissions[\s\S]*?ON CONFLICT \(role_id, module, action\) DO NOTHING/);
+  const code = (proposal + apply).replace(/--[^\n]*/g, "");
+  assert.doesNotMatch(code, /CURRENT_DATE|now\(\)::date|current_timestamp/i);
+  assert.match(proposal, /THEN 'MISSING_SOURCE' ELSE 'PROPOSED' END/);
+});
+
+test("the reconciliation report lists exact employee IDs, roles, permission keys and counts", () => {
+  const tsv = ["JH\t17\tAC-002\tactive\tPROPOSED\t1\t\t4\t\t9\t\t2025-12-01\tstart_date", "JH\t18\tAC-003\tactive\tMISSING_SOURCE\t1\t\t4\t\t9\t\t\t",
+    "RBAC\t3\tHR Manager\tadministrative_decisions\tview\t1\tPROPOSED_INSERT\t\t0041_employee_profile_and_decisions",
+    "RBAC\t4\tEmployee\tstaffing_blueprint\tview\t0\tPRESERVED_CUSTOM\t1\t0042_staffing_blueprint",
+    "COUNT\temployees_without_job_history\t2", `SUMMARY\t1\t1\t${"a".repeat(32)}\t1\t1\t1\t0\t${"b".repeat(32)}`].join("\n");
+  const before = parseReconTsv(tsv);
+  const { md, jhCsv, rbacCsv } = renderReconciliation(before, null, {});
+  assert.match(md, /\| 17 \| AC-002 \| PROPOSED \|/);
+  assert.match(md, /\| 18 \| AC-003 \| \*\*MISSING_SOURCE\*\* \|/);
+  assert.match(md, /\| 3 \| HR Manager \| administrative_decisions:view \| 1 \| \*\*PROPOSED_INSERT\*\* \|/);
+  assert.match(md, /\| employees_without_job_history \| 2 \| \(after rehearsal\) \|/);
+  assert.match(jhCsv, /^employee_id,employee_code,/);
+  assert.match(rbacCsv, /^role_id,role_name,module,action,seed_allowed,status,existing_allowed,source\n3,HR Manager,administrative_decisions,view,1,PROPOSED_INSERT,,0041/);
+});
+
+test("no CI/CD, npm lifecycle or application-startup path runs Drizzle migrations", () => {
+  const pkgJson = JSON.parse(read("package.json"));
+  for (const [name, cmd] of Object.entries(pkgJson.scripts)) {
+    if (/^(pre|post)|^(install|prepare|start)$/.test(name)) assert.doesNotMatch(cmd, /migrat|drizzle-kit/, `${name} runs ${cmd}`);
+  }
+  assert.equal(pkgJson.scripts["db:migrate"], "drizzle-kit migrate", "db:migrate stays a manual command");
+  for (const wf of readdirSync(".github/workflows")) assert.doesNotMatch(read(`.github/workflows/${wf}`), /db:migrate|drizzle-kit\s+(migrate|push)|\/migrator|migrate\(/, wf);
+  const sources = [];
+  const walk = d => { for (const f of readdirSync(d, { withFileTypes: true })) { const p = `${d}/${f.name}`; if (f.isDirectory()) walk(p); else if (/\.(ts|tsx|mjs|js)$/.test(f.name)) sources.push(p); } };
+  for (const d of ["app", "db", "worker"]) walk(d);
+  walk("scripts");
+  for (const f of sources) {
+    const text = read(f);
+    if (f === "scripts/rehearse-organization-migration.mjs") continue;   // manual clone rehearsal, never part of startup or deploy
+    assert.doesNotMatch(text, /drizzle-orm\/[\w-]+\/migrator|drizzle-kit migrate/, f);
+  }
+  for (const f of ["vite.config.ts", "next.config.ts", "drizzle.config.ts"]) assert.doesNotMatch(read(f), /migrate\(/, f);
+});
+
+test("runtime DDL at application startup is limited to the reviewed idempotent statements", () => {
+  const found = [];
+  for (const f of ["app/portal-auth.ts", "app/api/hr/route.ts"]) for (const m of read(f).matchAll(/"((?:ALTER TABLE|CREATE TABLE|CREATE (?:UNIQUE )?INDEX|DROP )[^"]*)"/g)) found.push(m[1].replace(/\s*\(.*$/, "").trim());
+  assert.deepEqual(found.sort(), [
+    "ALTER TABLE holidays ADD COLUMN IF NOT EXISTS attendance_types TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE holidays ADD COLUMN IF NOT EXISTS recurrence_type TEXT NOT NULL DEFAULT 'once'",
+    "ALTER TABLE roles ADD COLUMN IF NOT EXISTS name_ar TEXT", "ALTER TABLE roles ADD COLUMN IF NOT EXISTS name_en TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_data_scope TEXT NOT NULL DEFAULT 'all'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1",
+    "CREATE TABLE IF NOT EXISTS system_settings",
+  ].sort());
+  const others = [];
+  const walk = d => { for (const f of readdirSync(d, { withFileTypes: true })) { const p = `${d}/${f.name}`; if (f.isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(f.name) && !["app/portal-auth.ts", "app/api/hr/route.ts"].includes(p)) others.push(p); } };
+  walk("app"); walk("db"); walk("worker");
+  for (const f of others) assert.doesNotMatch(read(f), /["'`]\s*(ALTER TABLE|CREATE TABLE|DROP TABLE|CREATE (UNIQUE )?INDEX)\b/i, f);
+  // The runtime reseed is gated by SEED_VERSION; preflight compares it with production's system_settings.seed_version.
+  assert.match(read("app/api/hr/route.ts"), /^const SEED_VERSION = "[^"]+";/m);
+});
+
+test("the packaged schema-audit script is pinned and strictly read-only", () => {
+  const audit = read("ops/hr-schema-audit.sh");
+  assert.ok(read(`${PKG}/files.sha256`).includes(`${sha256(audit)}  ops/hr-schema-audit.sh`));
+  const sql = [...audit.matchAll(/-c "([\s\S]*?)"/g)].map(m => m[1]).join("\n");
+  assert.match(sql, /^\s*SELECT table_name, column_name\s+FROM information_schema\.columns/m);
+  assert.doesNotMatch(audit, /\b(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE|GRANT)\b/);
+  assert.match(audit, /sys\.exit\(3\)/);
 });
 
 test("audit rows record every existing ledger row and unrecorded migration without touching the ledger", () => {

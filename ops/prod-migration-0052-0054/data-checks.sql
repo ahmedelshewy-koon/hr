@@ -3,11 +3,13 @@
 -- drops) may never have run there. Output: one line per check, "id<TAB>PASS|FAIL<TAB>evidence" (run with -At -F tab).
 -- Nothing here changes data: a FAIL means a reviewer must decide (attest, or fix through a separately approved change).
 WITH roles_needed AS (SELECT id, name FROM roles WHERE name IN ('HR Manager','Department Manager')),
+-- 0042 seeds staffing_blueprint for three roles (HR Manager, Department Manager, Employee), 6 actions each.
+staffing_roles AS (SELECT id, name FROM roles WHERE name IN ('HR Manager','Department Manager','Employee')),
 admin_decisions AS (
   SELECT count(*) AS present FROM permissions p JOIN roles_needed r ON r.id = p.role_id
   WHERE p.module = 'administrative_decisions' AND p.action IN ('view','create')),
 staffing AS (
-  SELECT count(*) AS present FROM permissions p JOIN roles_needed r ON r.id = p.role_id
+  SELECT count(*) AS present FROM permissions p JOIN staffing_roles r ON r.id = p.role_id
   WHERE p.module = 'staffing_blueprint' AND p.action IN ('view','create','edit','approve','delete','manage_settings')),
 history AS (
   SELECT count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM employee_job_history h WHERE h.employee_id = e.id)) AS missing,
@@ -47,8 +49,8 @@ SELECT id, status, evidence FROM (
          (SELECT present FROM admin_decisions) || ' of ' || 2 * (SELECT count(*) FROM roles_needed) || ' expected (role, view/create) rows'
   UNION ALL
   SELECT 8, '0042_staffing_blueprint_permissions',
-         CASE WHEN (SELECT present FROM staffing) = 6 * (SELECT count(*) FROM roles_needed) THEN 'PASS' ELSE 'FAIL' END,
-         (SELECT present FROM staffing) || ' of ' || 6 * (SELECT count(*) FROM roles_needed) || ' expected (role, action) rows'
+         CASE WHEN (SELECT present FROM staffing) = 6 * (SELECT count(*) FROM staffing_roles) THEN 'PASS' ELSE 'FAIL' END,
+         (SELECT present FROM staffing) || ' of ' || 6 * (SELECT count(*) FROM staffing_roles) || ' expected (role, action) rows'
   UNION ALL
   SELECT 9, '0046_debit_account_nullable',
          CASE WHEN (SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='cost_centers' AND column_name='debit_account') = 'YES' THEN 'PASS' ELSE 'FAIL' END,

@@ -1,12 +1,26 @@
 {
-  "schema": "hr-ledger-attestation-v1",
-  "note": "Reviewed decisions only, committed through a reviewed pull request. Until production_ledger.fingerprint is set and every unexplained ledger row has an accepted entry, preflight reports LINEAGE=UNVERIFIED and rehearse/apply refuse to run. Never edit this to make a run pass without evidence.",
+  "schema": "hr-ledger-attestation-v2",
+  "note": "Reviewed decisions only, committed through a reviewed pull request. A row attestation that names an evidence_tag is accepted only when evidence/vps-lineage contains that file and its journal entry, and sha256(file bytes) and the journal timestamp both equal the production row. production_ledger.fingerprint must be copied from LINEAGE_REPORT.md of a preflight of this exact commit. Never edit this to make a run pass without evidence.",
   "production_ledger": null,
-  "rows": [],
-  "data_checks": [],
-  "example_entries_do_not_copy": {
-    "production_ledger": { "fingerprint": "<md5 from LINEAGE_REPORT.md>", "row_count": 33, "head": 1791372110232, "reviewed_by": "<name>", "reviewed_at": "<date>", "evidence": "<run directory / PR comment>" },
-    "row": { "created_at": 1791298824926, "hash": "<64 hex>", "decision": "accept", "identified_as": "<source journal + tag, e.g. /opt/sanaa-hr/releases/X/drizzle-postgres 0031_foo>", "evidence": "<DISCOVERY.md match, file diff vs current migrations>", "reviewed_by": "<name>", "reviewed_at": "<date>" },
-    "data_check": { "id": "0041_job_history_backfill", "decision": "accept", "reason": "<why the failed check is acceptable>", "reviewed_by": "<name>", "reviewed_at": "<date>" }
-  }
+  "rows": [
+    {
+      "created_at": 1791298824926,
+      "evidence_tag": "0031_vps_current_schema",
+      "decision": "accept",
+      "identified_as": "VPS-generated schema-only migration 0031_vps_current_schema (17 tables; no data inserts or permission seeds)",
+      "evidence": "DevOps technical review of the Stage 1 evidence for 30ee91e: original file recovered, SQL sha256 and journal timestamp match ledger row #32 exactly",
+      "reviewed_by": "DevOps (VPS administrator) - confirm in PR #7 review",
+      "reviewed_at": "2026-10-21"
+    },
+    {
+      "created_at": 1791372110232,
+      "evidence_tag": "0032_vps_attendance_device_country",
+      "decision": "accept",
+      "identified_as": "VPS-generated migration 0032_vps_attendance_device_country",
+      "evidence": "DevOps technical review of the Stage 1 evidence for 30ee91e: original file recovered, SQL sha256 and journal timestamp match ledger row #33 exactly",
+      "reviewed_by": "DevOps (VPS administrator) - confirm in PR #7 review",
+      "reviewed_at": "2026-10-21"
+    }
+  ],
+  "data_checks": []
 }

@@ -29,7 +29,7 @@ writeFileSync(`${dir}/expected-ledger.sql`, [
   "",
 ].join("\n"));
 
-const files = ["drizzle-postgres/meta/_journal.json", "ops/hr-schema-contract.json", ...journal.map(e => `drizzle-postgres/${e.tag}.sql`)];
+const files = ["drizzle-postgres/meta/_journal.json", "ops/hr-schema-contract.json", "ops/hr-schema-audit.sh", ...journal.map(e => `drizzle-postgres/${e.tag}.sql`)];
 writeFileSync(`${dir}/files.sha256`, files.map(f => `${sha(blobAt("HEAD", f))}  ${f}`).join("\n") + "\n");
 
 // Every committed (tag, when, text) on every ref, oldest commit first.

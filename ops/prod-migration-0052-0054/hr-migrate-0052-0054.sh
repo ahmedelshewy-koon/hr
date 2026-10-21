@@ -112,18 +112,40 @@ expect_reviewed_gap() {
 }
 
 # ---------- migration lineage (read-only) ----------
-# Dumps the ledger and the 0031-0051 data checks, then classifies them (lineage.mjs). Returns 0 verified, 4 not.
+# Exact proposal of the historical data reconciliation (temp tables only; the transaction is rolled back).
+recon_proposal() {
+  { echo "BEGIN;"; cat "$HERE/recon-proposal.sql" "$HERE/recon-report.sql"; echo "ROLLBACK;"; } | psql_to "$1" -At -F $'\t' | grep -v '^HR_RECON_PROPOSAL' > "$2"
+}
+
+# system_settings.seed_version vs the release's SEED_VERSION: a mismatch means the first API request after a deploy
+# runs the application's runtime reseed (role remapping and permission upserts).
+runtime_seed_check() {
+  local db release
+  db="$(psql_to "$1" -At -c "SELECT CASE WHEN to_regclass('public.system_settings') IS NULL THEN NULL ELSE (SELECT value_json FROM system_settings WHERE setting_key='seed_version') END")"
+  release="$(sed -n 's/^const SEED_VERSION = "\([^"]*\)";.*/\1/p' "$REPO/app/api/hr/route.ts" | head -n1)"
+  [[ -n "$release" ]] || die "could not read SEED_VERSION from the release (app/api/hr/route.ts)"
+  node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({dbSeedVersion: process.argv[2] || null, releaseSeedVersion: process.argv[3]}))' "$2" "$db" "$release"
+}
+
+# Dumps the ledger, the 0031-0051 data checks, the reconciliation proposal and the runtime seed state, then classifies
+# them (lineage.mjs). Returns 0 verified, 4 not.
 lineage_check() {
   local target="$1" out="$2" discover="${3:-}"
   psql_to "$target" -At -F $'\t' -c "SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id" > "$out/ledger.tsv"
   { echo "BEGIN TRANSACTION READ ONLY;"; cat "$HERE/data-checks.sql"; echo "ROLLBACK;"; } | psql_to "$target" -At -F $'\t' > "$out/data-checks.tsv"
+  recon_proposal "$target" "$out/recon.tsv"
+  node "$HERE/lineage.mjs" recon-render --recon "$out/recon.tsv" --out "$out" >&2
+  runtime_seed_check "$target" "$out/runtime.json"
   if [[ -n "$discover" ]]; then node "$HERE/lineage.mjs" discover --ledger "$out/ledger.tsv" --out "$out" >&2 || log "WARNING: journal discovery failed"; fi
   local rc=0
-  node "$HERE/lineage.mjs" classify --repo "$REPO" --ledger "$out/ledger.tsv" --data-checks "$out/data-checks.tsv" --out "$out" >&2 || rc=$?
+  node "$HERE/lineage.mjs" classify --repo "$REPO" --ledger "$out/ledger.tsv" --data-checks "$out/data-checks.tsv" \
+    --recon "$out/recon.tsv" --runtime "$out/runtime.json" --out "$out" >&2 || rc=$?
   [[ $rc == 0 || $rc == "$LINEAGE_EXIT" ]] || die "lineage classification failed ($rc)"
   LINEAGE_JSON="$out/lineage.json"
   return "$rc"
 }
+
+recon_fingerprints() { awk -F'\t' '$1=="SUMMARY"{print $4 "/" $9}' "$1"; }
 
 ledger_fingerprint_of() { node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).fingerprint)' "$1"; }
 
@@ -197,7 +219,8 @@ migration_stream() {
   hr_managers_sql "$HR_MANAGERS"
   cat "$HERE/ledger-record.sql" "$HERE/audit.sql"
   node "$HERE/lineage.mjs" audit-sql --lineage "$LINEAGE_JSON" --run-id "$(basename "$RUN_DIR")" --package "$(package_fingerprint)" --deployer "${DEPLOYER_SHA:-unknown}"
-  cat "$HERE/validate.sql" "$HERE/fingerprint-end.sql"
+  echo "\\set audit_run_id '$(basename "$RUN_DIR")'"
+  cat "$HERE/recon-proposal.sql" "$HERE/recon-apply.sql" "$HERE/validate.sql" "$HERE/fingerprint-end.sql"
   echo "$1;"
 }
 
@@ -229,6 +252,7 @@ capture_rollback_pre() {
   psql_to "$target" -At <<'SQL' > "$out"
 SELECT '\set perm_max_id ' || coalesce(max(id), 0) FROM permissions;
 SELECT '\set dr_max_id ' || coalesce(max(id), 0) FROM deduction_rules;
+SELECT '\set hist_max_id ' || coalesce(max(id), 0) FROM employee_job_history;
 SELECT '\set ledger_pre_max_id ' || coalesce(max(id), 0) FROM drizzle.__drizzle_migrations;
 SELECT '\set orig_runs_idx ' || quote_literal(coalesce((SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='idx_payroll_runs_month_year_country'), ''));
 SELECT '\set orig_email_idx ' || quote_literal((SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='idx_employees_work_email'));
@@ -236,14 +260,14 @@ SELECT '\set wf_was_not_null ' || CASE WHEN is_nullable = 'NO' THEN 'true' ELSE 
  WHERE table_schema='public' AND table_name='approval_workflow_runs' AND column_name='workflow_id';
 SQL
   grep -q '\\' <(grep orig_ "$out" | cut -d' ' -f3-) && die "index definition contains a backslash; rollback capture unsafe"
-  grep -c '^\\set ' "$out" | grep -qx 6 || die "rollback capture incomplete: $out"
+  grep -c '^\\set ' "$out" | grep -qx 7 || die "rollback capture incomplete: $out"
 }
 
 # Right after COMMIT (no writers): the baseline state of every object 0052-0054 introduced.
 capture_rollback_baseline() {
   local target="$1" vars="$2" line
   line="$({ echo "BEGIN;"; cat "$vars" "$HERE/rollback-baseline.sql"
-            echo "SELECT format('\\set rb_baseline %s', quote_literal(:'hr_rb_state')) WHERE :hr_rb_parts = 30;"; echo "ROLLBACK;"; } | psql_to "$target" -At)"
+            echo "SELECT format('\\set rb_baseline %s', quote_literal(:'hr_rb_state')) WHERE :hr_rb_parts = 31;"; echo "ROLLBACK;"; } | psql_to "$target" -At)"
   [[ "$line" =~ ^\\set\ rb_baseline\ \'[a-z_:=/\;0-9a-f]+\'$ ]] || die "rollback baseline capture failed"
   echo "$line" >> "$vars"
 }
@@ -263,13 +287,16 @@ verify_files() {
   ( cd "$REPO" && sha256sum --quiet -c "$HERE/files.sha256" ) || die "release files differ from the reviewed hashes in files.sha256"
   for f in expected-ledger.sql guards.sql report.sql hr-manager-access.sql data-checks.sql fingerprint-begin.sql fingerprint-end.sql \
            ledger-record.sql audit.sql validate.sql rollback-baseline.sql rollback-template.sql expected-missing.txt lineage.mjs \
+           recon-proposal.sql recon-report.sql recon-apply.sql reconciliation-approval.json \
            known-migration-versions.json ledger-attestations.json deployer-review.json; do
     [[ -s "$HERE/$f" ]] || die "missing $HERE/$f"
   done
 }
 
+# Everything that decides what apply does: scripts, SQL, reviewed decisions and the recovered evidence files.
 package_fingerprint() {
-  cat "$HERE/files.sha256" "$HERE"/*.sql "$HERE"/*.mjs "$HERE"/*.json "$HERE/expected-missing.txt" "${BASH_SOURCE[0]}" | sha256sum | cut -d' ' -f1
+  { cat "$HERE/files.sha256" "$HERE"/*.sql "$HERE"/*.mjs "$HERE"/*.json "$HERE/expected-missing.txt" "${BASH_SOURCE[0]}"
+    find "$HERE/evidence" -type f -print0 2>/dev/null | LC_ALL=C sort -z | xargs -0 -r cat; } | sha256sum | cut -d' ' -f1
 }
 
 host_checks() {
@@ -396,6 +423,13 @@ cmd_rehearse() {
   run_migration clone:hr_clone "$RUN_DIR/migration-clone.log" COMMIT || die "migration failed on the clone (see migration-clone.log); production unchanged"
   contract_check clone:hr_clone "$RUN_DIR/contract-clone-after.txt" || die "contract still incomplete on clone"
   run_validate_sql clone:hr_clone > "$RUN_DIR/validate-clone.txt"; grep -q '^HR_VALIDATION=PASS' "$RUN_DIR/validate-clone.txt" || die "post-commit validation failed on clone"
+  recon_proposal clone:hr_clone "$RUN_DIR/recon-after.tsv"
+  node "$HERE/lineage.mjs" recon-render --recon "$RUN_DIR/recon.tsv" --after "$RUN_DIR/recon-after.tsv" --out "$RUN_DIR" >&2
+  local vars after_jh after_rbac; vars="$(node "$HERE/lineage.mjs" psql-vars --repo "$REPO")"
+  after_jh="$(awk -F'\t' '$1=="SUMMARY"{print $2}' "$RUN_DIR/recon-after.tsv")"; after_rbac="$(awk -F'\t' '$1=="SUMMARY"{print $5}' "$RUN_DIR/recon-after.tsv")"
+  if grep -q 'recon_jh_enabled true' <<< "$vars" && [[ "$after_jh" != 0 ]]; then die "approved job-history rows remain un-inserted on the clone ($after_jh)"; fi
+  if grep -q 'recon_rbac_enabled true' <<< "$vars" && [[ "$after_rbac" != 0 ]]; then die "approved RBAC rows remain un-inserted on the clone ($after_rbac)"; fi
+  log "reconciliation before/after: RECONCILIATION_BEFORE_AFTER.md"
 
   log "4/8 compare with a from-scratch build of all 55 migrations"
   build_reference
@@ -441,6 +475,7 @@ RESULT=PASS
 TIMESTAMP=$(date -u +%s)
 PACKAGE_FINGERPRINT=$(package_fingerprint)
 LEDGER_FINGERPRINT=$(ledger_fingerprint_of "$prod_lineage")
+RECON_FINGERPRINTS=$(recon_fingerprints "$RUN_DIR/recon.tsv")
 HR_MANAGERS=$HR_MANAGERS
 DEPLOYER_SHA256=${DEPLOYER_SHA:-missing}
 BACKUP=$backup
@@ -477,6 +512,7 @@ cmd_apply() {
   production_gates
   (( LINEAGE_OK )) || lineage_stop
   grep -qx "LEDGER_FINGERPRINT=$(ledger_fingerprint_of "$LINEAGE_JSON")" "$r" || die "production's ledger changed since the rehearsal; rehearse again"
+  grep -qx "RECON_FINGERPRINTS=$(recon_fingerprints "$RUN_DIR/recon.tsv")" "$r" || die "the reconciliation proposal changed since the rehearsal; rehearse (and re-approve) again"
 
   trap 'restore_service' EXIT
   log "1/7 stopping $SVC (maintenance window starts)"

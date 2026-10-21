@@ -3,8 +3,9 @@
 -- (hr_managers, portal_session_activity, timesheets, payroll tables, ...), any non-default value in a new column
 -- (payroll_runs tracking fields, employees.working_business_unit_id, ...), any change to a seeded permission or
 -- deduction rule, or any change to the recorded ledger rows refuses the rollback: restore the verified backup instead
--- (RUNBOOK section 7). Existing (pre-package) ledger rows are never touched.
--- Variables (rollback-vars.sql, captured at apply): perm_max_id, dr_max_id, ledger_pre_max_id, orig_runs_idx,
+-- (RUNBOOK section 7). Existing (pre-package) ledger rows are never touched. The approved reconciliation rows
+-- (job history above hist_max_id, permissions above perm_max_id) are removed too, only while unchanged since apply.
+-- Variables (rollback-vars.sql, captured at apply): perm_max_id, dr_max_id, hist_max_id, ledger_pre_max_id, orig_runs_idx,
 -- orig_email_idx, wf_was_not_null, rb_baseline; plus attested_ledger_fp, expected_ledger, rollback_run_id.
 
 -- Guard 1: every new table, the seeded rows and the package ledger rows match the post-apply baseline.
@@ -66,6 +67,7 @@ DROP TABLE timesheets, timesheet_edit_permissions, timesheet_month_locks, payrol
   ALTER TABLE approval_workflow_runs ALTER COLUMN workflow_id SET NOT NULL;
 \endif
 DELETE FROM permissions WHERE id > :perm_max_id;
+DELETE FROM employee_job_history WHERE id > :hist_max_id;
 DELETE FROM deduction_rules WHERE id > :dr_max_id AND rule_type = 'absence' AND name_en IN ('Absence with notice','Absence without notice');
 -- Only the three rows this package recorded (id above the pre-apply maximum AND exactly a 0052-0054 hash/timestamp).
 WITH e(idx,tag,hash,created_at) AS :expected_ledger

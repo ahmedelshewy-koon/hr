@@ -1,7 +1,8 @@
 -- State of everything 0052-0054 introduced, as one string (:hr_rb_state). Captured right after COMMIT while HR is
 -- stopped (the baseline) and recomputed by rollback: any difference means data was written into the new objects
 -- (including hr_managers, portal_session_activity, user_permissions), a seeded row was changed, or the recorded
--- ledger rows changed - and the logical rollback is refused. Needs perm_max_id, dr_max_id, ledger_pre_max_id.
+-- ledger rows changed, or a reconciliation job-history row changed - and the logical rollback is refused.
+-- Needs perm_max_id, dr_max_id, hist_max_id, ledger_pre_max_id.
 -- Runs in a writable transaction (temp table); the caller ends it with ROLLBACK or uses it inside rollback.
 CREATE TEMP TABLE IF NOT EXISTS hr_rb_fp (name text PRIMARY KEY, val text NOT NULL);
 TRUNCATE hr_rb_fp;
@@ -14,6 +15,7 @@ FROM unnest(ARRAY['timesheets','timesheet_edit_permissions','timesheet_month_loc
  'user_permissions','portal_session_activity']) x
 WHERE to_regclass('public.' || x) IS NOT NULL ORDER BY x \gexec
 INSERT INTO hr_rb_fp SELECT 'seed:permissions', count(*) || '/' || md5(coalesce(string_agg(p::text, chr(10) ORDER BY p.id), '')) FROM permissions p WHERE p.id > :perm_max_id;
+INSERT INTO hr_rb_fp SELECT 'recon:employee_job_history', count(*) || '/' || md5(coalesce(string_agg(h::text, chr(10) ORDER BY h.id), '')) FROM employee_job_history h WHERE h.id > :hist_max_id;
 INSERT INTO hr_rb_fp SELECT 'seed:deduction_rules', count(*) || '/' || md5(coalesce(string_agg(d::text, chr(10) ORDER BY d.id), '')) FROM deduction_rules d WHERE d.id > :dr_max_id;
 INSERT INTO hr_rb_fp SELECT 'ledger:package', count(*) || '/' || md5(coalesce(string_agg(m.id || ':' || m.hash || ':' || m.created_at, ',' ORDER BY m.id), ''))
 FROM drizzle.__drizzle_migrations m WHERE m.id > :ledger_pre_max_id;

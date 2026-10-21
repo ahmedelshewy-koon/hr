@@ -1,10 +1,11 @@
 import type { TransactionDatabase } from '../../db/postgres';
 import { EMPLOYEE_MANAGER_SQL, requireEmployeeHr } from '../employees/hr-assignment.ts';
 import { advanceWorkflow, type ResolvedStep, type StepConfig, type WorkflowRun } from './workflow-policy.ts';
+import { payrollRegionChain } from './payroll-region.ts';
 type DB=TransactionDatabase;
 type Row=Record<string,unknown>;
 export type SourceType='employee_request'|'attendance_correction';
-export type Snapshot={workflowId:number;version:number;companyId:number;departmentId:number|null;employeeId:number;requestType:string;steps:ResolvedStep[]};
+export type Snapshot={workflowId:number|null;version:number;companyId:number;departmentId:number|null;employeeId:number;requestType:string;steps:ResolvedStep[]};
 export const isWorkflowStage=(stage:unknown)=>String(stage).startsWith('workflow:');
 export async function workflowsReady(db:DB){return Boolean((await db.prepare("SELECT to_regclass('public.approval_workflow_runs') AS name").first<{name:string|null}>())?.name);}
 export async function resolveWorkflow(db:DB,employeeId:number,requestType:string):Promise<Snapshot|null>{
@@ -12,11 +13,15 @@ export async function resolveWorkflow(db:DB,employeeId:number,requestType:string
   // The most specific active workflow wins: the employee's team, then section, then department, then the company-wide default.
   // An inactive unit workflow is skipped, so its employees fall back to the company workflow.
   const row=await db.prepare(`SELECT w.*,${EMPLOYEE_MANAGER_SQL} AS manager_id FROM employees e JOIN approval_workflows w ON w.company_id=e.company_id AND w.request_type=? AND w.active=true AND (w.department_id IS NULL OR w.department_id IN (e.team_id,e.section_id,e.department_id)) WHERE e.id=? ORDER BY CASE WHEN w.department_id IS NULL THEN 3 WHEN w.department_id=e.team_id THEN 0 WHEN w.department_id=e.section_id THEN 1 ELSE 2 END LIMIT 1 FOR SHARE OF e,w`).bind(requestType,employeeId).first<Row>();
-  if(!row)return null;
-  const config=JSON.parse(String(row.steps_json)) as StepConfig[],steps:ResolvedStep[]=[];
+  const regionChain=requestType==='attendance_correction'?null:await payrollRegionChain(db,employeeId);
+  if(!row&&regionChain===null)return null;
+  const context=row??await db.prepare(`SELECT e.company_id,e.department_id,${EMPLOYEE_MANAGER_SQL} AS manager_id FROM employees e WHERE e.id=?`).bind(employeeId).first<Row>();
+  if(!context?.company_id)throw new Response('A company assignment is required for the approval record',{status:409});
+  const config=row?JSON.parse(String(row.steps_json)) as StepConfig[]:[{kind:'manager'},{kind:'hr'}] as StepConfig[],steps:ResolvedStep[]=[];
   for(const step of config){
+    if(step.kind==='hr'&&regionChain?.length){for(const member of regionChain){if(steps.some(existing=>existing.userId===member.userId))continue;steps.push(member);}continue;}
     let userId=step.userId;
-    if(step.kind==='manager')userId=Number((await db.prepare("SELECT id FROM users WHERE employee_id=? AND status='active' ORDER BY id LIMIT 1").bind(row.manager_id).first<Row>())?.id);
+    if(step.kind==='manager')userId=Number((await db.prepare("SELECT id FROM users WHERE employee_id=? AND status='active' ORDER BY id LIMIT 1").bind(context.manager_id).first<Row>())?.id);
     if(step.kind==='hr')userId=await requireEmployeeHr(db,employeeId);
     const user=await db.prepare("SELECT u.id,u.employee_id,e.name_en,e.name_ar FROM users u JOIN employees e ON e.id=u.employee_id WHERE u.id=? AND u.status='active' AND e.employment_status IN ('active','probation','notice_period') FOR SHARE OF u,e").bind(userId||0).first<Row>();
     if(!user)throw new Response('أحد موافقي المسار غير متاح. راجع إعدادات الاعتمادات / An approver is unavailable',{status:409});
@@ -25,7 +30,7 @@ export async function resolveWorkflow(db:DB,employeeId:number,requestType:string
     steps.push({userId:Number(user.id),name:String(user.name_en||user.name_ar),nameAr:String(user.name_ar||user.name_en)});
   }
   if(!steps.length)throw new Response('مسار الاعتماد بلا مراحل / Empty approval workflow',{status:409});
-  return {workflowId:Number(row.id),version:Number(row.version),companyId:Number(row.company_id),departmentId:row.department_id==null?null:Number(row.department_id),employeeId,requestType,steps};
+  return {workflowId:row?Number(row.id):null,version:row?Number(row.version):0,companyId:Number(context.company_id),departmentId:context.department_id==null?null:Number(context.department_id),employeeId,requestType,steps};
 }
 export async function attachWorkflow(db:DB,sourceType:SourceType,sourceId:number,snapshot:Snapshot){
   await db.prepare("INSERT INTO approval_workflow_runs (source_type,source_id,employee_id,company_id,department_id,workflow_id,version,request_type,steps_json,current_user_id) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(sourceType,sourceId,snapshot.employeeId,snapshot.companyId,snapshot.departmentId??null,snapshot.workflowId,snapshot.version,snapshot.requestType,JSON.stringify(snapshot.steps),snapshot.steps[0].userId).run();

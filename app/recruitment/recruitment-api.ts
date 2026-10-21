@@ -2928,12 +2928,12 @@ async function convertHire(
                   .first<{ id: number }>()
               : ownerType === "employee"
                 ? await tx
-                    .prepare("SELECT id FROM users WHERE employee_id=?")
+                    .prepare("SELECT id FROM users WHERE employee_id=? AND status='active' ORDER BY id DESC LIMIT 1")
                     .bind(employee.id)
                     .first<{ id: number }>()
                 : ownerType === "manager"
                   ? await tx
-                      .prepare("SELECT u.id FROM users u WHERE u.employee_id=?")
+                      .prepare("SELECT u.id FROM users u WHERE u.employee_id=? AND u.status='active' ORDER BY u.id DESC LIMIT 1")
                       .bind(
                         number(offer.manager_employee_id) ||
                           number(offer.hiring_manager_employee_id),

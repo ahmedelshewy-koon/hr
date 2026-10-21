@@ -51,6 +51,9 @@ const worker = {
   },
   async scheduled(_controller:ScheduledController,_env:Env,ctx:ExecutionContext){
     ctx.waitUntil((async()=>{const [{createDatabase},{runScheduledAttendanceScan}]=await Promise.all([import("../db/postgres"),import("../app/attendance/scheduled-scan")]);const database=createDatabase();try{await runScheduledAttendanceScan(database,{timeZone:"Africa/Cairo"});}finally{await database.close();}})());
+    // Timesheet Management: nightly recalculation plus reminder and summary e-mails (mail needs MAIL_API_URL/KEY/FROM; skipped otherwise).
+    ctx.waitUntil((async()=>{const [{createDatabase},{runScheduledTimesheetJobs},{readMailConfig}]=await Promise.all([import("../db/postgres"),import("../app/timesheet/notify"),import("../app/timesheet/mail-config")]);const database=createDatabase();try{await runScheduledTimesheetJobs(database,readMailConfig());}catch{/* a missing timesheet migration must not break the attendance scan */}finally{await database.close();}})());
+    ctx.waitUntil((async()=>{const [{createDatabase},{escalateStaleRequests}]=await Promise.all([import("../db/postgres"),import("../app/approvals/request-escalation")]);const database=createDatabase();try{await escalateStaleRequests(database);}finally{await database.close();}})());
   },
 };
 

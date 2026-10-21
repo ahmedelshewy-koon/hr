@@ -10,7 +10,7 @@ import {
   Trash2, Unlock, Users, ScrollText, Wallet, X, UserRoundSearch, Workflow, Laptop, GraduationCap,
 } from "lucide-react";
 import { reportingOrder } from "./organization/reporting-line";
-import { BankExportLayoutDrawer, EmployeeDetailsDrawer, EmployeeDrawer, HolidayDrawer, HolidayPostponeDrawer, InsuranceRateDrawer, LoanDrawer, OrganizationEntityDrawer, PayrollRunDrawer, SalaryStructureDrawer, TaxBracketDrawer } from "./employee-drawer";
+import { EmployeeDetailsDrawer, EmployeeDrawer, HolidayDrawer, HolidayPostponeDrawer, OrganizationEntityDrawer } from "./employee-drawer";
 import { localizedDisplayValue, localizedJobTitle } from "./localization";
 import { localizeApiMessage } from "./api-messages";
 import { PAGE_LABELS, pageLabel, resolveNotificationDestination, type PageId } from "./navigation-labels";
@@ -27,7 +27,6 @@ import { resolvedContractEndDate } from "./employees/contract-policy";
 import { scheduledDailyMinutes } from "./employees/schedule-policy";
 import { currentHolidayRows } from "./leave/holiday-calendar";
 import { HolidayActionsMenu } from "./holiday-actions-menu";
-import { AttendanceWorkspace } from "./attendance-workspace";
 import { AssetsWorkspace } from "./assets-workspace";
 import { RecruitmentWorkspace } from "./recruitment-workspace";
 import { LifecycleWorkspace } from "./lifecycle-workspace";
@@ -42,6 +41,9 @@ import "./org-chart.css";
 import "./login.css";
 import "./leave-types.css";
 import "./payroll.css";
+import { PayrollWorkspace } from "./payroll-workspace";
+import { payrollExcel } from "./payroll/export";
+import { employeePayrollCountry } from "./payroll/country";
 import "./employee-portal.css";
 import "./attendance.css";
 import "./approvals-center.css";
@@ -131,6 +133,7 @@ import { DecisionPrompt, DecisionsPage } from "./decisions-page";
 import { ApprovalWorkflowSettings } from './approval-workflow-settings';
 import { BlueprintWorkspace } from './blueprint-workspace';
 import { CostCentersWorkspace } from './cost-centers-workspace';
+import { AttendanceHub } from './attendance-hub';
 import { PlansWorkspace } from './plans-workspace';
 import { IntegrationsWorkspace } from './integrations-workspace';
 import { useOrganizationAccess } from './settings/use-organization-snapshot';
@@ -153,6 +156,8 @@ type HRData = {
   salaryStructures: Row[]; salaryAllowances: Row[]; payrollRuns: Row[];
   payrollItems: Row[]; payrollAllowanceLines: Row[]; loansAdvances: Row[];
   taxBrackets: Row[]; insuranceRates: Row[]; canManagePayroll?: boolean;
+  businessUnits?:Row[];costCenters?:Row[];businessUnitCostCenterMappings?:Row[];payrollCurrencies?:Row[];canViewBasicSalary?:boolean;
+  attendanceTypes?:Row[];
   currentUser?: Row;
   allowedPages?:Page[];
 };
@@ -244,13 +249,13 @@ function downloadCsv(filename: string, columns: { field: string; header: string 
   const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
 }
 
-export function HRApp() {
+export function HRApp({ initialPage }: { initialPage?: PageId } = {}) {
   const [authState,setAuthState]=useState<"checking"|"signed_in"|"signed_out">("checking");
   const [authUser,setAuthUser]=useState<AuthUser|null>(null);
   // Signed-out visitors see the public landing page; the "#login" hash opens the sign-in screen.
   const [preLogin,setPreLogin]=useState<"landing"|"login">("landing");
   const [lang, setLang] = useState<Lang>("ar");
-  const [page, setPage] = useState<Page>("dashboard");
+  const [page, setPage] = useState<Page>(initialPage ?? "dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -279,6 +284,10 @@ export function HRApp() {
     document.documentElement.lang = lang;
     document.documentElement.dir = rtl ? "rtl" : "ltr";
   }, [lang, rtl]);
+  // /timesheet-management belongs to the Attendance page (Timesheet tab); leaving Attendance returns to the root path.
+  useEffect(()=>{
+    if(page!=="attendance"&&window.location.pathname==="/timesheet-management")window.history.replaceState(null,"",`/${window.location.search}${window.location.hash}`);
+  },[page]);
   useEffect(()=>{
     const sync=()=>{const next=window.location.hash===LOGIN_HASH?"login":"landing";setPreLogin(next);if(next==="login")window.scrollTo(0,0);};
     sync();
@@ -318,7 +327,7 @@ export function HRApp() {
   const logout=async()=>{try{const response=await fetch("/api/auth",{method:"DELETE"});if(!response.ok)throw new Error(rtl?"تعذر تسجيل الخروج. حاول مرة أخرى.":"Unable to sign out. Please try again.");setAuthUser(null);setAuthState("signed_out");setMobileOpen(false);setNotificationsOpen(false);setRequestOpen(false);setFocusEmployeeId(null);}catch{setToast(rtl?"تعذر تسجيل الخروج. تحقق من الاتصال وحاول مرة أخرى.":"Unable to sign out. Check your connection and try again.");window.setTimeout(()=>setToast(""),4000);}};
   if(authState==="checking") return <div className="auth-loading"><div><Activity size={20}/><span>جارٍ التحقق من تسجيل الدخول...</span></div></div>;
   if(authState==="signed_out"&&preLogin==="landing") return <LandingPage/>;
-  if(authState==="signed_out") return <LoginPage onSuccess={user=>{if(window.location.hash===LOGIN_HASH)window.history.replaceState(null,"",window.location.pathname+window.location.search);setAuthUser(user);setPage((user.allowed_pages?.[0] as Page)||(user.role_name==="Employee"?"portal":"dashboard"));setAuthState("signed_in");}}/>;
+  if(authState==="signed_out") return <LoginPage onSuccess={user=>{if(window.location.hash===LOGIN_HASH)window.history.replaceState(null,"",window.location.pathname+window.location.search);setAuthUser(user);setPage(initialPage&&user.allowed_pages?.includes(initialPage)?initialPage:(user.allowed_pages?.[0] as Page)||(user.role_name==="Employee"?"portal":"dashboard"));setAuthState("signed_in");}}/>;
 
   const role=roleIdFromName(authUser?.role_name);
   const rolePages:Record<RoleId,Page[]>={
@@ -417,7 +426,7 @@ export function HRApp() {
           {visiblePage === "approvals" && <ApprovalsCenter rtl={rtl} notify={notify} />}
           {visiblePage === "employees" && <EmployeesPage key={focusEmployeeId??"list"} rtl={rtl} notify={notify} initialEmployeeId={focusEmployeeId??undefined} />}
           {visiblePage === "leave" && <LeavePage rtl={rtl} notify={notify} />}
-          {visiblePage === "attendance" && <AttendanceWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "attendance" && <AttendanceHub rtl={rtl} notify={notify} canTimesheet={["Super Admin","HR Manager"].includes(String(authUser?.role_name))} />}
           {visiblePage === "recruitment" && <RecruitmentWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "lifecycle" && <LifecycleWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "assets" && <AssetsWorkspace rtl={rtl} notify={notify} />}
@@ -427,7 +436,7 @@ export function HRApp() {
           {visiblePage === "decisions" && <DecisionsPage rtl={rtl} notify={notify} />}
           {visiblePage === "users" && <UsersPage rtl={rtl} notify={notify} />}
           {visiblePage === "reports" && <ReportsWorkspace rtl={rtl} notify={notify}/>}
-          {visiblePage === "payroll" && <PayrollPage rtl={rtl} notify={notify} />}
+          {visiblePage === "payroll" && <PayrollWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "cost_centers" && <CostCentersWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "plans" && <PlansWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "integrations" && <IntegrationsWorkspace rtl={rtl} notify={notify} />}
@@ -592,16 +601,18 @@ function EmployeesPage({rtl,notify,initialEmployeeId}:{rtl:boolean;notify:(s:str
   const isOrganizationTab=hasOrganizationTabs&&ORGANIZATION_SECTIONS.some(item=>item.id!=="hr"&&item.id===tab);
   const manageDepartments=()=>{if(hasOrganizationTabs)setTab("departments");else notify(rtl?"إدارة الإدارات متاحة لمسؤول مخول":"Department management requires an authorized administrator");};
   const [locationFilter,setLocationFilter]=useState<string|null>(null);
+  const [payrollCountryFilter,setPayrollCountryFilter]=useState("");
   const [departmentFilter,setDepartmentFilter]=useState<Row|null>(null);
   const locationCounts=workCountryCounts(data?.employees??[]), activeLocation=locationCounts.some(item=>item.country===locationFilter)?locationFilter:null;
-  const shownEmployees=(data?.employees??[]).filter(row=>(!activeLocation||workCountry(row)===activeLocation)&&(!departmentFilter||Number(row.department_id)===Number(departmentFilter.id))&&matchesQuery(row,["name_en","name_ar","employee_code","legacy_employee_code","work_email","department_name","job_title_name","work_location","country"],filter.needle));
+  const shownEmployees=(data?.employees??[]).filter(row=>(!activeLocation||workCountry(row)===activeLocation)&&(!payrollCountryFilter||employeePayrollCountry(row)===payrollCountryFilter)&&(!departmentFilter||Number(row.department_id)===Number(departmentFilter.id))&&matchesQuery(row,["name_en","name_ar","employee_code","legacy_employee_code","work_email","department_name","job_title_name","work_location","country"],filter.needle));
   const shownJobTitles=(data?.jobTitles??[]).filter(row=>matchesQuery(row,["name_en","name_ar","department_name"],filter.needle));
   const shownDepartments=(data?.departments??[]).filter(row=>matchesQuery(row,["name_en","name_ar","manager_name","manager_name_ar","manager_code"],filter.needle));
   const shownCount=tab==="employees"?shownEmployees.length:tab==="jobs"?shownJobTitles.length:shownDepartments.length;
+  const exportEmployees=()=>{if(!data)return;const currentYear=new Date().getUTCFullYear();const records=shownEmployees.filter(row=>row.employment_status!=="terminated").map(row=>{const balances=data.leaveBalances.filter(balance=>Number(balance.employee_id)===Number(row.id)&&Number(balance.year)===currentYear);const vacationBalance=balances.length?balances.reduce((sum,balance)=>sum+Number(balance.available??(Number(balance.entitlement)-Number(balance.used)-Number(balance.pending))),0):data.employeeLeaveTypes.filter(item=>Number(item.employee_id)===Number(row.id)).reduce((sum,item)=>sum+Number(data.leaveTypes.find(type=>Number(type.id)===Number(item.leave_type_id))?.default_days||0),0);const unit=data.businessUnits?.find(item=>Number(item.id)===Number(row.working_business_unit_id)),center=data.costCenters?.find(item=>Number(item.id)===Number(row.cost_center_id)),attendanceType=data.attendanceTypes?.find(item=>Number(item.id)===Number(row.attendance_type_id));return {employee_code:row.employee_code,name_en:row.name_en,name_ar:row.name_ar,company:row.company_name,attendance_type:attendanceType?.name_en||"",working_business_unit:unit?.unit_name||"",cost_center:center?.name_en||"",payroll_country:row.salary_country||"",salary_currency:row.salary_currency||"",vacation_balance:vacationBalance,...(data.canViewBasicSalary?{basic_salary:row.salary}:{} )};});const blob=new Blob(["\ufeff",payrollExcel(records,"employees")],{type:"application/vnd.ms-excel;charset=utf-8"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`employees-${currentYear}.xls`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   const total=data?.employees.length??0, active=data?.employees.filter(e=>e.employment_status==="active").length??0;
   const canDeleteEmployee=data?.currentUser?.role_name==="Super Admin"||(data?.permissions??[]).some(permission=>Number(permission.role_id)===Number(data?.currentUser?.role_id)&&permission.module==="employees"&&permission.action==="delete"&&Number(permission.allowed)===1);
-  const deleteEmployee=async(employee:Row)=>{const name=rtl?(employee.name_ar||employee.name_en):(employee.name_en||employee.name_ar);if(!window.confirm(rtl?`هل تريد حذف الموظف «${name}»؟ سيتم تعطيل حسابه مع الاحتفاظ بسجلاته السابقة.`:`Delete “${name}”? Their account will be disabled while historical records are retained.`))return;try{await hrApi({action:"delete_employee",employeeId:employee.id});if(Number(selected?.row.id)===Number(employee.id))setSelected(null);await reload();notify(rtl?"تم حذف الموظف وتعطيل حسابه":"Employee deleted and account disabled");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر حذف الموظف":"Unable to delete employee"));}};
-  const employeeTabs=[{id:"employees",label:rtl?"الموظفون":"Employees"},...(hasOrganizationTabs?ORGANIZATION_SECTIONS.filter(item=>item.id!=="hr").map(item=>({id:item.id,label:rtl?item.ar:item.en,icon:item.icon})):[]),{id:"jobs",label:rtl?"المسميات الوظيفية":"Job titles"},...(!hasOrganizationTabs?[{id:"departments",label:rtl?"الأقسام":"Departments"}]:[])];const action=tab==="employees"?<div className="employee-header-actions"><div className="employee-view-switch" role="group" aria-label={rtl?"طريقة عرض الموظفين":"Employee view mode"}><button className={employeeView==="cards"?"active":""} onClick={()=>setEmployeeView("cards")} aria-label={rtl?"عرض كروت":"Card view"} title={rtl?"عرض كروت":"Card view"}><LayoutGrid size={17}/></button><button className={employeeView==="rows"?"active":""} onClick={()=>setEmployeeView("rows")} aria-label={rtl?"عرض صفوف":"Row view"} title={rtl?"عرض صفوف":"Row view"}><List size={18}/></button></div><button className="primary" onClick={()=>setOpen(true)}><Plus size={16}/>{rtl?"إضافة موظف":"Add employee"}</button></div>:tab==="jobs"?<button className="primary" onClick={()=>setEntityEditor({kind:"job_title"})}><Plus size={16}/>{rtl?"إضافة مسمى":"Add job title"}</button>:data?.organization?<button className="primary" disabled={!orgAccess.canView} title={orgAccess.canView?undefined:(rtl?"إدارة الإدارات تتطلب صلاحية":"Department management requires permission")} onClick={manageDepartments}><Network size={16}/>{rtl?"إدارة الإدارات":"Manage departments"}</button>:<button className="primary" onClick={()=>setEntityEditor({kind:"department"})}><Plus size={16}/>{rtl?"إضافة قسم":"Add department"}</button>;
+  const deleteEmployee=async(employee:Row)=>{const name=rtl?(employee.name_ar||employee.name_en):(employee.name_en||employee.name_ar);if(!window.confirm(rtl?`هل تريد حذف الموظف «${name}» وحساب دخوله المرتبط؟ ستبقى السجلات السابقة.`:`Delete “${name}” and their linked login account? Historical records will remain.`))return;try{await hrApi({action:"delete_employee",employeeId:employee.id});if(Number(selected?.row.id)===Number(employee.id))setSelected(null);await reload();notify(rtl?"تم حذف الموظف وحساب دخوله":"Employee and linked account deleted");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر حذف الموظف":"Unable to delete employee"));}};
+  const employeeTabs=[{id:"employees",label:rtl?"الموظفون":"Employees"},...(hasOrganizationTabs?ORGANIZATION_SECTIONS.filter(item=>item.id!=="hr").map(item=>({id:item.id,label:rtl?item.ar:item.en,icon:item.icon})):[]),{id:"jobs",label:rtl?"المسميات الوظيفية":"Job titles"},...(!hasOrganizationTabs?[{id:"departments",label:rtl?"الأقسام":"Departments"}]:[])];const action=tab==="employees"?<div className="employee-header-actions"><div className="employee-view-switch" role="group" aria-label={rtl?"طريقة عرض الموظفين":"Employee view mode"}><button className={employeeView==="cards"?"active":""} onClick={()=>setEmployeeView("cards")} aria-label={rtl?"عرض كروت":"Card view"} title={rtl?"عرض كروت":"Card view"}><LayoutGrid size={17}/></button><button className={employeeView==="rows"?"active":""} onClick={()=>setEmployeeView("rows")} aria-label={rtl?"عرض صفوف":"Row view"} title={rtl?"عرض صفوف":"Row view"}><List size={18}/></button></div><button className="outline" onClick={exportEmployees}><Download size={16}/>{rtl?"تصدير Excel":"Export Excel"}</button><button className="primary" onClick={()=>setOpen(true)}><Plus size={16}/>{rtl?"إضافة موظف":"Add employee"}</button></div>:tab==="jobs"?<button className="primary" onClick={()=>setEntityEditor({kind:"job_title"})}><Plus size={16}/>{rtl?"إضافة مسمى":"Add job title"}</button>:data?.organization?<button className="primary" disabled={!orgAccess.canView} title={orgAccess.canView?undefined:(rtl?"إدارة الإدارات تتطلب صلاحية":"Department management requires permission")} onClick={manageDepartments}><Network size={16}/>{rtl?"إدارة الإدارات":"Manage departments"}</button>:<button className="primary" onClick={()=>setEntityEditor({kind:"department"})}><Plus size={16}/>{rtl?"إضافة قسم":"Add department"}</button>;
   // Opening a profile replaces the directory inside the page (the sidebar stays beside it); editing still uses the drawer.
   const profileEmployeeId=selected&&!selected.edit?Number(selected.row.id):(!selected&&deepLinkedEmployeeId?deepLinkedEmployeeId:null);
   // Editing uses the same page layout as the profile view; back, cancel and save return to where the edit was opened (the profile or the list).
@@ -612,6 +623,7 @@ function EmployeesPage({rtl,notify,initialEmployeeId}:{rtl:boolean;notify:(s:str
   <section className="mini-stats"><div><Users/><span><b>{total?formatNumber(total,rtl):"—"}</b>{rtl?"إجمالي الموظفين":"Total employees"}</span></div><div><CheckCircle2/><span><b>{active?formatNumber(active,rtl):"—"}</b>{rtl?"الموظفون النشطون":"Active employees"}</span></div><div className="location-stat"><Globe2/><span><small className="location-title">{rtl?"الموظفون حسب مقر العمل":"Employees by work location"}{activeLocation&&<button type="button" className="location-clear" onClick={()=>setLocationFilter(null)}>{rtl?"عرض الكل":"Show all"}</button>}</small>{locationCounts.length?<ul>{locationCounts.map(item=>{const name=countryName(item.country,rtl),selectedLocation=activeLocation===item.country;return <li key={item.country}><button type="button" className={selectedLocation?"active":""} aria-pressed={selectedLocation} title={rtl?`عرض موظفي ${name} (${formatNumber(item.count,rtl)})`:`Show ${name} employees (${item.count})`} onClick={()=>{setTab("employees");setLocationFilter(selectedLocation?null:item.country);}}><img src={`/flags/${item.code.toLowerCase()}.svg`} alt="" aria-hidden="true"/><em>{name}</em><strong>{formatNumber(item.count,rtl)}</strong></button></li>;})}</ul>:<b>—</b>}</span></div></section>
   {tab==="employees"&&departmentFilter&&<div className="employee-header-actions"><button className="outline" onClick={()=>setDepartmentFilter(null)} aria-label={rtl?"إلغاء تصفية القسم":"Clear department filter"}>{rtl?(departmentFilter.name_ar||departmentFilter.name_en):departmentFilter.name_en}<X size={16}/></button></div>}
   <div className="employee-workspace-nav"><SettingsSubnav level="primary" rtl={rtl} label={rtl?"أقسام الموظفين":"Employee sections"} items={employeeTabs} active={tab} onChange={setTab}/></div>
+  {tab==="employees"&&<div className="employee-header-actions"><label>{rtl?"دولة الرواتب":"Payroll country"} <select value={payrollCountryFilter} onChange={event=>setPayrollCountryFilter(event.target.value)}><option value="">{rtl?"كل الدول":"All countries"}</option><option value="Egypt">{rtl?"مصر":"Egypt"}</option><option value="KSA">{rtl?"السعودية":"KSA"}</option></select></label></div>}
   {isOrganizationTab&&data&&<div className="employee-organization-panel"><OrganizationSettings activeSection={tab} onSectionChange={setTab} rtl={rtl} access={orgAccess} employees={data.employees} hrResponsibles={data.hrResponsibles||[]} hrCandidates={data.hrCandidates||[]} notify={notify} onSaveJobTitle={async payload=>{await hrApi({action:"save_job_title",...payload});}} onSaveHrResponsible={async payload=>{await hrApi(payload);}} onChanged={()=>{window.dispatchEvent(new Event("hr-data-changed"));}}/></div>}
   {!isOrganizationTab&&<div className="panel table-panel employee-directory-panel"><FilterBar rtl={rtl} query={filter.query} setQuery={filter.setQuery} count={shownCount} placeholder={tab==="employees"?(rtl?"ابحث بالاسم أو الرقم الوظيفي أو البريد...":"Search by name, code or email..."):tab==="jobs"?(rtl?"ابحث بالمسمى الوظيفي...":"Search job titles..."):(rtl?"ابحث باسم القسم أو مديره...":"Search departments or managers...")} end={action}/><div className="employee-directory-scroll">{tab==="employees"?(employeeView==="cards"?<EmployeeCardGrid rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} canDelete={canDeleteEmployee} onDelete={deleteEmployee} onOpen={(row,edit)=>setSelected({row,edit})}/>:<EmployeeRowList onOpenProfile={data?.organization?row=>setSelected({row,edit:true}):undefined} rtl={rtl} rows={shownEmployees} departments={data?.departments} jobTitles={data?.jobTitles} onSave={async form=>{await hrApi({action:"update_employee",...form});await reload();notify(rtl?"تم حفظ التعديل وتحديث كارت الموظف":"Employee row and card updated");}}/>):tab==="jobs"?<JobTitleTable rtl={rtl} rows={shownJobTitles} departments={data?.departments} onEdit={record=>setEntityEditor({kind:"job_title",record})}/>:<DepartmentGrid rtl={rtl} rows={shownDepartments} onOpen={department=>{setDepartmentFilter(department);setLocationFilter(null);filter.setQuery("");setTab("employees");}} jobs={data?.jobTitles} employees={data?.employees} reload={reload} notify={notify} onEdit={record=>data?.organization?manageDepartments():setEntityEditor({kind:"department",record})}/>}</div></div>}
   {open&&<EmployeeDrawer rtl={rtl} data={data} close={()=>setOpen(false)} submit={async(form)=>{await hrApi({action:"create_employee",...form});setOpen(false);await reload();notify(rtl?"تم إنشاء الموظف وحساب المستخدم بنجاح":"Employee and user account created successfully");}}/>}
@@ -944,17 +956,24 @@ function UsersPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
   const candidates=(data?.employees??[]).filter(row=>row.work_email&&!accountEmployeeIds.has(Number(row.id))&&["active","probation","notice_period"].includes(String(row.employment_status)));
   const roles=(data?.roles??[]).filter(role=>isSuper||(Number(role.is_system)===1&&["Department Manager","Employee"].includes(String(role.name)))),defaultRoleId=String(roles.find(role=>role.name==="Employee")?.id||roles[0]?.id||""),selectedRoleId=newRoleId||defaultRoleId;
   const create=async()=>{if(!employeeId||!selectedRoleId)return;try{setCreating(true);await hrApi({action:"create_user",employeeId:Number(employeeId),roleId:Number(selectedRoleId)});setEmployeeId("");setNewRoleId("");await reload();notify(rtl?"تم إنشاء الحساب. كلمة المرور الافتراضية 123456":"Account created. The default password is 123456");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر إنشاء الحساب":"Unable to create account"));}finally{setCreating(false);}};
-  return <><PageHeader eyebrow={rtl?"إدارة الوصول":"ACCESS CONTROL"} title={pageLabel("users",rtl)} text={rtl?"أنشئ حسابات الدخول وحدد الأدوار وأعد كلمات المرور من مكان واحد.":"Create login accounts, assign roles, and reset passwords in one place."}/>{error&&<div className="error-banner">{error}</div>}{isSuper&&<Tabs items={[{id:"users",label:rtl?"المستخدمون":"Users"},{id:"roles",label:rtl?"الأدوار والصلاحيات":"Roles & permissions"}]} active={tab} setActive={setTab}/>} {tab==="users"?<><section className="panel user-account-create"><div><b>{rtl?"إنشاء حساب لموظف":"Create an employee account"}</b><small>{rtl?"يظهر هنا الموظفون الذين لديهم بريد وظيفي وليس لديهم حساب دخول.":"Employees with a work email and no login account appear here."}</small></div><label><span>{rtl?"الموظف":"Employee"}</span><select value={employeeId} onChange={event=>setEmployeeId(event.target.value)}><option value="">{rtl?"اختر موظفًا":"Select an employee"}</option>{candidates.map(row=><option key={row.id} value={row.id}>{rtl?(row.name_ar||row.name_en):row.name_en} — {row.work_email}</option>)}</select></label><label><span>{rtl?"دور المستخدم":"Access role"}</span><select value={selectedRoleId} onChange={event=>setNewRoleId(event.target.value)}>{roles.map(role=><option key={role.id} value={role.id}>{roleLabel(role,rtl)}</option>)}</select></label><button className="primary" disabled={!employeeId||!selectedRoleId||creating} onClick={()=>void create()}><Plus size={16}/>{creating?(rtl?"جارٍ الإنشاء...":"Creating..."):(rtl?"إنشاء الحساب":"Create account")}</button><em>{rtl?"كلمة المرور الافتراضية: 123456 — سيُطلب تغييرها عند أول دخول":"Default password: 123456 — change is required on first login"}</em></section><div className="panel table-panel"><FilterBar rtl={rtl} query={filter.query} setQuery={filter.setQuery} placeholder={rtl?"ابحث بالبريد أو الاسم أو الدور...":"Search by email, name or role..."}/><UserAccessCards rtl={rtl} rows={shownUsers} roles={roles} currentRole={currentRole} reload={reload} notify={notify}/></div></>:isSuper?<PermissionEditor rtl={rtl} notify={notify} data={data} reload={reload}/>:null}</>;
+  return <><PageHeader eyebrow={rtl?"إدارة الوصول":"ACCESS CONTROL"} title={pageLabel("users",rtl)} text={rtl?"أنشئ حسابات الدخول وحدد الأدوار وأعد كلمات المرور من مكان واحد.":"Create login accounts, assign roles, and reset passwords in one place."}/>{error&&<div className="error-banner">{error}</div>}{isSuper&&<Tabs items={[{id:"users",label:rtl?"المستخدمون":"Users"},{id:"roles",label:rtl?"الأدوار والصلاحيات":"Roles & permissions"}]} active={tab} setActive={setTab}/>} {tab==="users"?<><section className="panel user-account-create"><div><b>{rtl?"إنشاء حساب لموظف":"Create an employee account"}</b><small>{rtl?"يظهر هنا الموظفون الذين لديهم بريد وظيفي وليس لديهم حساب دخول.":"Employees with a work email and no login account appear here."}</small></div><label><span>{rtl?"الموظف":"Employee"}</span><select value={employeeId} onChange={event=>setEmployeeId(event.target.value)}><option value="">{rtl?"اختر موظفًا":"Select an employee"}</option>{candidates.map(row=><option key={row.id} value={row.id}>{rtl?(row.name_ar||row.name_en):row.name_en} — {row.work_email}</option>)}</select></label><label><span>{rtl?"دور المستخدم":"Access role"}</span><select value={selectedRoleId} onChange={event=>setNewRoleId(event.target.value)}>{roles.map(role=><option key={role.id} value={role.id}>{roleLabel(role,rtl)}</option>)}</select></label><button className="primary" disabled={!employeeId||!selectedRoleId||creating} onClick={()=>void create()}><Plus size={16}/>{creating?(rtl?"جارٍ الإنشاء...":"Creating..."):(rtl?"إنشاء الحساب":"Create account")}</button><em>{rtl?"كلمة المرور الافتراضية: 123456 — سيُطلب تغييرها عند أول دخول":"Default password: 123456 — change is required on first login"}</em></section><div className="panel table-panel"><FilterBar rtl={rtl} query={filter.query} setQuery={filter.setQuery} placeholder={rtl?"ابحث بالبريد أو الاسم أو الدور...":"Search by email, name or role..."}/><UserAccessCards rtl={rtl} rows={shownUsers} roles={roles} currentRole={currentRole} currentUserId={Number(data?.currentUser?.id)||0} reload={reload} notify={notify}/></div></>:isSuper?<PermissionEditor rtl={rtl} notify={notify} data={data} reload={reload}/>:null}</>;
 }
 
-function UserAccessCards({rtl,rows,roles,currentRole,reload,notify}:{rtl:boolean;rows:Row[];roles:Row[];currentRole:string;reload:()=>Promise<void>;notify:(message:string)=>void}){
-  const [editingId,setEditingId]=useState<number|null>(null);
+function UserAccessCards({rtl,rows,roles,currentRole,currentUserId,reload,notify}:{rtl:boolean;rows:Row[];roles:Row[];currentRole:string;currentUserId:number;reload:()=>Promise<void>;notify:(message:string)=>void}){
+  const [editingId,setEditingId]=useState<number|null>(null),[deletingId,setDeletingId]=useState<number|null>(null);
+  const deleteAccount=async(row:Row)=>{
+    const label=String(row.employee_name||row.email);
+    if(!window.confirm(rtl?`حذف حساب «${label}»؟ سيتوقف دخوله فورًا، وسيبقى الموظف وسجلاته السابقة.`:`Delete the login account for “${label}”? Access will end immediately; the employee and historical records will remain.`))return;
+    try{setDeletingId(Number(row.id));await hrApi({action:"delete_user",userId:row.id});await reload();notify(rtl?"تم حذف حساب المستخدم":"User account deleted");}
+    catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر حذف المستخدم":"Unable to delete user"));}
+    finally{setDeletingId(null);}
+  };
   // تسمية البحث القديمة لهذا الإجراء: ريست إلى 123456.
   const save=async(row:Row,changes:Record<string,unknown>)=>{try{await hrApi({action:"save_user",userId:row.id,roleId:changes.roleId??row.role_id,status:changes.status??row.status,...changes});await reload();notify(rtl?"تم تحديث صلاحيات الحساب":"User access updated");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر تحديث الحساب":"Unable to update user"));}};
   const reset=async(row:Row)=>{if(!window.confirm(rtl?"إعادة كلمة المرور إلى 123456؟ سيُطلب من المستخدم تغييرها عند الدخول.":"Reset the password to 123456? The user must change it at sign-in."))return;try{await hrApi({action:"save_user",userId:row.id,roleId:row.role_id,status:row.status,temporaryPassword:"123456"});await reload();notify(rtl?"تمت إعادة كلمة المرور إلى 123456":"Password reset to 123456");}catch(reason){notify(reason instanceof Error?reason.message:(rtl?"تعذر إعادة كلمة المرور":"Unable to reset password"));}};
   if(!rows.length)return <Empty icon={ShieldCheck} title={rtl?"لا توجد حسابات دخول":"No login accounts"} text={rtl?"أنشئ حسابًا لموظف لديه بريد وظيفي من النموذج بالأعلى.":"Create an account for an employee with a work email above."}/>;
   return <div className="user-access-grid">{rows.map(row=>{
-    const protectedAccount=currentRole!=="Super Admin"&&["Super Admin","HR Manager"].includes(String(row.role_name));
+    const protectedAccount=Number(row.id)===currentUserId||(currentRole!=="Super Admin"&&!["Employee","Department Manager"].includes(String(row.role_name)));
     const name=rtl?(row.employee_name_ar||row.employee_name||row.email):(row.employee_name||row.email);
     const role=roles.find(item=>Number(item.id)===Number(row.role_id))||row;
     const editing=editingId===Number(row.id);
@@ -969,6 +988,7 @@ function UserAccessCards({rtl,rows,roles,currentRole,reload,notify}:{rtl:boolean
       <span className={`user-card-status ${row.status==="active"?"active":"disabled"}`}>{row.status==="active"?(rtl?"نشط":"Active"):(rtl?"موقوف":"Disabled")}</span>
       </div>
       <div className="user-card-actions">
+        <button type="button" title={rtl?"حذف المستخدم":"Delete user"} aria-label={rtl?"حذف المستخدم":"Delete user"} disabled={protectedAccount||deletingId===Number(row.id)} onClick={()=>void deleteAccount(row)}><Trash2 size={17}/></button>
         <button type="button" title={rtl?"إعادة تعيين كلمة المرور":"Reset password"} aria-label={rtl?"إعادة تعيين كلمة المرور":"Reset password"} disabled={protectedAccount} onClick={()=>void reset(row)}><KeyRound size={17}/></button>
         <button type="button" title={rtl?"تعديل الدور والحالة":"Edit role and status"} aria-label={rtl?"تعديل الدور والحالة":"Edit role and status"} aria-expanded={editing} aria-controls={`user-access-edit-${row.id}`} disabled={protectedAccount} onClick={()=>setEditingId(editing?null:Number(row.id))}><Pencil size={17}/></button>
       </div>
@@ -979,146 +999,6 @@ function UserAccessCards({rtl,rows,roles,currentRole,reload,notify}:{rtl:boolean
       </div>}
     </article>;
   })}</div>;
-}
-
-function PayrollPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
-  const [tab,setTab]=useState("runs");
-  const [runDrawerOpen,setRunDrawerOpen]=useState(false);
-  const [structureDrawerOpen,setStructureDrawerOpen]=useState(false);
-  const [loanDrawerOpen,setLoanDrawerOpen]=useState(false);
-  const [taxEditor,setTaxEditor]=useState<Row|null|undefined>(undefined);
-  const [insuranceEditor,setInsuranceEditor]=useState<Row|null|undefined>(undefined);
-  const [bankExportOpen,setBankExportOpen]=useState(false);
-  const [selectedRun,setSelectedRun]=useState<Row|null>(null);
-  const {data,error,reload}=useHRData(rtl);
-  const canManage=Boolean(data?.canManagePayroll);
-  const hasPermission=(action:string)=>data?.currentUser?.role_name==="Super Admin"||(data?.permissions??[]).some(p=>Number(p.role_id)===Number(data?.currentUser?.role_id)&&p.module==="payroll"&&p.action===action&&Number(p.allowed)===1);
-  const canApprove=hasPermission("approve"), canLock=hasPermission("lock"), canReopen=hasPermission("reopen");
-  const runs=(data?.payrollRuns??[]).slice().sort((a,b)=>Number(b.year)-Number(a.year)||Number(b.month)-Number(a.month));
-  const employees=(data?.employees??[]).filter(e=>e.employment_status!=="deleted");
-  const bankLayout=parseSetting(data?.settings?.find(s=>s.setting_key==="payroll_bank_export")) as {columns?:{field:string;header:string}[]};
-
-  const action=tab==="runs"?<button className="primary" onClick={()=>setRunDrawerOpen(true)}><Plus size={16}/>{rtl?"دورة رواتب جديدة":"New payroll run"}</button>
-    :tab==="structures"?<button className="primary" onClick={()=>setStructureDrawerOpen(true)}><Plus size={16}/>{rtl?"إضافة هيكل راتب":"Add salary structure"}</button>
-    :tab==="loans"?<button className="primary" onClick={()=>setLoanDrawerOpen(true)}><Plus size={16}/>{rtl?"إضافة سلفة":"Add loan"}</button>
-    :undefined;
-
-  return <>
-    <PageHeader eyebrow={rtl?"الرواتب والمزايا":"PAYROLL & BENEFITS"} title={rtl?"الرواتب":"Payroll"} text={rtl?"دورات الرواتب وهياكل الأجور والسلف والضرائب والتأمينات.":"Payroll runs, salary structures, loans, tax and insurance rates."} action={action}/>
-    {error&&<div className="error-banner">{error}<button onClick={()=>void reload()}>{rtl?"إعادة المحاولة":"Retry"}</button></div>}
-    {!canManage&&<div className="error-banner info">{rtl?"لا تملك صلاحية إدارة الرواتب.":"You don't have payroll management access."}</div>}
-    <Tabs items={[{id:"runs",label:rtl?"دورات الرواتب":"Payroll runs"},{id:"structures",label:rtl?"هياكل الرواتب":"Salary structures"},{id:"loans",label:rtl?"السلف والقروض":"Loans & advances"},{id:"config",label:rtl?"الضرائب والتأمينات":"Tax & insurance"}]} active={tab} setActive={setTab}/>
-    {tab==="runs"&&<PayrollRunsTable rtl={rtl} runs={runs} items={data?.payrollItems??[]} onOpen={setSelectedRun}/>}
-    {tab==="structures"&&<SalaryStructuresTable rtl={rtl} rows={data?.salaryStructures??[]} allowances={data?.salaryAllowances??[]}/>}
-    {tab==="loans"&&<LoansTable rtl={rtl} rows={data?.loansAdvances??[]}/>}
-    {tab==="config"&&<TaxInsurancePanel rtl={rtl} brackets={data?.taxBrackets??[]} rates={data?.insuranceRates??[]} onEditBracket={setTaxEditor} onEditRate={setInsuranceEditor} onConfigureExport={()=>setBankExportOpen(true)}/>}
-
-    {runDrawerOpen&&<PayrollRunDrawer rtl={rtl} close={()=>setRunDrawerOpen(false)} submit={async form=>{await hrApi({action:"create_payroll_run",...form});setRunDrawerOpen(false);await reload();notify(rtl?"تم إنشاء دورة الرواتب":"Payroll run created");}}/>}
-    {structureDrawerOpen&&<SalaryStructureDrawer rtl={rtl} employees={employees} close={()=>setStructureDrawerOpen(false)} submit={async form=>{await hrApi({action:"save_salary_structure",...form});setStructureDrawerOpen(false);await reload();notify(rtl?"تم حفظ هيكل الراتب":"Salary structure saved");}}/>}
-    {loanDrawerOpen&&<LoanDrawer rtl={rtl} employees={employees} close={()=>setLoanDrawerOpen(false)} submit={async form=>{await hrApi({action:"save_loan",...form});setLoanDrawerOpen(false);await reload();notify(rtl?"تم حفظ السلفة":"Loan saved");}}/>}
-    {taxEditor!==undefined&&<TaxBracketDrawer rtl={rtl} record={taxEditor||undefined} close={()=>setTaxEditor(undefined)} submit={async form=>{await hrApi({action:"save_tax_bracket",...form});setTaxEditor(undefined);await reload();notify(rtl?"تم حفظ الشريحة الضريبية":"Tax bracket saved");}}/>}
-    {insuranceEditor!==undefined&&<InsuranceRateDrawer rtl={rtl} record={insuranceEditor||undefined} close={()=>setInsuranceEditor(undefined)} submit={async form=>{await hrApi({action:"save_insurance_rate",...form});setInsuranceEditor(undefined);await reload();notify(rtl?"تم حفظ نسبة التأمين":"Insurance rate saved");}}/>}
-    {bankExportOpen&&<BankExportLayoutDrawer rtl={rtl} initialColumns={bankLayout.columns??[]} close={()=>setBankExportOpen(false)} submit={async columns=>{await hrApi({action:"save_system_settings",settingKey:"payroll_bank_export",values:{columns}});setBankExportOpen(false);await reload();notify(rtl?"تم حفظ إعدادات التصدير":"Export layout saved");}}/>}
-    {selectedRun&&<PayrollRunDetail rtl={rtl} run={runs.find(r=>Number(r.id)===Number(selectedRun.id))||selectedRun} items={(data?.payrollItems??[]).filter(item=>Number(item.payroll_run_id)===Number(selectedRun.id))} allowanceLines={data?.payrollAllowanceLines??[]} canApprove={canApprove} canLock={canLock} canReopen={canReopen} close={()=>setSelectedRun(null)} reload={reload} notify={notify}/>}
-  </>;
-}
-
-function PayrollRunsTable({rtl,runs,items,onOpen}:{rtl:boolean;runs:Row[];items:Row[];onOpen:(run:Row)=>void}){
-  if(!runs.length) return <div className="panel table-panel"><Empty icon={Wallet} title={rtl?"لا توجد دورات رواتب":"No payroll runs"} text={rtl?"أنشئ أول دورة رواتب للبدء.":"Create the first payroll run to get started."}/></div>;
-  return <div className="panel table-panel"><div className="data-table payroll-runs-table"><div className="tr th"><span>{rtl?"الشهر":"Month"}</span><span>{rtl?"الدولة":"Country"}</span><span>{rtl?"عدد الموظفين":"Employees"}</span><span>{rtl?"إجمالي الصافي":"Total net"}</span><span>{rtl?"الحالة":"Status"}</span><span></span></div>{runs.map(run=>{const runItems=items.filter(item=>Number(item.payroll_run_id)===Number(run.id));const totalNet=runItems.reduce((sum,item)=>sum+(Number(item.net_salary)||0),0);return <div className="tr" key={run.id}><span><b>{new Intl.DateTimeFormat(rtl?"ar-SA-u-nu-arab":"en-GB",{month:"long",year:"numeric"}).format(new Date(Number(run.year),Number(run.month)-1,1))}</b></span><span>{localizedCountry(run.country,rtl)}</span><span>{formatNumber(runItems.length,rtl)}</span><span>{new Intl.NumberFormat(localeFor(rtl),{style:"currency",currency:run.country==="Egypt"?"EGP":"SAR",maximumFractionDigits:0}).format(totalNet)}</span><span><Status tone={payrollStatusTone(run.status)}>{payrollStatusLabel(run.status,rtl)}</Status></span><span><button className="plain-icon" onClick={()=>onOpen(run)} aria-label={rtl?"فتح الدورة":"Open run"}><ChevronRight size={20}/></button></span></div>;})}</div></div>;
-}
-
-function SalaryStructuresTable({rtl,rows,allowances}:{rtl:boolean;rows:Row[];allowances:Row[]}){
-  const sorted=rows.slice().sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from)));
-  if(!sorted.length) return <div className="panel table-panel"><Empty icon={Wallet} title={rtl?"لا توجد هياكل رواتب":"No salary structures"} text={rtl?"أضف أول هيكل راتب لموظف لبدء احتساب الرواتب.":"Add the first employee salary structure to enable payroll calculation."}/></div>;
-  return <div className="panel table-panel"><div className="data-table salary-structures-table"><div className="tr th"><span>{rtl?"الموظف":"Employee"}</span><span>{rtl?"الراتب الأساسي":"Basic salary"}</span><span>{rtl?"البدلات":"Allowances"}</span><span>{rtl?"سريان من":"Effective from"}</span><span>{rtl?"حتى":"Until"}</span><span>{rtl?"الحالة":"Status"}</span></div>{sorted.map(row=>{const lines=allowances.filter(a=>Number(a.salary_structure_id)===Number(row.id));return <div className="tr" key={row.id}><span className="person"><Avatar initials={personInitials(row.employee_name)} small tone="blue"/><span><b>{rtl?(row.employee_name_ar||row.employee_name):row.employee_name}</b><small>{row.employee_code}</small></span></span><span>{new Intl.NumberFormat(localeFor(rtl),{style:"currency",currency:row.currency||"SAR",maximumFractionDigits:0}).format(Number(row.basic_salary)||0)}</span><span>{lines.length?lines.map(l=>l.type).join(", "):"—"}</span><span>{formatDate(row.effective_from,rtl)}</span><span>{row.effective_to?formatDate(row.effective_to,rtl):(rtl?"مستمر":"Ongoing")}</span><span><Status tone={row.effective_to?"gray":"green"}>{row.effective_to?(rtl?"سابق":"Historical"):(rtl?"الحالي":"Current")}</Status></span></div>;})}</div></div>;
-}
-
-function LoansTable({rtl,rows}:{rtl:boolean;rows:Row[]}){
-  if(!rows.length) return <div className="panel table-panel"><Empty icon={Wallet} title={rtl?"لا توجد سلف":"No loans"} text={rtl?"لم تتم إضافة أي سلف أو قروض حتى الآن.":"No loans or advances have been added yet."}/></div>;
-  return <div className="panel table-panel"><div className="data-table loans-table"><div className="tr th"><span>{rtl?"الموظف":"Employee"}</span><span>{rtl?"إجمالي المبلغ":"Total amount"}</span><span>{rtl?"المتبقي":"Remaining"}</span><span>{rtl?"القسط الشهري":"Monthly installment"}</span><span>{rtl?"الحالة":"Status"}</span></div>{rows.map(row=>{const total=Number(row.total_amount)||0;const remaining=Number(row.remaining_amount)||0;const progress=total>0?Math.round(((total-remaining)/total)*100):0;return <div className="tr" key={row.id}><span className="person"><Avatar initials={personInitials(row.employee_name)} small tone="violet"/><span><b>{rtl?(row.employee_name_ar||row.employee_name):row.employee_name}</b><small>{row.employee_code}</small></span></span><span>{formatNumber(total,rtl)}</span><span><div className="loan-progress"><div className="loan-progress-bar"><span style={{width:`${progress}%`}}/></div><small>{formatNumber(remaining,rtl)} {rtl?"متبقٍ":"remaining"}</small></div></span><span>{formatNumber(Number(row.monthly_installment)||0,rtl)}</span><span><Status tone={row.status==="paid_off"?"blue":"green"}>{row.status==="paid_off"?(rtl?"مسدد بالكامل":"Paid off"):(rtl?"نشطة":"Active")}</Status></span></div>;})}</div></div>;
-}
-
-function TaxInsurancePanel({rtl,brackets,rates,onEditBracket,onEditRate,onConfigureExport}:{rtl:boolean;brackets:Row[];rates:Row[];onEditBracket:(record:Row|null)=>void;onEditRate:(record:Row|null)=>void;onConfigureExport:()=>void}){
-  const sortedBrackets=brackets.slice().sort((a,b)=>String(b.country).localeCompare(String(a.country))||String(b.effective_from).localeCompare(String(a.effective_from))||Number(a.min_amount)-Number(b.min_amount));
-  const sortedRates=rates.slice().sort((a,b)=>String(b.effective_from).localeCompare(String(a.effective_from)));
-  return <>
-    <section className="panel tax-panel">
-      <header><div><span className="eyebrow">{rtl?"الضريبة":"TAX"}</span><h2>{rtl?"الشرائح الضريبية":"Tax brackets"}</h2><p>{rtl?"تُطبَّق تصاعديًا على الدخل الخاضع للضريبة لكل دولة.":"Applied progressively to taxable income, per country."}</p></div><button className="primary" onClick={()=>onEditBracket(null)}><Plus size={16}/>{rtl?"إضافة شريحة":"Add bracket"}</button></header>
-      {sortedBrackets.length?<table><thead><tr><th>{rtl?"الدولة":"Country"}</th><th>{rtl?"من":"From"}</th><th>{rtl?"إلى":"To"}</th><th>{rtl?"النسبة":"Rate"}</th><th>{rtl?"سريان من":"Effective from"}</th><th></th></tr></thead><tbody>{sortedBrackets.map(row=><tr key={row.id}><td>{localizedCountry(row.country,rtl)}</td><td>{formatNumber(Number(row.min_amount)||0,rtl)}</td><td>{row.max_amount==null?(rtl?"بلا حد":"No limit"):formatNumber(Number(row.max_amount),rtl)}</td><td>%{formatNumber(Number(row.rate)||0,rtl)}</td><td>{formatDate(row.effective_from,rtl)}</td><td><button className="plain-icon" onClick={()=>onEditBracket(row)} aria-label={rtl?"تعديل":"Edit"}><Pencil size={16}/></button></td></tr>)}</tbody></table>:<Empty title={rtl?"لا توجد شرائح ضريبية":"No tax brackets"} text={rtl?"أضف الشرائح الضريبية لكل دولة لاحتساب الضريبة تلقائيًا.":"Add per-country tax brackets to calculate tax automatically."}/>}
-    </section>
-    <section className="panel tax-panel">
-      <header><div><span className="eyebrow">{rtl?"التأمينات":"INSURANCE"}</span><h2>{rtl?"نسب التأمينات الاجتماعية":"Social insurance rates"}</h2><p>{rtl?"نسبة الموظف تُخصم من الراتب، ونسبة صاحب العمل للمرجعية.":"Employee share is deducted from salary; employer share is for reference."}</p></div><button className="primary" onClick={()=>onEditRate(null)}><Plus size={16}/>{rtl?"إضافة نسبة":"Add rate"}</button></header>
-      {sortedRates.length?<table><thead><tr><th>{rtl?"الدولة":"Country"}</th><th>{rtl?"نسبة الموظف":"Employee rate"}</th><th>{rtl?"نسبة صاحب العمل":"Employer rate"}</th><th>{rtl?"سريان من":"Effective from"}</th><th></th></tr></thead><tbody>{sortedRates.map(row=><tr key={row.id}><td>{localizedCountry(row.country,rtl)}</td><td>%{formatNumber(Number(row.employee_rate)||0,rtl)}</td><td>%{formatNumber(Number(row.employer_rate)||0,rtl)}</td><td>{formatDate(row.effective_from,rtl)}</td><td><button className="plain-icon" onClick={()=>onEditRate(row)} aria-label={rtl?"تعديل":"Edit"}><Pencil size={16}/></button></td></tr>)}</tbody></table>:<Empty title={rtl?"لا توجد نسب تأمين":"No insurance rates"} text={rtl?"أضف نسب التأمينات لكل دولة لاحتساب الخصم تلقائيًا.":"Add per-country insurance rates to calculate the deduction automatically."}/>}
-    </section>
-    <section className="panel tax-panel export-config"><div><span className="eyebrow">{rtl?"تصدير":"EXPORT"}</span><h2>{rtl?"تنسيق ملف التحويل البنكي":"Bank transfer file layout"}</h2><p>{rtl?"حدد الأعمدة وعناوينها حسب متطلبات البنك.":"Choose the columns and headers your bank requires."}</p></div><button className="outline" onClick={onConfigureExport}><SlidersHorizontal size={16}/>{rtl?"إعداد الأعمدة":"Configure columns"}</button></section>
-  </>;
-}
-
-function PayrollRunDetail({rtl,run,items,allowanceLines,canApprove,canLock,canReopen,close,reload,notify}:{rtl:boolean;run:Row;items:Row[];allowanceLines:Row[];canApprove:boolean;canLock:boolean;canReopen:boolean;close:()=>void;reload:()=>Promise<void>;notify:(s:string)=>void}){
-  const [busy,setBusy]=useState(false);
-  const [payslipItem,setPayslipItem]=useState<Row|null>(null);
-  const monthLabel=new Intl.DateTimeFormat(rtl?"ar-SA-u-nu-arab":"en-GB",{month:"long",year:"numeric"}).format(new Date(Number(run.year),Number(run.month)-1,1));
-  const currency=run.country==="Egypt"?"EGP":"SAR";
-  const money=(value:number)=>new Intl.NumberFormat(localeFor(rtl),{style:"currency",currency,maximumFractionDigits:2}).format(value||0);
-  const totalNet=items.reduce((sum,item)=>sum+(Number(item.net_salary)||0),0);
-
-  const runAction=async(actionName:string,extra:Record<string,unknown>={},successMessage?:string)=>{
-    try{setBusy(true);await hrApi({action:actionName,payrollRunId:run.id,...extra});await reload();notify(successMessage||(rtl?"تم تنفيذ الإجراء بنجاح":"Action completed"));}
-    catch(e){notify(e instanceof Error?e.message:(rtl?"تعذر تنفيذ الإجراء":"Action failed"));}
-    finally{setBusy(false);}
-  };
-
-  const exportCsv=async(kind:"bank"|"accounting")=>{
-    try{
-      setBusy(true);
-      if(kind==="bank"){
-        const result=await hrApi({action:"export_bank_file",payrollRunId:run.id});
-        downloadCsv(`bank-transfer-${run.year}-${String(run.month).padStart(2,"0")}.csv`,result.columns,result.rows);
-      } else {
-        const result=await hrApi({action:"export_accounting_summary",payrollRunId:run.id});
-        const totals=result.totals||{};
-        const rows=[
-          {label:rtl?"الراتب الأساسي":"Basic salary",amount:totals.basic_salary},
-          {label:rtl?"إجمالي البدلات":"Total allowances",amount:totals.total_allowances},
-          {label:rtl?"العمل الإضافي":"Overtime",amount:totals.overtime_amount},
-          {label:rtl?"خصم الغياب والتأخير":"Absence & lateness deduction",amount:totals.absence_deduction},
-          {label:rtl?"خصم الإجازة بدون راتب":"Unpaid leave deduction",amount:totals.unpaid_leave_deduction},
-          {label:rtl?"خصم السلف":"Loan deduction",amount:totals.loan_deduction},
-          {label:rtl?"خصم التأمينات":"Insurance deduction",amount:totals.insurance_deduction},
-          {label:rtl?"خصم الضريبة":"Tax deduction",amount:totals.tax_deduction},
-          ...(result.allowancesByType||[]).map((t:Row)=>({label:`${rtl?"بدل":"Allowance"} — ${t.type}`,amount:t.amount})),
-          {label:rtl?"صافي الرواتب":"Net salary",amount:totals.net_salary},
-        ];
-        downloadCsv(`accounting-summary-${run.year}-${String(run.month).padStart(2,"0")}.csv`,[{field:"label",header:rtl?"البند":"Line item"},{field:"amount",header:rtl?"المبلغ":"Amount"}],rows);
-      }
-    } catch(e){notify(e instanceof Error?e.message:(rtl?"تعذر تصدير الملف":"Unable to export the file"));}
-    finally{setBusy(false);}
-  };
-
-  const canExport=(run.status==="approved"||run.status==="locked")&&canApprove;
-
-  return <div className="modal-layer"><button className="modal-scrim print-hide" onClick={close} aria-label={rtl?"إغلاق":"Close"}/><aside className="drawer payroll-run-detail-drawer" role="dialog" aria-modal="true">
-    <header className="print-hide"><div><span className="eyebrow">{rtl?"دورة رواتب":"PAYROLL RUN"}</span><h2>{monthLabel} · {localizedCountry(run.country,rtl)}</h2><p>{rtl?`${formatNumber(items.length,rtl)} موظف · صافي إجمالي ${money(totalNet)}`:`${items.length} employees · total net ${money(totalNet)}`}</p></div><button className="icon-button" onClick={close} aria-label={rtl?"إغلاق":"Close"}><X size={20}/></button></header>
-
-    <div className="payroll-run-actions print-hide">
-      <Status tone={payrollStatusTone(run.status)}>{payrollStatusLabel(run.status,rtl)}</Status>
-      {run.status==="draft"&&<button className="outline" disabled={busy} onClick={()=>void runAction("calculate_payroll_run",{},rtl?"تم احتساب الرواتب":"Payroll calculated")}><SlidersHorizontal size={16}/>{rtl?"احتساب / إعادة احتساب":"Calculate / Recalculate"}</button>}
-      {run.status==="draft"&&<button className="primary" disabled={busy||!items.length} onClick={()=>void runAction("submit_payroll_run",{},rtl?"تم إرسال الدورة للاعتماد":"Submitted for approval")}><Send size={16}/>{rtl?"إرسال للاعتماد":"Submit for approval"}</button>}
-      {run.status==="pending_hr"&&canApprove&&<button className="primary" disabled={busy} onClick={()=>void runAction("approve_payroll_run",{},rtl?"تم اعتماد الدورة":"Run approved")}><Check size={16}/>{rtl?"اعتماد":"Approve"}</button>}
-      {run.status==="approved"&&canLock&&<button className="primary" disabled={busy} onClick={()=>void runAction("lock_payroll_run",{},rtl?"تم قفل الدورة":"Run locked")}><Lock size={16}/>{rtl?"قفل":"Lock"}</button>}
-      {run.status==="locked"&&canReopen&&<button className="outline" disabled={busy} onClick={()=>{const reason=window.prompt(rtl?"اكتب سبب إعادة الفتح":"Reason for reopening");if(reason)void runAction("reopen_payroll_run",{reason},rtl?"تمت إعادة فتح الدورة":"Run reopened");}}><Unlock size={16}/>{rtl?"إعادة فتح":"Reopen"}</button>}
-      {canExport&&<><button className="outline" disabled={busy} onClick={()=>void exportCsv("bank")}><Download size={16}/>{rtl?"ملف التحويل البنكي":"Bank transfer file"}</button><button className="outline" disabled={busy} onClick={()=>void exportCsv("accounting")}><Download size={16}/>{rtl?"ملخص محاسبي":"Accounting summary"}</button></>}
-    </div>
-
-    <div className="payroll-items-scroll">
-      {items.length?<div className="data-table payroll-items-table"><div className="tr th"><span>{rtl?"الموظف":"Employee"}</span><span>{rtl?"الأساسي":"Basic"}</span><span>{rtl?"البدلات":"Allowances"}</span><span>{rtl?"إضافي":"Overtime"}</span><span>{rtl?"غياب":"Absence"}</span><span>{rtl?"بدون راتب":"Unpaid"}</span><span>{rtl?"سلف":"Loan"}</span><span>{rtl?"تأمين":"Insurance"}</span><span>{rtl?"ضريبة":"Tax"}</span><span>{rtl?"الصافي":"Net"}</span><span></span></div>
-      {items.map(item=><div className="tr" key={item.id}><span className="person"><Avatar initials={personInitials(item.employee_name)} small tone="blue"/><span><b>{rtl?(item.employee_name_ar||item.employee_name):item.employee_name}</b><small>{item.employee_code}</small></span></span><span>{money(Number(item.basic_salary))}</span><span>{money(Number(item.total_allowances))}</span><span>{money(Number(item.overtime_amount))}</span><span className="negative">{money(Number(item.absence_deduction))}</span><span className="negative">{money(Number(item.unpaid_leave_deduction))}</span><span className="negative">{money(Number(item.loan_deduction))}</span><span className="negative">{money(Number(item.insurance_deduction))}</span><span className="negative">{money(Number(item.tax_deduction))}</span><span><b>{money(Number(item.net_salary))}</b></span><span><button className="plain-icon" onClick={()=>setPayslipItem({...item,currency})} aria-label={rtl?"عرض القسيمة":"View payslip"}><FileText size={18}/></button></span></div>)}
-      </div>:<Empty icon={Wallet} title={rtl?"لم يتم الاحتساب بعد":"Not calculated yet"} text={rtl?"استخدم زر الاحتساب أعلاه لبناء بيانات الرواتب.":"Use the Calculate button above to build the payroll data."}/>}
-    </div>
-  </aside>
-  {payslipItem&&<div className="modal-layer"><button className="modal-scrim print-hide" onClick={()=>setPayslipItem(null)} aria-label={rtl?"إغلاق":"Close"}/><aside className="drawer payslip-drawer"><button className="icon-btn print-hide payslip-close" onClick={()=>setPayslipItem(null)} aria-label={rtl?"إغلاق":"Close"}><X size={20}/></button><PayslipCard rtl={rtl} item={payslipItem} allowanceLines={allowanceLines.filter(line=>Number(line.payroll_item_id)===Number(payslipItem.id))}/></aside></div>}
-  </div>;
 }
 
 function HrSettingsPage({rtl,notify}:{rtl:boolean;notify:(s:string)=>void}){
@@ -1276,7 +1156,7 @@ function PermissionEditor({rtl,notify,data,reload}:{rtl:boolean;notify:(s:string
     {id:"approvals",label:pageLabel("approvals",rtl),description:rtl?"مراجعة الطلبات واعتمادها أو رفضها":"Review and decide requests",gate:["request_approvals","view"],grants:[{module:"request_approvals"}]},
     {id:"employees",label:pageLabel("employees",rtl),description:rtl?"ملفات الموظفين والأقسام والمسميات والرواتب":"Employee records, departments, titles, and salaries",gate:["employees","view"],grants:[{module:"employees"},{module:"departments"},{module:"job_titles"},{module:"employee_salaries"}]},
     {id:"leave",label:pageLabel("leave",rtl),description:rtl?"الأنواع والأرصدة والسياسات والعمليات":"Types, balances, policies, and actions",gate:["leave_management","view"],grants:[{module:"leave_management"}]},
-    {id:"attendance",label:pageLabel("attendance",rtl),description:rtl?"السجلات والتعديلات والاستثناءات":"Records, adjustments, and exceptions",gate:["attendance","view"],grants:[{module:"attendance"},{module:"attendance_adjustments"}]},
+    {id:"attendance",label:pageLabel("attendance",rtl),description:rtl?"السجلات والتعديلات والاستثناءات":"Records, adjustments, and exceptions",gate:["attendance","view"],grants:[{module:"attendance"},{module:"attendance_adjustments"},{module:"timesheetManagement"}]},
     {id:"recruitment",label:pageLabel("recruitment",rtl),description:rtl?"الوظائف والمرشحون والمقابلات":"Jobs, candidates, and interviews",gate:["recruitment","view"],grants:[{module:"recruitment"}]},
     {id:"lifecycle",label:pageLabel("lifecycle",rtl),description:rtl?"عمليات مباشرة الموظف وإخلاء الطرف":"Joining and clearance workflows",gate:["onboarding","view"],grants:[{module:"onboarding"},{module:"offboarding"}]},
     {id:"assets",label:pageLabel("assets",rtl),description:rtl?"إضافة العهد والأصول وإسنادها وإرجاعها":"Create, assign, and return assets",gate:["assets","view"],grants:[{module:"assets"}]},

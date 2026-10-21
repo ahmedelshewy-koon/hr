@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
+import { registerHooks } from "node:module";
 import test from "node:test";
+
+// The production bundle targets Cloudflare. Node's HTML smoke test supplies
+// an empty worker binding without changing the application's runtime imports.
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "cloudflare:workers") {
+      return { url: "data:text/javascript,export const env = {}", shortCircuit: true };
+    }
+    return nextResolve(specifier, context);
+  },
+});
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);

@@ -1,0 +1,5 @@
+# PROPOSED /etc/sudoers.d/sana-hr-migration (root:root 0440; check with: visudo -cf /etc/sudoers.d/sana-hr-migration).
+# Lets the GitHub Actions SSH user run ONLY the reviewed wrapper; the wrapper accepts only evidence/preflight/rehearse of
+# allow-listed commits. Install only with the administrator's approval; remove it after the release.
+Defaults!/usr/local/sbin/sana-hr-migration env_reset, !setenv
+sana-deploy ALL=(root) NOPASSWD: /usr/local/sbin/sana-hr-migration

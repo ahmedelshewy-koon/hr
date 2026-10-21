@@ -191,6 +191,51 @@ bash ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh postdeploy --run-dir /
 
 ---
 
+## Optional: run Stage 1, preflight and rehearsal through GitHub Actions
+
+Workflow: `.github/workflows/hr-migration-0052-0054.yml` (manual only). Stages: `capabilities`, `evidence`, `preflight` and `rehearse`.
+
+**Apply, rollback, postdeploy and the deploy are not in it.** Those stay manual, as root, behind Checkpoints B–D.
+
+**Why setup is needed:**
+- As configured, `sana-deploy` can upload to its inbox and run only `sudo -n /usr/local/sbin/sana-hr-deploy`.
+- The package needs root: `docker exec` into the database, `/root/...` run and backup directories, `crontab -l -u root`.
+- So the workflow cannot run anything until the administrator approves and installs the setup below. Run the `capabilities` stage first: it reports read-only what `sana-deploy` may do.
+
+**One-time setup (administrator's decision; remove it after the release):**
+
+| Step | Command (as root, from a checkout of the reviewed commit) |
+|---|---|
+| Wrapper | `install -o root -g root -m 0755 ops/prod-migration-0052-0054/vps/sana-hr-migration /usr/local/sbin/sana-hr-migration` |
+| sudo rule (only that wrapper) | `install -o root -g root -m 0440 ops/prod-migration-0052-0054/vps/sudoers.sana-hr-migration /etc/sudoers.d/sana-hr-migration && visudo -cf /etc/sudoers.d/sana-hr-migration` |
+| Allow-list (exact commit and stage) | `install -d -m 0755 /etc/sanaa-hr && printf '%s evidence\n%s preflight\n' <sha> <sha> > /etc/sanaa-hr/migration-approved-commits && chmod 0644 /etc/sanaa-hr/migration-approved-commits` |
+| Recovered files | Place them, unmodified, in `/root/vps-recovered-migrations/`, with `meta/` |
+| GitHub environment | A repository admin creates `production-migration` with required reviewers. The workflow refuses to start without it |
+
+**What the wrapper guarantees:**
+- It runs only `evidence`, `preflight` and `rehearse`, and only for a commit and stage listed in the root-owned allow-list.
+- It receives the package as a git bundle on stdin and checks out exactly that commit. It never reads `sana-deploy`'s home directory.
+- It keeps the package's stdout (the HR-manager e-mail report) on the VPS.
+- It returns a review archive without e-mails or the deployer copy. The archive is kept in GitHub for 7 days.
+- No secret, SSH key or existing permission is changed: the workflow reads `SANA_DEPLOY_KEY` / `SANA_DEPLOY_KNOWN_HOSTS` like the existing workflows.
+
+**Runs:** Actions → *HR migration 0052-0054* → Run workflow.
+
+| When | Inputs | Expected |
+|---|---|---|
+| Before setup, any time | stage `capabilities`, any package commit | Summary *Ready* or *Not ready* |
+| Stage 1 | stage `evidence`, package = PR #7 commit, candidate = release commit | Green (exit 4 is accepted); artifact with the review archive and STAGE1 summary in the job summary |
+| Checkpoint A | Developers: `lineage.mjs ingest` on the extracted review archive (it contains everything ingest needs) | Same as the manual path |
+| Window 2.2 | Administrator allow-lists the Checkpoint A commit for `preflight` and `rehearse`; stage `preflight` | Green, `PREFLIGHT=PASS` in the log |
+| Window 2.3 | stage `rehearse`, confirm `REHEARSE-0052-0054-NO-PRODUCTION-CHANGE`, environment approval | Green, REHEARSAL_RESULT in the job summary; the run directory stays in `/root/sanaa-hr-migration-runs/` for `apply` |
+| 2.4 onwards | Manual as above: `apply` from `/root/hr-migration` at the **same commit** (apply checks the package fingerprint against the rehearsal) | — |
+
+**Two cautions:**
+- **Default branch.** GitHub can only start a manual workflow whose file is on the default branch. Getting this file onto `main` needs its own approved PR.
+- **Deploys on merge.** Any merge to `main` also triggers `deploy-production.yml` (push to `main`). Before such a merge, make sure that deploy run is held by the `production` environment's reviewers and rejected. Otherwise it could deploy before 0052–0054 are applied; the deployer's schema audit should refuse that.
+
+Stages share the deploy's concurrency group, so they never overlap a deployment. Start one run at a time: GitHub keeps only one pending run per group.
+
 ## Recovery
 
 | Situation | Action |
@@ -224,3 +269,4 @@ bash ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh postdeploy --run-dir /
 | 7 | Candidate release named, and containing the insert-only reseed (`app/api/hr/role-permission-seed.ts`) | Release owner | open |
 | 8 | Written approval to apply (Checkpoint B), with the `--hr-managers` decision (default: none) | Release owner | open |
 | 9 | Go/no-go for the deploy (Checkpoint C) and sign-off (Checkpoint D) | Release owner | open |
+| 10 | GitHub Actions path only: approve and install the wrapper, sudoers entry and allow-list; create the `production-migration` environment with required reviewers; get the workflow file onto `main` with the triggered deploy held | VPS administrator; repository admin; release owner | open (optional) |

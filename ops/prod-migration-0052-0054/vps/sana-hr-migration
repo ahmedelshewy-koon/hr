@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# /usr/local/sbin/sana-hr-migration - PROPOSED root-owned wrapper that lets the sana-deploy SSH user (GitHub Actions) run
+# ONLY the read-only and isolated stages of the 0052-0054 package. Install root:root 0755 from a reviewed commit, with
+# sudoers.sana-hr-migration. It never runs apply, rollback, postdeploy or a deployment, and it accepts nothing from
+# sana-deploy's home directory: the package arrives as a git bundle on stdin, and runs only if the administrator
+# allow-listed that exact commit for that exact stage.
+#
+#   sudo -n sana-hr-migration <evidence|preflight|rehearse> <package-sha> [<candidate-sha>]  < hr.bundle
+#   sudo -n sana-hr-migration fetch <run-name>      -> the run's review archive (no e-mails, no deployer copy) on stdout
+#
+# Allow-list (root:root, mode 600/640/644): /etc/sanaa-hr/migration-approved-commits, one "<40-hex sha> <stage>" per line.
+# Exit codes: the package's own (0 pass, 1 failure, 4 lineage not verified); 64 refused by this wrapper.
+set -Eeuo pipefail
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ALLOWLIST=/etc/sanaa-hr/migration-approved-commits
+WORK=/root/hr-migration-ci
+RECOVERED=/root/vps-recovered-migrations
+RUN_ROOT=/root/sanaa-hr-migration-runs
+MAX_BUNDLE_BYTES=$((300 * 1024 * 1024))
+STAGES="evidence preflight rehearse"
+REFUSED=64
+
+refuse() { echo "sana-hr-migration: REFUSED: $*" >&2; exit "$REFUSED"; }
+
+valid_stage() { [[ " $STAGES " == *" $1 "* ]]; }
+valid_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+
+# The administrator's allow-list: root-owned, not writable by anyone else, and naming this exact commit and stage.
+approved() {
+  local sha="$1" stage="$2" meta
+  [[ -f "$ALLOWLIST" && ! -L "$ALLOWLIST" ]] || refuse "allow-list $ALLOWLIST is missing"
+  meta="$(stat -c '%U %a' -- "$ALLOWLIST")"
+  [[ "$meta" =~ ^root\ (600|640|644)$ ]] || refuse "allow-list must be owned by root and not group/world-writable (is: $meta)"
+  grep -Eq "^${sha}[[:space:]]+${stage}[[:space:]]*$" "$ALLOWLIST" || refuse "commit $sha is not allow-listed for '$stage' in $ALLOWLIST"
+}
+
+# Reads the git bundle from stdin into a root-owned file and checks out exactly <sha> in a fresh root-owned directory.
+# Git's object hashes guarantee the checked-out files are those of the allow-listed commit. Prints the checkout path.
+intake() {
+  local sha="$1" cand="${2:-}" dir="$WORK/$1" bundle="$WORK/$1.bundle"
+  mkdir -p "$WORK"; rm -rf -- "$dir" "$bundle"
+  head -c "$((MAX_BUNDLE_BYTES + 1))" > "$bundle"
+  (( $(stat -c %s -- "$bundle") <= MAX_BUNDLE_BYTES )) || refuse "bundle larger than $MAX_BUNDLE_BYTES bytes"
+  head -n1 -- "$bundle" | grep -Eq '^# v[23] git bundle$' || refuse "stdin is not a git bundle"
+  git -c core.hooksPath=/dev/null clone -q --no-checkout "$bundle" "$dir" 2>/dev/null || refuse "stdin is not a valid git bundle"
+  git -C "$dir" -c core.hooksPath=/dev/null -c advice.detachedHead=false checkout -q --detach "$sha" 2>/dev/null || refuse "commit $sha is not in the bundle"
+  [[ "$(git -C "$dir" rev-parse HEAD)" == "$sha" ]] || refuse "checkout is not $sha"
+  if [[ -n "$cand" ]]; then
+    git -C "$dir" cat-file -e "$cand^{commit}" 2>/dev/null || refuse "candidate $cand is not in the bundle"
+    rm -rf -- "$WORK/candidate-$cand"; mkdir -p "$WORK/candidate-$cand"
+    { git -C "$dir" archive "$cand" -- ops/hr-schema-audit.sh ops/hr-schema-contract.json app/api/hr/route.ts 2>/dev/null | tar -x -C "$WORK/candidate-$cand"; } \
+      || refuse "candidate $cand lacks ops/hr-schema-audit.sh, ops/hr-schema-contract.json or app/api/hr/route.ts"
+    echo "$cand" > "$WORK/candidate-$cand/.release-sha"
+  fi
+  rm -f -- "$bundle"
+  echo "$dir"
+}
+
+# Review archive of a run: everything except personal data (hr-manager-access) and the deployer copy.
+review_archive() {
+  local run="$1" name; name="$(basename "$run")"
+  [[ -f "$run/preflight.txt" ]] && sed '/===== HR MANAGER ACCESS/,$d' "$run/preflight.txt" > "$run/preflight-redacted.txt"
+  ( cd "$RUN_ROOT" && tar --exclude="$name/hr-manager-access.csv" --exclude="$name/deployer.copy" --exclude="$name/preflight.txt" \
+      -czf "$name.review.tar.gz" "$name" )
+  echo "REVIEW_ARCHIVE=$name"
+}
+
+latest_run() { find "$RUN_ROOT" -mindepth 1 -maxdepth 1 -type d -name "$1-*" 2>/dev/null | sort | tail -n1; }
+
+run_stage() {
+  local stage="$1" sha="$2" cand="${3:-}" dir rc=0 run before
+  valid_stage "$stage" || refuse "stage '$stage' is not allowed (only: $STAGES). apply, rollback, postdeploy and deploys are never run from here"
+  valid_sha "$sha" || refuse "package sha must be 40 lowercase hex characters"
+  [[ -z "$cand" ]] || valid_sha "$cand" || refuse "candidate sha must be 40 lowercase hex characters"
+  [[ -z "$cand" || "$stage" == evidence ]] || refuse "a candidate is only checked by 'evidence'"
+  approved "$sha" "$stage"
+  dir="$(intake "$sha" "$cand")"
+  local args=()
+  if [[ "$stage" == evidence ]]; then
+    if [[ -d "$RECOVERED" ]]; then args+=(--recovered "$RECOVERED"); else echo "NOTE: $RECOVERED not found: evidence runs without the recovered files" >&2; fi
+    [[ -n "$cand" ]] && args+=(--candidate "$WORK/candidate-$cand")
+  fi
+  before="$(latest_run "$stage")"
+  # stdin is closed (the package must never read the bundle stream); stdout stays on the VPS because preflight prints
+  # the HR-manager access report (e-mails). Only the package's log lines (stderr) reach the GitHub Actions log.
+  bash "$dir/ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh" "$stage" "${args[@]}" < /dev/null > "$WORK/$stage-stdout.txt" || rc=$?
+  run="$(latest_run "$stage")"
+  if [[ -n "$run" && "$run" != "$before" ]]; then
+    review_archive "$run"
+    for f in STAGE1_SUMMARY.md REHEARSAL_RESULT; do [[ -s "$run/$f" ]] && { echo "===== $f"; cat "$run/$f"; }; done
+  fi
+  echo "PACKAGE_EXIT=$rc"
+  return "$rc"
+}
+
+fetch() {
+  [[ "${1:-}" =~ ^(evidence|preflight|rehearse)-[0-9]{8}T[0-9]{6}Z$ ]] || refuse "bad run name"
+  local f="$RUN_ROOT/$1.review.tar.gz"
+  [[ -f "$f" && ! -L "$f" ]] || refuse "no review archive for $1"
+  cat -- "$f"
+}
+
+main() {
+  [[ $EUID -eq 0 ]] || refuse "run through sudo"
+  case "${1:-}" in
+    fetch) fetch "${2:-}" ;;
+    *) run_stage "${1:-}" "${2:-}" "${3:-}" ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

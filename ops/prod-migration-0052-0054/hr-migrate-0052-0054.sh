@@ -219,7 +219,8 @@ candidate_check() {
   [[ -d "$c" ]] || die "--candidate $c is not a directory"
   {
     echo "candidate: $(cd "$c" && pwd -P)"
-    echo "git_sha: $(git -C "$c" rev-parse HEAD 2>/dev/null || echo unknown)"
+    if [[ -s "$c/.release-sha" ]]; then echo "git_sha: $(head -c 40 "$c/.release-sha")"   # extracted by vps/sana-hr-migration
+    else echo "git_sha: $(git -C "$c" rev-parse HEAD 2>/dev/null || echo unknown)"; fi
     for f in ops/hr-schema-audit.sh ops/hr-schema-contract.json; do
       want="$(awk -v f="$f" '$2 == f { print $1 }' "$HERE/files.sha256")"
       if [[ -f "$c/$f" ]]; then got="$(sha256sum < "$c/$f" | cut -d' ' -f1)"; else got=missing; fi

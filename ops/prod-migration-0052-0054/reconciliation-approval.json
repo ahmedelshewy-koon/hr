@@ -1,0 +1,20 @@
+{
+  "schema": "hr-reconciliation-approval-v1",
+  "note": "Explicit approval of the historical data reconciliation. Each part is applied only when its decision is \"approved\" AND its proposal_fingerprint equals the fingerprint preflight computes from production (RECONCILIATION_PROPOSAL.md). Any change in production after approval (an employee gains history, a permission is edited) changes the fingerprint and the apply transaction aborts. Commit approvals only through a reviewed pull request, by people allowed to approve HR data and access changes.",
+  "job_history": {
+    "decision": "pending",
+    "proposal_fingerprint": null,
+    "employee_ids": [],
+    "approved_by": null,
+    "approved_at": null,
+    "conditions": "Approve only the PROPOSED rows listed in job-history-proposal.csv. MISSING_SOURCE employees are never inserted; correct their stored assignment_effective_date/start_date through the application first (separately approved) or attest the exception in ledger-attestations.json data_checks."
+  },
+  "rbac": {
+    "decision": "pending",
+    "proposal_fingerprint": null,
+    "rows": [],
+    "approved_by": null,
+    "approved_at": null,
+    "conditions": "Approve the exact PROPOSED_INSERT rows in rbac-proposal.csv. Rows with allowed=1 grant access (administrative_decisions view/create for HR Manager and Department Manager); allowed=0 rows are explicit denials restoring parity with 0042 and change no access. PRESERVED_CUSTOM rows are never modified."
+  }
+}

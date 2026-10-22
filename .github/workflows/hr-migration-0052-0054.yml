@@ -1,0 +1,188 @@
+name: HR migration 0052-0054 (evidence, preflight, rehearsal - no apply)
+
+# Manually triggered stages of ops/prod-migration-0052-0054 (ADMIN_HANDOFF.md). Production apply, rollback and deploys are
+# deliberately NOT available here: they stay with the administrator behind Checkpoints B-D.
+# Requires, on the VPS, the reviewed wrapper ops/prod-migration-0052-0054/vps/sana-hr-migration with its sudoers entry and
+# an allow-list naming the exact commit and stage; and, in GitHub, the environment "production-migration" with
+# required reviewers. Without them every run stops before touching the VPS (or is refused there).
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "capabilities = read-only probe of what sana-deploy may do; evidence / preflight are read-only; rehearse restores a fresh backup into a throwaway container"
+        type: choice
+        required: true
+        options: [capabilities, evidence, preflight, rehearse]
+      package_sha:
+        description: "Full 40-character commit of the PR #7 package (must be allow-listed on the VPS for this stage)"
+        type: string
+        required: true
+      candidate_sha:
+        description: "evidence only: full 40-character commit of the release the deployer will run"
+        type: string
+        required: false
+        default: ""
+      confirm:
+        description: "rehearse only: type REHEARSE-0052-0054-NO-PRODUCTION-CHANGE"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Same group as deploy-production.yml: a stage never overlaps a deployment.
+concurrency:
+  group: sanaa-hr-production
+  cancel-in-progress: false
+
+env:
+  VPS: sana-deploy@209.42.23.12
+  WRAPPER: /usr/local/sbin/sana-hr-migration
+
+jobs:
+  guard:
+    name: Validate inputs and environment protection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Validate inputs
+        env:
+          STAGE: ${{ inputs.stage }}
+          PKG: ${{ inputs.package_sha }}
+          CAND: ${{ inputs.candidate_sha }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          case "$STAGE" in capabilities|evidence|preflight|rehearse) ;; *) echo "::error::stage '$STAGE' is not allowed"; exit 1 ;; esac
+          [[ "$PKG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::package_sha must be a full 40-character lowercase commit"; exit 1; }
+          if [[ -n "$CAND" ]]; then
+            [[ "$STAGE" == evidence && "$CAND" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::candidate_sha is a full commit and only used by evidence"; exit 1; }
+          fi
+          if [[ "$STAGE" == rehearse && "$CONFIRM" != "REHEARSE-0052-0054-NO-PRODUCTION-CHANGE" ]]; then
+            echo "::error::rehearse needs confirm = REHEARSE-0052-0054-NO-PRODUCTION-CHANGE"; exit 1
+          fi
+      - name: Require reviewers on the production-migration environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! body="$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                 "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/environments/production-migration")"; then
+            echo "::error::environment 'production-migration' does not exist. A repository administrator must create it with required reviewers first."; exit 1
+          fi
+          jq -e '[.protection_rules[]? | select(.type == "required_reviewers")] | length > 0' <<< "$body" > /dev/null \
+            || { echo "::error::environment 'production-migration' has no required reviewers"; exit 1; }
+          echo "production-migration is protected by required reviewers"
+
+  run:
+    name: ${{ inputs.stage }} on the VPS
+    needs: guard
+    runs-on: ubuntu-24.04
+    environment: production-migration
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.package_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the checkout is exactly the requested package
+        env:
+          PKG: ${{ inputs.package_sha }}
+          CAND: ${{ inputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PKG"
+          test -s ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh
+          bash -n ops/prod-migration-0052-0054/hr-migrate-0052-0054.sh ops/prod-migration-0052-0054/vps/sana-hr-migration
+          if [[ -n "$CAND" ]]; then git cat-file -e "$CAND^{commit}" || { echo "::error::candidate $CAND not found in the repository"; exit 1; }; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Package self-tests (no database, no VPS)
+        run: |
+          npm ci
+          node --import ./tests/register-workers-loader.mjs --test tests/prod-migration-lineage.test.mjs tests/prod-migration-handoff.test.mjs tests/prod-migration-actions.test.mjs
+      - name: Configure verified SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SANA_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SANA_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: Capabilities probe (read-only, as sana-deploy)
+        if: inputs.stage == 'capabilities'
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum ops/prod-migration-0052-0054/vps/sana-hr-migration | cut -d' ' -f1)"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$VPS" 'bash -s' <<SH | tee capabilities.txt
+          set -u
+          echo "USER=\$(id -un) GROUPS=\$(id -Gn)"
+          echo "SERVICE=\$(systemctl is-active sanaa-hr.service || true)"
+          echo "=== sudo rules (sudo -n -l) ==="; sudo -n -l 2>&1 || true
+          docker ps >/dev/null 2>&1 && echo "DOCKER_ACCESS=yes (root-equivalent)" || echo "DOCKER_ACCESS=no"
+          test -r /root/sanaa-hr-migration-runs 2>/dev/null && echo "ROOT_RUN_DIR_READABLE=yes" || echo "ROOT_RUN_DIR_READABLE=no"
+          if [ -x $WRAPPER ]; then
+            got="\$(sha256sum $WRAPPER | cut -d' ' -f1)"
+            [ "\$got" = "$expected" ] && echo "WRAPPER=installed, matches this commit" || echo "WRAPPER=installed, DIFFERS from this commit (\$got)"
+          else echo "WRAPPER=not installed"; fi
+          sudo -n -l $WRAPPER >/dev/null 2>&1 && echo "WRAPPER_SUDO=allowed" || echo "WRAPPER_SUDO=not allowed"
+          SH
+          {
+            echo "### sana-deploy capabilities"; echo '```'; cat capabilities.txt; echo '```'
+            if grep -q 'WRAPPER=installed, matches' capabilities.txt && grep -q 'WRAPPER_SUDO=allowed' capabilities.txt; then
+              echo "**Ready:** the evidence, preflight and rehearse stages can run through this workflow (allow-listed commits only)."
+            else
+              echo "**Not ready:** sana-deploy cannot run the package. Install the reviewed wrapper and sudoers entry (ADMIN_HANDOFF.md, GitHub Actions section)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run ${{ inputs.stage }} through the reviewed wrapper
+        if: inputs.stage != 'capabilities'
+        env:
+          STAGE: ${{ inputs.stage }}
+          PKG: ${{ inputs.package_sha }}
+          CAND: ${{ inputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          git branch -f hr-migration-package "$PKG"
+          refs=(hr-migration-package)
+          if [[ -n "$CAND" ]]; then git branch -f hr-migration-candidate "$CAND"; refs+=(hr-migration-candidate); fi
+          git bundle create "$RUNNER_TEMP/hr.bundle" "${refs[@]}"
+          mkdir -p review
+          set +e
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            "$VPS" "sudo -n $WRAPPER $STAGE $PKG $CAND" < "$RUNNER_TEMP/hr.bundle" 2>&1 | tee review/remote-output.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          name="$(sed -n 's/^REVIEW_ARCHIVE=//p' review/remote-output.txt | tail -n1)"
+          if [[ "$name" =~ ^(evidence|preflight|rehearse)-[0-9]{8}T[0-9]{6}Z$ ]]; then
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$VPS" "sudo -n $WRAPPER fetch $name" > "review/$name.review.tar.gz"
+            (cd review && sha256sum "$name.review.tar.gz" > "$name.review.tar.gz.sha256")
+          fi
+          {
+            echo "### $STAGE of $PKG: exit $rc"
+            awk '/^===== (STAGE1_SUMMARY.md|REHEARSAL_RESULT)/{p=1} p' review/remote-output.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+          # evidence exits 4 until Checkpoint A is committed: that is its expected result, not a failure.
+          if [[ "$rc" == 0 || ( "$STAGE" == evidence && "$rc" == 4 ) ]]; then exit 0; fi
+          echo "::error::$STAGE ended with exit $rc (see review/remote-output.txt)"; exit 1
+      - name: Upload review archive (no e-mails, no deployer copy; kept 7 days)
+        if: always() && inputs.stage != 'capabilities'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr-migration-${{ inputs.stage }}-${{ github.run_id }}
+          path: review/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f "$HOME/.ssh/id_ed25519"

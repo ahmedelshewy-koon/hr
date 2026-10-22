@@ -1,0 +1,812 @@
+{
+ "generated_by": "gen-ledger-sql.mjs",
+ "note": "every committed version of every migration, LF and CRLF hashes; first commit seen",
+ "commits_scanned": 41,
+ "versions": [
+  {
+   "tag": "0000_clear_colossus",
+   "when": 1786697343380,
+   "hash": "900205377cd75f2ec7716bb561c7c90564cbc86ea486b0265cbbfd498a9884ff",
+   "eol": "lf",
+   "commit": "e6273ea631d1"
+  },
+  {
+   "tag": "0000_clear_colossus",
+   "when": 1786697343380,
+   "hash": "fdb53cefc24823861ca4b0cee67e8c0e3c695ab286e4b90ba413f4b124f1128a",
+   "eol": "crlf",
+   "commit": "e6273ea631d1"
+  },
+  {
+   "tag": "0001_real_employees",
+   "when": 1786697343381,
+   "hash": "dbc83b88042d60ac0d55f466a84b3b375378be6b869c3d93a1467d98cd365211",
+   "eol": "lf",
+   "commit": "e6273ea631d1"
+  },
+  {
+   "tag": "0001_real_employees",
+   "when": 1786697343381,
+   "hash": "817d6023955527d25c86ef9bb518069b61bd37002be8d07276bb04b3e27b2aee",
+   "eol": "crlf",
+   "commit": "e6273ea631d1"
+  },
+  {
+   "tag": "0002_clear_odin",
+   "when": 1786699159552,
+   "hash": "45d5a6555cc37fe2196d925d878222a78cf7b78e41a8afd01e825a9f286355d9",
+   "eol": "lf",
+   "commit": "a491f54a2cbf"
+  },
+  {
+   "tag": "0002_clear_odin",
+   "when": 1786699159552,
+   "hash": "0ceb69063ab4cd16ec6579aa4ed70828f67356639673cb13eeb0ae5fa440c153",
+   "eol": "crlf",
+   "commit": "a491f54a2cbf"
+  },
+  {
+   "tag": "0003_organization-department-tree",
+   "when": 1786700303173,
+   "hash": "2b560abbc8a8e7323f42722001f8e149cbdf5f5c08d07cefe8f5cbedfcfea8bb",
+   "eol": "lf",
+   "commit": "647bfc8bb060"
+  },
+  {
+   "tag": "0003_organization-department-tree",
+   "when": 1786700303173,
+   "hash": "c727f98cab6bdc844f2799c64021d10e7027f9d947af1b6620ea53aeefa0a5f1",
+   "eol": "crlf",
+   "commit": "647bfc8bb060"
+  },
+  {
+   "tag": "0004_nice_mordo",
+   "when": 1786700711280,
+   "hash": "2275cb8b8a21ebd84ffc4bd39896990e5d33afb79889d902fc20c90620d15bcb",
+   "eol": "lf",
+   "commit": "53bddb102e6c"
+  },
+  {
+   "tag": "0004_nice_mordo",
+   "when": 1786700711280,
+   "hash": "7c1f52dd9140aa66f4039c1dd7ec153d59efd2004f1c2c63961957355dc4e95b",
+   "eol": "crlf",
+   "commit": "53bddb102e6c"
+  },
+  {
+   "tag": "0005_plain_vertigo",
+   "when": 1786705860398,
+   "hash": "5bb6f3b6fcb727991e8ec6c7f713976b5c117f61fbcfa8723a3344ce7e0f7899",
+   "eol": "lf",
+   "commit": "034bc8a96399"
+  },
+  {
+   "tag": "0005_plain_vertigo",
+   "when": 1786705860398,
+   "hash": "0754cb51a226479cac50997cf9b5e7fad1f65b39a15d5ebffb9f107dae8c1f39",
+   "eol": "crlf",
+   "commit": "034bc8a96399"
+  },
+  {
+   "tag": "0004_nice_mordo",
+   "when": 1786700711280,
+   "hash": "9583bfa6aabe76ed0f5f740aaf1ea72f26eaab5772d10d110abc59fb24bb7fd9",
+   "eol": "lf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0004_nice_mordo",
+   "when": 1786700711280,
+   "hash": "ae1c009d0d82da45d238167a7ff52b3bb65bd20d3c1b09241a225582856c5372",
+   "eol": "crlf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0005_plain_vertigo",
+   "when": 1786705860398,
+   "hash": "67bd8aee76db3ee35f8b1cd7b01da53c82be9cc9f00c08c049bb203334b80cee",
+   "eol": "lf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0005_plain_vertigo",
+   "when": 1786705860398,
+   "hash": "074af51f273bf5c5784ad2e700b8a941e0f5b2038994a5fa7baba3fa2cdc93a7",
+   "eol": "crlf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0006_lucky_kang",
+   "when": 1786706365071,
+   "hash": "10b850a582606bb614a39bb834adb09282d46c08417b6a05db18a7f519f5889b",
+   "eol": "lf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0006_lucky_kang",
+   "when": 1786706365071,
+   "hash": "8eb7b76aea61da64ec83965292aca5db46bf130dc4c48543a1ec59130f6f868a",
+   "eol": "crlf",
+   "commit": "01c4f3562b1c"
+  },
+  {
+   "tag": "0007_wise_lord_tyger",
+   "when": 1786720502401,
+   "hash": "ebc2b99b089f33199f5d3ae09db9236e02dd0378c407f4f53863a827e445d389",
+   "eol": "lf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0007_wise_lord_tyger",
+   "when": 1786720502401,
+   "hash": "f562eb6f80ffc033001fc97c1125c92bdae23ba660cedf6a0c14e1923a087d35",
+   "eol": "crlf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0008_conscious_leech",
+   "when": 1786720832247,
+   "hash": "c5a74c4228e87ef47245a592808989255cbafc82948b0c37f751bd597e3b7c68",
+   "eol": "lf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0008_conscious_leech",
+   "when": 1786720832247,
+   "hash": "c6cfbbf79010bcd5f74e9a05ff8c55473074910d7bd73ddc934499b42755fe7f",
+   "eol": "crlf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0009_four_role_auth",
+   "when": 1787203200000,
+   "hash": "aa6d9ab5334ee8eade54a44fe5225d618261e83839d9912b23a0551956230863",
+   "eol": "lf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0009_four_role_auth",
+   "when": 1787203200000,
+   "hash": "4f9fb576e1c7852ed7d7ad540610fb701e96ec715bde83bfb0fae0dabb70b04e",
+   "eol": "crlf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0010_assign_department_managers",
+   "when": 1787203260000,
+   "hash": "b38066edf95745ca1696c91795cad9a943aa212b0ab675a2c54b620507e5a5ef",
+   "eol": "lf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0010_assign_department_managers",
+   "when": 1787203260000,
+   "hash": "a37cfc0b90326410575fde13622bcac7040826a682845a150faea43ed26389e6",
+   "eol": "crlf",
+   "commit": "c6a1a53ab878"
+  },
+  {
+   "tag": "0011_third_vivisector",
+   "when": 1787312348012,
+   "hash": "1dbaea7f2795ef193785441ed876e40e302262e4ef935d0eef1da2a0ef4a13de",
+   "eol": "lf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0011_third_vivisector",
+   "when": 1787312348012,
+   "hash": "3336e3bb1624099df39798f08196e87bcf163a4b52d4436d1d7688b8d699a18f",
+   "eol": "crlf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0012_natural_sway",
+   "when": 1787314358290,
+   "hash": "c223943eda616c111e17abb3c4f7eaec60321d6dabc41e463da31b91feb312da",
+   "eol": "lf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0012_natural_sway",
+   "when": 1787314358290,
+   "hash": "75e2898e7743c2de2073f48b940945ce05c43686a1fd4f01f557705c86354742",
+   "eol": "crlf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0013_hr_core_completion",
+   "when": 1787319000000,
+   "hash": "77d1c15830720ad384b88c8e8229a1eedc948b4e70c506a596c060f9d913bb2e",
+   "eol": "lf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0013_hr_core_completion",
+   "when": 1787319000000,
+   "hash": "45207e1f9b528205aac928c6dd40909d8591b98886a05ebb8d7eae1ed47ca1bf",
+   "eol": "crlf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0014_complete_hrms",
+   "when": 1787405400000,
+   "hash": "08c1a264ff9ac8260f109d7514a6b51e1b95b871e6c4d0d0694394bb8ce1fb68",
+   "eol": "lf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0014_complete_hrms",
+   "when": 1787405400000,
+   "hash": "1482e869b6b1cfb983362ce11ffbcb5a20de3115d6983001ca9925db89d7d288",
+   "eol": "crlf",
+   "commit": "a3a11c1e42c1"
+  },
+  {
+   "tag": "0015_performance_workflow",
+   "when": 1787472000000,
+   "hash": "e9d338c6557b96446d08fb388dc1c36f69accbc51296e4eafa6fda8d92cfc512",
+   "eol": "lf",
+   "commit": "ae3a895bd9e1"
+  },
+  {
+   "tag": "0015_performance_workflow",
+   "when": 1787472000000,
+   "hash": "584580715f6b91015dc0d71db45231a9277e63995f1a2ed2a7d5354fcda62f3b",
+   "eol": "crlf",
+   "commit": "ae3a895bd9e1"
+  },
+  {
+   "tag": "0016_lifecycle-task-owner",
+   "when": 1787496190454,
+   "hash": "971855021d5499e524923ab51cc126d1865286d772f88c85de6846648aead4c8",
+   "eol": "lf",
+   "commit": "88fe12969673"
+  },
+  {
+   "tag": "0016_lifecycle-task-owner",
+   "when": 1787496190454,
+   "hash": "7e40114c865f87caf6608dd4c28c663e325c23dd93a6943922f775493b4b21bc",
+   "eol": "crlf",
+   "commit": "88fe12969673"
+  },
+  {
+   "tag": "0017_lame_norrin_radd",
+   "when": 1787500482275,
+   "hash": "b30888e42e006290a264ac5ba9e436b73000e0eed455397e5ea1370fb8b72b32",
+   "eol": "lf",
+   "commit": "88fe12969673"
+  },
+  {
+   "tag": "0017_lame_norrin_radd",
+   "when": 1787500482275,
+   "hash": "78c6b4f9388f6c9bbb52a485360f1c964d9a936ee7348db8139c45d79412a6af",
+   "eol": "crlf",
+   "commit": "88fe12969673"
+  },
+  {
+   "tag": "0018_access_role_templates",
+   "when": 1787501000000,
+   "hash": "64d65609c3b1e4c35debe1d8eb7934b8d8a052bb67fbcbd4a651cd0395864b7b",
+   "eol": "lf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0018_access_role_templates",
+   "when": 1787501000000,
+   "hash": "ab7e9b332f87fcf36947ce53b1483f3fe7ac3bba7e76afe3a8031dad328c1e18",
+   "eol": "crlf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0019_contract_expiry_alerts",
+   "when": 1787616000000,
+   "hash": "6b23b60c85bc880dd02f6efddf99941a3687fe6824bda65da367654c72227ead",
+   "eol": "lf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0019_contract_expiry_alerts",
+   "when": 1787616000000,
+   "hash": "58b77719e0a19ae42683627176b2982b93804910b8a340739b63aecdb5b7038b",
+   "eol": "crlf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0020_recruitment_ats",
+   "when": 1787630400000,
+   "hash": "35ec54a8dd50951aeeb29391f8bd3149eaa502c50644239a82276a54a55708fc",
+   "eol": "lf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0020_recruitment_ats",
+   "when": 1787630400000,
+   "hash": "c5905054c051f35cb17a880bed049ec8e92bcc434409ea4d0fed3c51b340b342",
+   "eol": "crlf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0021_organization_unit_type",
+   "when": 1787644800000,
+   "hash": "af807bb670e777f75ab4037b72a2a7f6255e509730c969bda49956516ddf2da6",
+   "eol": "lf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0021_organization_unit_type",
+   "when": 1787644800000,
+   "hash": "704aa2564abfc34f0e32392525693c19ce7ff4f8a4a3e9752a7bf95137c73f21",
+   "eol": "crlf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0022_recruitment_candidate_stage_compat",
+   "when": 1787659200000,
+   "hash": "eb34a7d28653439ce97b2dfa1fb0fb079e2f76a4c1a70e6bd0d86f293c7c0103",
+   "eol": "lf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0022_recruitment_candidate_stage_compat",
+   "when": 1787659200000,
+   "hash": "c7fde3e4dbac941aa7f4fa83daea01ed90fd48520de8354f2f839ecf71fd8d0e",
+   "eol": "crlf",
+   "commit": "cceafff185fa"
+  },
+  {
+   "tag": "0023_zkteco_mb2000",
+   "when": 1789560000000,
+   "hash": "39fdf13a9355747629ae87ad23c85f13b3294a23bd6fff3f3d798139243acd36",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0023_zkteco_mb2000",
+   "when": 1789560000000,
+   "hash": "ef2afbabd661d2543be6f38657da6992f8d47a61338e8d77d85e59d0f8fb7c54",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0024_drop_leave_policies",
+   "when": 1789831190040,
+   "hash": "71fb370ee3fea432f19684834759d3c2c0a59e8ea32dc075e146c96a37b2bb2c",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0024_drop_leave_policies",
+   "when": 1789831190040,
+   "hash": "e7366e39e03b4523f7b963b55e826fd6728a71c6003179552820b3c1cd5ad343",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0025_training_program_details",
+   "when": 1789837611230,
+   "hash": "638edf20c3ac6b3f73e1a6f7275a7b73f99eed808c5683d28e767648b9d340bb",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0025_training_program_details",
+   "when": 1789837611230,
+   "hash": "82624369fc18889b02b9a34b2d90370b06b937e816fbd1d4f0720129d8d96336",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0026_training_evaluation_certificates",
+   "when": 1789837935650,
+   "hash": "cc4f6982c8a694a752da50cb0cbb985b9fa8a5e429863173b0bfd0dd3e76960a",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0026_training_evaluation_certificates",
+   "when": 1789837935650,
+   "hash": "b3cf74e590d207a0db7c9a12f320c52e020542a395db7ee519d47fb026fd572e",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0027_optional_job_requirements",
+   "when": 1790006400000,
+   "hash": "46ad3ee365dcb7d801db75e8df14dc47bd2d88ee987e4b835465132f4f5acfb3",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0027_optional_job_requirements",
+   "when": 1790006400000,
+   "hash": "7c0117506973dd0768314ca0346cf5741b4ec99f2528b639da2cd86e4e7c1442",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0028_employee_personal_details",
+   "when": 1790294400000,
+   "hash": "ae574021b7102f47ce8b79520a0a658cb987cbbfd83ceb22cdfb03f0f3960e9c",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0028_employee_personal_details",
+   "when": 1790294400000,
+   "hash": "f95c417f03e10e99e673ad783cbdead7b024c5f97cd7c49c901d092bcdf6dd9b",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0029_employee_company_hr",
+   "when": 1790380800000,
+   "hash": "0d18f85c32b080fd7b42b94aae7c22a65d8cfe2228e32846695c5654fdd66696",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0029_employee_company_hr",
+   "when": 1790380800000,
+   "hash": "bee2a068bf6aa95fb76ecb7f2d03dbbef3d85378445270674f195e92ee32b8d5",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0030_organizational_assignments",
+   "when": 1790422744917,
+   "hash": "3aa2e4ffdc337c085aa45dac244ae0568b0448515efb02fac90f50364f11446a",
+   "eol": "lf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0030_organizational_assignments",
+   "when": 1790422744917,
+   "hash": "cb30206c82d8da2113a7b94c87838422eb7222ab036c06bf1c742bf193446f76",
+   "eol": "crlf",
+   "commit": "516d980a118c"
+  },
+  {
+   "tag": "0023_zkteco_mb2000",
+   "when": 1789560000000,
+   "hash": "2283312436e749af8b6eeebb53b829b472a6b78b904826e6ef7acadbbed014c1",
+   "eol": "lf",
+   "commit": "7db9865dcd23"
+  },
+  {
+   "tag": "0023_zkteco_mb2000",
+   "when": 1789560000000,
+   "hash": "f6c7bb9c7f5980f56fba63258c10f76cb10dab1c3b84c6740e7a71aa7c5c2504",
+   "eol": "crlf",
+   "commit": "7db9865dcd23"
+  },
+  {
+   "tag": "0036_approval_workflows",
+   "when": 1791100818319,
+   "hash": "263dda0fa4fff47dbb70da74f1ce9f2d483ace415a765c601609eea6851f8761",
+   "eol": "lf",
+   "commit": "52cd837c8b4f"
+  },
+  {
+   "tag": "0036_approval_workflows",
+   "when": 1791100818319,
+   "hash": "56c0b194fafac686e24433c98abea5787dbb80986aebcef27e05a8a80ea4e2b7",
+   "eol": "crlf",
+   "commit": "52cd837c8b4f"
+  },
+  {
+   "tag": "0051_attendance_ingest_sources",
+   "when": 1791310000000,
+   "hash": "b7d8e7f829c86c3b73bc73992f3f9b107d81a983135b8d0c3b14bb6bb1c816f5",
+   "eol": "lf",
+   "commit": "b1c43357553c"
+  },
+  {
+   "tag": "0051_attendance_ingest_sources",
+   "when": 1791310000000,
+   "hash": "e53362e02a8ba8797421e51fdbc00d8d6fd4090f235108048e1c20dc79bb209f",
+   "eol": "crlf",
+   "commit": "b1c43357553c"
+  },
+  {
+   "tag": "0031_hr_data_scope",
+   "when": 1790773448045,
+   "hash": "43745ad385a10e4e94e0c9112b58f259ee5975d0010dd7ff9d30c6bf418bf872",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0031_hr_data_scope",
+   "when": 1790773448045,
+   "hash": "9b07234ae5ea0245a5114dab06d7334a0b040f62db4ace6228e773aaeb7944ae",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0032_biometric_agents",
+   "when": 1790776914266,
+   "hash": "13eceb7c7f0322857826e036073ea4a2a781270ed7127cdee18592856e34d821",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0032_biometric_agents",
+   "when": 1790776914266,
+   "hash": "6829efdbe7473c4aced8f842978510068a9c05c5f17c3ef393f82fe998e04665",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0033_employee_nationality_country",
+   "when": 1790927245245,
+   "hash": "d778ecfaa98570d87b57119f6588aac5cfdda1912c74225e5c7e77edc206d249",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0034_employee_codes",
+   "when": 1790955849915,
+   "hash": "9f32d10df13ad741fce599c85e084b30d1ad3d977381a4af942b123f17f5408c",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0034_employee_codes",
+   "when": 1790955849915,
+   "hash": "bd459deb43955645e5c66c1cacc0135e1338c91ae294b981a3cc5437a584762f",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0035_hr_settings",
+   "when": 1791099091334,
+   "hash": "1bfdf96ba24afb1eff38034db84ff39a46bdbf5b48cb4d4b0a1a15794bf3d4a6",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0035_hr_settings",
+   "when": 1791099091334,
+   "hash": "3175f427ce901fd6a2c941f9ba630590d2f8164059bd8d20b0e34cddfcfaa71c",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0037_deduction_rule_reference_fields",
+   "when": 1791101562999,
+   "hash": "9b30a8998046ab048a5af1fc66d2ca4162d8bc50e402d3f86b78b223af2ff4c9",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0037_deduction_rule_reference_fields",
+   "when": 1791101562999,
+   "hash": "bbf7de3a0ebb5528e66701319cdca8a2482221f4bb8a24eaf9e191ac1d280134",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0038_approval_workflow_department",
+   "when": 1791114688970,
+   "hash": "02acb00243ab94bd155eb1ae06a931f83610f22f8c50a172d625e1974b5f7ae3",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0038_approval_workflow_department",
+   "when": 1791114688970,
+   "hash": "49d670ad5b2585b15991494ae426c4337da8dea3d4225500335b11ccf5e3d01b",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0039_workforce_planning",
+   "when": 1791120000000,
+   "hash": "711f639e7e56dcda19696204708a42f71488121b5e0ec6d1f3051d3ffaf44001",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0039_workforce_planning",
+   "when": 1791120000000,
+   "hash": "6df3d1d5f0bd2d475ffc505b2debba64e6727dbd075939e6f1d0e4c8208f949e",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0040_workforce_position_hierarchy",
+   "when": 1791130000000,
+   "hash": "66f848850db4e513e3dc96742c41185b9e9a3d4750a3e4371dda6f890d2e7113",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0040_workforce_position_hierarchy",
+   "when": 1791130000000,
+   "hash": "a2a2446e04b4834049c3a101bd91510fad12d2cbb32670007a4b77837ad93ddb",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0041_employee_profile_and_decisions",
+   "when": 1791211863187,
+   "hash": "af196065c1b7fa1a3352f34ea7def7a093a8cf9fd04958ee7030753b0579b7b6",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0041_employee_profile_and_decisions",
+   "when": 1791211863187,
+   "hash": "ff38a3d7927f72c47050f85b17012138729f045b3d9cbde29e86dc97c31d85c2",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0042_staffing_blueprint",
+   "when": 1791220000000,
+   "hash": "ecd4867cce2a89c0f87c05084c440c72f0d5b61e205cf1c95c0046a9cdb987f3",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0042_staffing_blueprint",
+   "when": 1791220000000,
+   "hash": "1ecfa392b056a10658fb134939d03d05c32b4acf88b349467d3267e80820f3c8",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0043_cost_centers",
+   "when": 1791230000000,
+   "hash": "610ebade930d2417bfb32e503ad832cc4be6cc336df51c0b120397a3343cbde3",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0043_cost_centers",
+   "when": 1791230000000,
+   "hash": "0722fd94cffe8f790041775a567267ce40f41fbc6930351f06f81fef5992763b",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0044_fingerprint_required",
+   "when": 1791240000000,
+   "hash": "3ac74b9ffeb4af98d0ecfed098386fe88c37fbf5526e28e5b1aa2f50ee3889e6",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0044_fingerprint_required",
+   "when": 1791240000000,
+   "hash": "549ffe271e019a25aa6d988c7afbf54425390252152e5a8457bf051b34961dd1",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0045_employee_remote_days",
+   "when": 1791250000000,
+   "hash": "e127de7c8af02fbf8d8ad556b38b0fd8a442a6f76cb53294a80169500d7a1a5c",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0045_employee_remote_days",
+   "when": 1791250000000,
+   "hash": "97c86ae64745f8bd8a2e21866696191e46c152f1a878535b6a57884a8560145d",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0046_cost_center_debit_optional",
+   "when": 1791260000000,
+   "hash": "d743e0f2d4f9a63646383745b1a55c7d772024719108ed16d9568a3847e699c7",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0046_cost_center_debit_optional",
+   "when": 1791260000000,
+   "hash": "3a2d5e5fe231e80ed00b3160d5db4c7d351a5e7586126c63e50b561bd643811e",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0047_attendance_device_country",
+   "when": 1791270000000,
+   "hash": "1d51c3205054213f4e5f99bae8d30d7b5d64342e0be49f2fe5e3da70c6a982ed",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0047_attendance_device_country",
+   "when": 1791270000000,
+   "hash": "3da38ca1c157808873f6b589cb9c0f4936c53bc3e77bbc08489e1549fe59f866",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0048_subscription_plans",
+   "when": 1791280000000,
+   "hash": "cedfb988753bf7cb4a554a71fffe998c2a570fe009e2dea98df608ed894b3ddf",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0048_subscription_plans",
+   "when": 1791280000000,
+   "hash": "f8674a2a6df4758a51568a9d5fc4cd4f59d7d0e70968b2e7c152f126194a266f",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0049_integrations",
+   "when": 1791290000000,
+   "hash": "3aeb7ae4ab42b609c1adbfe190f04bc63696edae1d26f580121d17bec1d7281f",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0049_integrations",
+   "when": 1791290000000,
+   "hash": "b08877e3d65067ecfb15a8fef64671d05b8f2f596667550a656854a315fce815",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0050_integrations_variables",
+   "when": 1791300000000,
+   "hash": "8f695710862f4d72b3cc3c73d98d8990d6712375a023428cdf7974c17174e97c",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0050_integrations_variables",
+   "when": 1791300000000,
+   "hash": "a27ef5694336a7920bc6d00f122b4df9d7ed2ba818fac2dba7d0a37f82c361d5",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0052_timesheet_management",
+   "when": 1791320000000,
+   "hash": "22a2ece70aea3d46ac6f67591a395ab12b1f4f57f883db2586c9b8a65083e67f",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0052_timesheet_management",
+   "when": 1791320000000,
+   "hash": "efdf03c960680509cf5877717e64e1d8422b16be5fc37a26174bc470f31ef87c",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0053_payroll_rebuild",
+   "when": 1791321000000,
+   "hash": "fa83be6393bad87361f182f8d5629e187536ac2e95f093e8e28693ac379b0cf9",
+   "eol": "lf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0053_payroll_rebuild",
+   "when": 1791321000000,
+   "hash": "03b5e33486e3c319c5be4b160bda09a29c126f545d953b5ed64843615faa01a7",
+   "eol": "crlf",
+   "commit": "17b97731732b"
+  },
+  {
+   "tag": "0054_deleted_employee_email",
+   "when": 1791972248259,
+   "hash": "a7df9413f7338e697a29768a1b05a4da8d8ebd78173a5a05a75dbb7485688014",
+   "eol": "lf",
+   "commit": "4290f230e97b"
+  },
+  {
+   "tag": "0054_deleted_employee_email",
+   "when": 1791972248259,
+   "hash": "0853a5fbcc8039a950a91d0ed3ac6b25522706875a0025afcea92f9da436a1ce",
+   "eol": "crlf",
+   "commit": "4290f230e97b"
+  }
+ ]
+}

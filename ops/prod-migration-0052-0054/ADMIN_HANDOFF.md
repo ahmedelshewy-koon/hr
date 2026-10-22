@@ -263,10 +263,10 @@ Stages share the deploy's concurrency group, so they never overlap a deployment.
 | 1 | Stage 1 evidence bundle delivered (recovered files, startup paths, candidate SHA) | VPS administrator | **open** |
 | 2 | Recovered files committed (`ingest --write`), reviewed | Developers | open (needs 1) |
 | 3 | `production_ledger.fingerprint` attested | Developers | open (needs 1) |
-| 4 | Job-history reconciliation, including the MISSING_SOURCE decision (option A or B) | HR data owner | open (needs 1) |
-| 5 | RBAC reconciliation: `administrative_decisions` view/create grants for HR Manager and Department Manager, plus parity denials | Access owner | open (needs 1) |
+| 4 | Job-history reconciliation, including the MISSING_SOURCE decision (option A or B) | HR data owner | **policy approved 2026-10-22, option A** (`BUSINESS_APPROVALS.md`); fingerprint binding needs 1 |
+| 5 | RBAC reconciliation: `administrative_decisions` view/create grants for HR Manager and Department Manager, plus parity denials | Access owner | **policy approved 2026-10-22** (`BUSINESS_APPROVALS.md`); fingerprint binding needs 1 |
 | 6 | Deployer verdict `approved` for sha256 `2df500bd…5fc7` (now `conditional_pass`) | Reviewers | open (needs 1) |
-| 7 | Candidate release named, and containing the insert-only reseed (`app/api/hr/role-permission-seed.ts`) | Release owner | open |
-| 8 | Written approval to apply (Checkpoint B), with the `--hr-managers` decision (default: none) | Release owner | open |
+| 7 | Candidate release named, and containing the insert-only reseed (`app/api/hr/role-permission-seed.ts`) | Release owner | **decided 2026-10-22:** `main` after the separate reseed PR is merged (its auto-deploy held); commit SHA open |
+| 8 | Written approval to apply (Checkpoint B), with the `--hr-managers` decision (default: none) | Release owner | **conditionally approved 2026-10-22**, HR managers none; confirm naming the passing rehearsal |
 | 9 | Go/no-go for the deploy (Checkpoint C) and sign-off (Checkpoint D) | Release owner | open |
 | 10 | GitHub Actions path only: approve and install the wrapper, sudoers entry and allow-list; create the `production-migration` environment with required reviewers; get the workflow file onto `main` with the triggered deploy held | VPS administrator; repository admin; release owner | open (optional) |

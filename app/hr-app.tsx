@@ -136,6 +136,7 @@ import { CostCentersWorkspace } from './cost-centers-workspace';
 import { AttendanceHub } from './attendance-hub';
 import { PlansWorkspace } from './plans-workspace';
 import { IntegrationsWorkspace } from './integrations-workspace';
+import { ExternalApiKeys } from './external-api-keys';
 import { useOrganizationAccess } from './settings/use-organization-snapshot';
 import { OrganizationChart } from './organization-chart';
 import { createLatestLoader, onHrDataChanged } from './organization/latest-loader';
@@ -439,7 +440,7 @@ export function HRApp({ initialPage }: { initialPage?: PageId } = {}) {
           {visiblePage === "payroll" && <PayrollWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "cost_centers" && <CostCentersWorkspace rtl={rtl} notify={notify} />}
           {visiblePage === "plans" && <PlansWorkspace rtl={rtl} notify={notify} />}
-          {visiblePage === "integrations" && <IntegrationsWorkspace rtl={rtl} notify={notify} />}
+          {visiblePage === "integrations" && <><ExternalApiKeys rtl={rtl} notify={notify} /><IntegrationsWorkspace rtl={rtl} notify={notify} /></>}
           {visiblePage === "hr_settings" && <HrSettingsPage rtl={rtl} notify={notify} />}
           {visiblePage === "settings" && <SettingsPage rtl={rtl} notify={notify} />}
         </div>

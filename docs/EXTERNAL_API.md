@@ -5,15 +5,11 @@ return work information only: no salary, identity number, bank details or person
 
 ## Getting a key
 
-An administrator runs, on any machine with Node.js:
-
-```bash
-node scripts/create-external-api-key.mjs crm
-```
-
-It prints the key (give it to the other system once; it is not stored anywhere) and a `crm:<hash>` pair. Add the
-pair to `EXTERNAL_API_KEYS` in the server environment (comma-separated, one pair per system) and restart HR. To
-revoke a system, remove its pair and restart.
+The Super Admin opens **Integrations**, then **API keys for other systems → Create key**, and names the system
+(for example CRM). The key is shown once: copy it and give it to that system. HR keeps only a hash of it (in
+`system_settings`, `external_api_clients`), so a lost key cannot be shown again; create a new one and revoke the
+old one. The list shows each key's last four characters and when it was last used. **Revoke** stops a system at
+once.
 
 ## Calling the API
 

@@ -239,3 +239,6 @@
 .pm-modal .pm-error{color:var(--pm-red)}
 .pm-modal .pm-hint{unicode-bidi:plaintext;text-align:start}
 @media(max-width:760px){.pm-modal-back{padding:0}.pm-modal{height:100%;border-radius:0}.pm-auth-grid{grid-template-columns:1fr;gap:18px}.pm-modal-body{padding:16px}}
+
+/* External API key, shown once after creation */
+.external-key-value{display:inline-block;max-width:100%;padding:2px 8px;border-radius:8px;background:var(--sana-surface);word-break:break-all;user-select:all}

@@ -11,8 +11,8 @@ import { readEmployees } from "../../../external-api/queries";
 export async function GET(request: Request) {
   return withDatabase("Unable to load employees", async db => {
     await enforceRateLimit(db, request, "external-api-ip", 600, 60);
-    const client = await authenticateClient(request);
-    await enforceRateLimit(db, request, "external-api", 120, 60, client.name);
+    const client = await authenticateClient(db, request);
+    await enforceRateLimit(db, request, "external-api", 120, 60, client.id);
     const params = new URL(request.url).searchParams;
     const query = pageQuery(params);
     const { rows, total } = await readEmployees(db, {

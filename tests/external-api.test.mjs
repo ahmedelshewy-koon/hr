@@ -1,26 +1,34 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { authenticateClient, idParam, pageQuery, parseKeyHashes, sinceParam, statusParam } from "../app/external-api/access.ts";
+import { createClient, idParam, matchClient, pageQuery, parseClients, publicClient, sinceParam, statusParam } from "../app/external-api/access.ts";
 import { formatDepartment, formatEmployee, page } from "../app/external-api/format.ts";
 
-const KEY = "hrx_test-key-1234567890";
-const HASH = createHash("sha256").update(KEY).digest("hex");
 const request = headers => new Request("http://localhost/api/external/employees", { headers });
 
-test("only a configured key authenticates, sent as x-api-key or a Bearer token", async () => {
-  const configured = `crm:${HASH}, broken-entry , other:${"0".repeat(64)}`;
-  assert.deepEqual(await authenticateClient(request({ "x-api-key": KEY }), configured), { name: "crm" });
-  assert.deepEqual(await authenticateClient(request({ authorization: `Bearer ${KEY}` }), configured), { name: "crm" });
+test("a created key authenticates as x-api-key or a Bearer token; other keys are refused", async () => {
+  const { key, client } = await createClient([], " CRM ", 1);
+  assert.equal(client.name, "CRM");
+  assert.match(key, /^hrx_[\w-]{43}$/);
+  assert.equal(client.hint, key.slice(-4));
+  assert.ok(!JSON.stringify(publicClient(client)).includes(client.hash), "the list never exposes the hash");
+  assert.equal((await matchClient(request({ "x-api-key": key }), [client])).id, client.id);
+  assert.equal((await matchClient(request({ authorization: `Bearer ${key}` }), [client])).id, client.id);
   for (const headers of [{}, { "x-api-key": "hrx_wrong" }, { "x-api-key": "plain-key" }]) {
-    await assert.rejects(authenticateClient(request(headers), configured), response => response.status === 401);
+    await assert.rejects(matchClient(request(headers), [client]), response => response.status === 401);
   }
-  await assert.rejects(authenticateClient(request({ "x-api-key": KEY }), ""), response => response.status === 401);
+  await assert.rejects(matchClient(request({ "x-api-key": key }), []), response => response.status === 401);
 });
 
-test("malformed key entries are ignored", () => {
-  assert.equal(parseKeyHashes(`crm:${HASH},bad name:${HASH},x:short,:${HASH}`).size, 1);
+test("key names are required and unique, ignoring case", async () => {
+  const { client } = await createClient([], "CRM", 1);
+  await assert.rejects(createClient([client], "crm", 1), response => response.status === 409);
+  await assert.rejects(createClient([], "  ", 1), response => response.status === 400);
+});
+
+test("a malformed stored setting yields no clients", () => {
+  assert.deepEqual(parseClients("not json"), []);
+  assert.deepEqual(parseClients('{"clients":[{"id":"1","name":"x","hash":"short"}]}'), []);
 });
 
 test("paging is clamped and filters are validated", () => {
